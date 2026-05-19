@@ -324,6 +324,8 @@
 @layer components {
   .metadata-badge {
     @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium tracking-wide;
+    max-width: 100%;
+    min-width: 0;
     background-color: hsl(var(--muted));
     color: hsl(var(--muted-foreground));
   }
@@ -332,15 +334,17 @@
     width: 0.45rem;
     height: 0.45rem;
     border-radius: 9999px;
+    flex-shrink: 0;
   }
 
   .metadata-badge__icon {
     width: 0.75rem;
     height: 0.75rem;
+    flex-shrink: 0;
   }
 
   .metadata-badge__label {
-    @apply truncate;
+    @apply min-w-0 truncate;
   }
 
   .metadata-badge--interactive {

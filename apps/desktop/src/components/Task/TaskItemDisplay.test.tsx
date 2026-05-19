@@ -216,6 +216,45 @@ describe('TaskItemDisplay', () => {
         expect(queryByText('#list-tag')).not.toBeInTheDocument();
     });
 
+    it('wraps expanded context and tag metadata groups', () => {
+        const metadataHeavyTask: Task = {
+            ...baseTask,
+            contexts: ['@desk', '@phone', '@errands', '@deep-work'],
+            tags: ['#home', '#finance', '#writing', '#admin'],
+        };
+
+        const { getByText } = render(
+            <LanguageProvider>
+                <TaskItemDisplay
+                    task={metadataHeavyTask}
+                    language="en"
+                    selectionMode={false}
+                    isViewOpen
+                    actions={{
+                        onToggleView: vi.fn(),
+                        onEdit: vi.fn(),
+                        onDelete: vi.fn(),
+                        onDuplicate: vi.fn(),
+                        onStatusChange: vi.fn(),
+                        openAttachment: vi.fn(),
+                    }}
+                    visibleAttachments={[]}
+                    recurrenceRule=""
+                    recurrenceStrategy="strict"
+                    prioritiesEnabled={false}
+                    timeEstimatesEnabled={false}
+                    isStagnant={false}
+                    showQuickDone={false}
+                    readOnly={false}
+                    t={(key: string) => key}
+                />
+            </LanguageProvider>
+        );
+
+        expect(getByText('@deep-work').closest('.metadata-badge')?.parentElement).toHaveClass('flex-wrap', 'min-w-0', 'max-w-full');
+        expect(getByText('#admin').closest('.metadata-badge')?.parentElement).toHaveClass('flex-wrap', 'min-w-0', 'max-w-full');
+    });
+
     it('keeps the hover hint out of the row text layout', () => {
         const { getByRole, queryByText } = render(
             <LanguageProvider>

@@ -345,14 +345,14 @@ export const TaskItemDisplay = memo(function TaskItemDisplay({
                 />
             )}
             {task.contexts?.length > 0 && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
                     {task.contexts.map((ctx) => (
                         <MetadataBadge key={ctx} variant="context" label={ctx} dotColor={getContextColor(ctx)} />
                     ))}
                 </div>
             )}
             {task.tags.length > 0 && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
                     {task.tags.map((tag) => (
                         <MetadataBadge key={tag} variant="tag" icon={Tag} label={tag} />
                     ))}
