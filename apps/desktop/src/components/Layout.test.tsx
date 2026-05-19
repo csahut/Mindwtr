@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, render, waitFor } from '@testing-library/react';
 import { useTaskStore } from '@mindwtr/core';
 
 import { LanguageProvider } from '../contexts/language-context';
@@ -145,25 +145,26 @@ describe('Layout sync conflict surface', () => {
 
 describe('Layout sync security warning', () => {
     it('shows a cleartext HTTP banner for WebDAV sync', async () => {
+        const backendSpy = vi.spyOn(SyncService, 'getSyncBackend').mockResolvedValue('webdav');
         const webdavSpy = vi.spyOn(SyncService, 'getWebDavConfig').mockResolvedValue({
             url: 'http://192.168.1.50/dav',
             username: '',
             hasPassword: false,
             allowInsecureHttp: true,
         });
-        const providerSpy = vi.spyOn(SyncService, 'getCloudProvider').mockResolvedValue('dropbox');
 
         try {
             const { findByText } = renderLayout();
 
             expect(await findByText(/WebDAV sync is using HTTP/)).toBeInTheDocument();
         } finally {
+            backendSpy.mockRestore();
             webdavSpy.mockRestore();
-            providerSpy.mockRestore();
         }
     });
 
-    it('aggregates cleartext warnings into one banner', async () => {
+    it('shows a cleartext HTTP banner for active self-hosted sync', async () => {
+        const backendSpy = vi.spyOn(SyncService, 'getSyncBackend').mockResolvedValue('cloud');
         const webdavSpy = vi.spyOn(SyncService, 'getWebDavConfig').mockResolvedValue({
             url: 'http://192.168.1.50/dav',
             username: '',
@@ -178,13 +179,43 @@ describe('Layout sync security warning', () => {
         });
 
         try {
-            const { findByText, queryAllByText } = renderLayout();
+            const { findByText, queryByText } = renderLayout();
 
-            expect(await findByText(/WebDAV sync is using HTTP.*Self-hosted sync is using HTTP/)).toBeInTheDocument();
-            expect(queryAllByText(/WebDAV sync is using HTTP/)).toHaveLength(1);
+            expect(await findByText(/Self-hosted sync is using HTTP/)).toBeInTheDocument();
+            expect(queryByText(/WebDAV sync is using HTTP/)).not.toBeInTheDocument();
         } finally {
+            backendSpy.mockRestore();
             webdavSpy.mockRestore();
             providerSpy.mockRestore();
+            cloudSpy.mockRestore();
+        }
+    });
+
+    it('ignores stale cleartext WebDAV settings while file sync is active', async () => {
+        const backendSpy = vi.spyOn(SyncService, 'getSyncBackend').mockResolvedValue('file');
+        const webdavSpy = vi.spyOn(SyncService, 'getWebDavConfig').mockResolvedValue({
+            url: 'http://192.168.1.50/dav',
+            username: '',
+            hasPassword: false,
+            allowInsecureHttp: true,
+        });
+        const cloudSpy = vi.spyOn(SyncService, 'getCloudConfig').mockResolvedValue({
+            url: 'http://192.168.1.50:3000',
+            token: '',
+            allowInsecureHttp: true,
+        });
+
+        try {
+            const { queryByText } = renderLayout();
+
+            await waitFor(() => expect(backendSpy).toHaveBeenCalled());
+            expect(queryByText(/WebDAV sync is using HTTP/)).not.toBeInTheDocument();
+            expect(queryByText(/Self-hosted sync is using HTTP/)).not.toBeInTheDocument();
+            expect(webdavSpy).not.toHaveBeenCalled();
+            expect(cloudSpy).not.toHaveBeenCalled();
+        } finally {
+            backendSpy.mockRestore();
+            webdavSpy.mockRestore();
             cloudSpy.mockRestore();
         }
     });

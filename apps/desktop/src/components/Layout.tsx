@@ -345,31 +345,31 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
     }, []);
 
     const refreshCleartextSyncWarning = useCallback(async () => {
-        const warnings = await Promise.all([
-            (async () => {
+        try {
+            const backend = await SyncService.getSyncBackend();
+            if (backend === 'webdav') {
                 const config = await SyncService.getWebDavConfig({ silent: true });
                 if (config.url.trim().toLowerCase().startsWith('http://')) {
-                    return tFallback(t,
+                    setCleartextSyncWarning(tFallback(t,
                         'settings.cleartextSyncWarningWebdav',
                         'WebDAV sync is using HTTP. Only local or private-network endpoints are allowed; data is not encrypted.'
-                    );
+                    ));
+                    return;
                 }
-                return null;
-            })().catch(() => undefined),
-            (async () => {
-                if (await SyncService.getCloudProvider() !== 'selfhosted') return null;
+            } else if (backend === 'cloud' && await SyncService.getCloudProvider() === 'selfhosted') {
                 const config = await SyncService.getCloudConfig({ silent: true });
                 if (config.url.trim().toLowerCase().startsWith('http://')) {
-                    return tFallback(t,
+                    setCleartextSyncWarning(tFallback(t,
                         'settings.cleartextSyncWarningCloud',
                         'Self-hosted sync is using HTTP. Only local or private-network endpoints are allowed; data is not encrypted.'
-                    );
+                    ));
+                    return;
                 }
-                return null;
-            })().catch(() => undefined),
-        ]);
-        const visibleWarnings = warnings.filter((warning): warning is string => Boolean(warning));
-        setCleartextSyncWarning(visibleWarnings.length > 0 ? visibleWarnings.join(' ') : null);
+            }
+            setCleartextSyncWarning(null);
+        } catch {
+            setCleartextSyncWarning(null);
+        }
     }, [t]);
 
     useEffect(() => {

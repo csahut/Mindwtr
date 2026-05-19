@@ -467,12 +467,39 @@ fn validate_sync_dir(path: &PathBuf) -> Result<PathBuf, String> {
     Ok(canonical)
 }
 
+fn strip_windows_verbatim_prefix(raw: &str) -> String {
+    const VERBATIM_UNC_PREFIX: &str = "\\\\?\\UNC\\";
+    const VERBATIM_PREFIX: &str = "\\\\?\\";
+
+    if let Some(rest) = raw.strip_prefix(VERBATIM_UNC_PREFIX) {
+        return format!("\\\\{rest}");
+    }
+    raw.strip_prefix(VERBATIM_PREFIX).unwrap_or(raw).to_string()
+}
+
+fn sync_dir_to_display_string(path: &Path) -> String {
+    strip_windows_verbatim_prefix(&path.to_string_lossy())
+}
+
 fn resolve_sync_dir(app: &tauri::AppHandle, path: Option<String>) -> Result<PathBuf, String> {
     let candidate = match path {
         Some(raw) => normalize_sync_dir(raw.trim()),
         None => default_sync_dir(app)?,
     };
     validate_sync_dir(&candidate)
+}
+
+fn configured_sync_dir(app: &tauri::AppHandle) -> Result<Option<PathBuf>, String> {
+    let config = read_config(app);
+    let Some(sync_path) = config
+        .sync_path
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(None);
+    };
+    resolve_sync_dir(app, Some(sync_path.to_string())).map(Some)
 }
 
 #[cfg(target_os = "macos")]
@@ -513,17 +540,9 @@ pub(crate) fn expand_tauri_fs_scope(app: &tauri::AppHandle, dir: &Path) {
 
 #[tauri::command]
 pub(crate) fn get_sync_path(app: tauri::AppHandle) -> Result<String, String> {
-    let config = read_config(&app);
-    let Some(sync_path) = config
-        .sync_path
-        .as_ref()
-        .map(|value| value.trim())
-        .filter(|value| !value.is_empty())
-    else {
-        return Ok(String::new());
-    };
-    let path = resolve_sync_dir(&app, Some(sync_path.to_string()))?;
-    Ok(path.to_string_lossy().to_string())
+    Ok(configured_sync_dir(&app)?
+        .map(|path| sync_dir_to_display_string(&path))
+        .unwrap_or_default())
 }
 
 #[tauri::command]
@@ -548,7 +567,7 @@ pub(crate) fn set_sync_path(
     let bookmark = create_sync_path_bookmark(&sanitized_path);
 
     let mut config = read_config(&app);
-    config.sync_path = Some(sanitized_path.to_string_lossy().to_string());
+    config.sync_path = Some(sync_dir_to_display_string(&sanitized_path));
     #[cfg(target_os = "macos")]
     {
         config.sync_path_bookmark = bookmark;
@@ -761,6 +780,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn strips_windows_verbatim_prefix_from_sync_path_display() {
+        assert_eq!(
+            strip_windows_verbatim_prefix(r"\\?\C:\Users\mmbtu\Dropbox\Apps\Mindwtr"),
+            r"C:\Users\mmbtu\Dropbox\Apps\Mindwtr"
+        );
+        assert_eq!(
+            strip_windows_verbatim_prefix(r"\\?\UNC\server\share\Mindwtr"),
+            r"\\server\share\Mindwtr"
+        );
+        assert_eq!(
+            strip_windows_verbatim_prefix(r"C:\Users\mmbtu\Dropbox\Apps\Mindwtr"),
+            r"C:\Users\mmbtu\Dropbox\Apps\Mindwtr"
+        );
+    }
+
+    #[test]
     fn parent_webdav_collection_url_strips_query_and_hash() {
         assert_eq!(
             parent_webdav_collection_url(
@@ -949,14 +984,11 @@ fn release_sync_lock(lock_path: &Path) {
 
 #[tauri::command]
 pub(crate) fn read_sync_file(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    let sync_path_str = get_sync_path(app)?;
-    if sync_path_str.trim().is_empty() {
-        return Err("Sync path is not configured".to_string());
-    }
-    let sync_dir = PathBuf::from(&sync_path_str);
+    let sync_dir = configured_sync_dir(&app)?
+        .ok_or_else(|| "Sync path is not configured".to_string())?;
     let sync_file = sync_dir.join(DATA_FILE_NAME);
     let backup_file = sync_dir.join(format!("{}.bak", DATA_FILE_NAME));
-    let legacy_sync_file = PathBuf::from(&sync_path_str).join(format!("{}-sync.json", APP_NAME));
+    let legacy_sync_file = sync_dir.join(format!("{}-sync.json", APP_NAME));
 
     let find_seed_backup_file = |dir: &Path| -> Option<PathBuf> {
         let mut latest: Option<(SystemTime, PathBuf)> = None;
@@ -1042,11 +1074,8 @@ pub(crate) fn read_sync_file(app: tauri::AppHandle) -> Result<serde_json::Value,
 
 #[tauri::command]
 pub(crate) fn write_sync_file(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
-    let sync_path_str = get_sync_path(app)?;
-    if sync_path_str.trim().is_empty() {
-        return Err("Sync path is not configured".to_string());
-    }
-    let sync_dir = PathBuf::from(&sync_path_str);
+    let sync_dir = configured_sync_dir(&app)?
+        .ok_or_else(|| "Sync path is not configured".to_string())?;
     let sync_file = sync_dir.join(DATA_FILE_NAME);
     let backup_file = sync_dir.join(format!("{}.bak", DATA_FILE_NAME));
     let tmp_file = sync_dir.join(format!("{}.tmp", DATA_FILE_NAME));
