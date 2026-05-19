@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     createAIProvider,
     getStaleItems,
+    isTaskInActiveProject,
     isDueForReview,
     safeParseDate,
     safeParseDueDate,
@@ -81,6 +82,7 @@ export function useReviewModalController({
 }: UseReviewModalControllerParams) {
     const { tasks, projects, areas, updateTask, deleteTask, settings, batchUpdateTasks, addTask } = useTaskStore();
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
+    const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
     const { isDark } = useTheme();
     const { t } = useLanguage();
     const { openQuickCapture } = useQuickCapture();
@@ -359,16 +361,28 @@ export function useReviewModalController({
     }, [aiSelectedIds, aiSuggestions, batchUpdateTasks, isActionableSuggestion]);
 
     const inboxTasks = useMemo(
-        () => tasks.filter((task) => task.status === 'inbox' && !task.deletedAt),
-        [tasks],
+        () => tasks.filter((task) => (
+            task.status === 'inbox'
+            && !task.deletedAt
+            && isTaskInActiveProject(task, projectById)
+        )),
+        [projectById, tasks],
     );
     const waitingTasks = useMemo(
-        () => tasks.filter((task) => task.status === 'waiting' && !task.deletedAt),
-        [tasks],
+        () => tasks.filter((task) => (
+            task.status === 'waiting'
+            && !task.deletedAt
+            && isTaskInActiveProject(task, projectById)
+        )),
+        [projectById, tasks],
     );
     const somedayTasks = useMemo(
-        () => tasks.filter((task) => task.status === 'someday' && !task.deletedAt),
-        [tasks],
+        () => tasks.filter((task) => (
+            task.status === 'someday'
+            && !task.deletedAt
+            && isTaskInActiveProject(task, projectById)
+        )),
+        [projectById, tasks],
     );
     const waitingDue = useMemo(
         () => waitingTasks.filter((task) => isDueForReview(task.reviewAt)),
@@ -395,7 +409,7 @@ export function useReviewModalController({
         [somedayDue, somedayFuture],
     );
     const activeProjects = useMemo(
-        () => projects.filter((project) => project.status === 'active'),
+        () => projects.filter((project) => project.status === 'active' && !project.deletedAt),
         [projects],
     );
     const dueProjects = useMemo(
@@ -420,6 +434,7 @@ export function useReviewModalController({
         tasks.forEach((task) => {
             if (task.deletedAt) return;
             if (task.status === 'done' || task.status === 'archived' || task.status === 'reference') return;
+            if (!isTaskInActiveProject(task, projectById)) return;
             const dueDate = safeParseDueDate(task.dueDate);
             if (dueDate) entries.push({ task, date: dueDate, kind: 'due' });
             const startTime = safeParseDate(task.startTime);
@@ -429,7 +444,7 @@ export function useReviewModalController({
         return entries
             .filter((entry) => entry.date >= startOfToday && entry.date < upcomingEnd)
             .sort((a, b) => a.date.getTime() - b.date.getTime());
-    }, [tasks]);
+    }, [projectById, tasks]);
 
     const externalCalendarReviewItems = useMemo<ExternalCalendarDaySummary[]>(() => {
         const now = new Date();
@@ -470,6 +485,7 @@ export function useReviewModalController({
         tasks.forEach((task) => {
             if (task.deletedAt) return;
             if (task.status === 'done' || task.status === 'archived' || task.status === 'reference') return;
+            if (!isTaskInActiveProject(task, projectById)) return;
             (task.contexts ?? []).forEach((contextValue) => {
                 const normalized = contextValue.trim();
                 if (!normalized) return;
@@ -484,7 +500,7 @@ export function useReviewModalController({
                 tasks: contextTasks.sort((a, b) => a.title.localeCompare(b.title)),
             }))
             .sort((a, b) => (b.tasks.length - a.tasks.length) || a.context.localeCompare(b.context));
-    }, [tasks]);
+    }, [projectById, tasks]);
 
     const projectReviewEntries = useMemo<ReviewProjectEntry[]>(() => orderedProjects.map((project) => {
         const projectTasks = tasks.filter(

@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import {
     getFrequentTaskTokens,
     getRecentTaskTokens,
+    isTaskInActiveProject,
     normalizeClockTimeInput,
     type AppData,
     type Area,
@@ -161,14 +162,21 @@ export function useInboxProcessingState({
     const inboxCount = useMemo(() => (
         tasks.filter((task) => {
             if (task.status !== 'inbox' || task.deletedAt) return false;
+            if (!isTaskInActiveProject(task, projectMap)) return false;
             if (!matchesAreaFilter(task)) return false;
             return true;
         }).length
-    ), [tasks, matchesAreaFilter]);
+    ), [tasks, projectMap, matchesAreaFilter]);
 
     const remainingInboxCount = useMemo(
-        () => tasks.filter((task) => task.status === 'inbox' && !skippedIds.has(task.id) && matchesAreaFilter(task)).length,
-        [tasks, skippedIds, matchesAreaFilter],
+        () => tasks.filter((task) => (
+            task.status === 'inbox'
+            && !task.deletedAt
+            && !skippedIds.has(task.id)
+            && isTaskInActiveProject(task, projectMap)
+            && matchesAreaFilter(task)
+        )).length,
+        [tasks, skippedIds, projectMap, matchesAreaFilter],
     );
 
     const resetProcessingSession = useCallback(() => {

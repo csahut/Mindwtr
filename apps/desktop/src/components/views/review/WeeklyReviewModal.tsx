@@ -4,6 +4,7 @@ import {
     DEFAULT_AREA_COLOR,
     getStaleItems,
     isDueForReview,
+    isTaskInActiveProject,
     safeFormatDate,
     safeParseDate,
     safeParseDueDate,
@@ -61,6 +62,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
     );
     const addTask = useTaskStore((state) => state.addTask);
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
+    const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
     const { t } = useLanguage();
     const [aiSuggestions, setAiSuggestions] = useState<ReviewSuggestion[]>([]);
     const [aiSelectedIds, setAiSelectedIds] = useState<Set<string>>(new Set());
@@ -90,6 +92,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
 
         tasks.forEach((task) => {
             if (task.deletedAt) return;
+            if (!isTaskInActiveProject(task, projectMap)) return;
             if (task.status === 'done' || task.status === 'archived' || task.status === 'reference') return;
             const dueDate = safeParseDueDate(task.dueDate);
             if (dueDate) entries.push({ task, date: dueDate, kind: 'due' });
@@ -102,7 +105,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
             .sort((a, b) => a.date.getTime() - b.date.getTime());
 
         return upcoming;
-    }, [tasks]);
+    }, [tasks, projectMap]);
     const externalCalendarReviewItems = useMemo<ExternalCalendarDaySummary[]>(() => {
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -138,6 +141,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
         const groups = new Map<string, Task[]>();
         tasks.forEach((task) => {
             if (task.deletedAt) return;
+            if (!isTaskInActiveProject(task, projectMap)) return;
             if (task.status === 'done' || task.status === 'archived' || task.status === 'reference') return;
             (task.contexts ?? []).forEach((contextValue) => {
                 const normalized = contextValue.trim();
@@ -153,7 +157,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                 tasks: contextTasks.sort((a, b) => a.title.localeCompare(b.title)),
             }))
             .sort((a, b) => (b.tasks.length - a.tasks.length) || a.context.localeCompare(b.context));
-    }, [tasks]);
+    }, [tasks, projectMap]);
 
     const steps = useMemo<{ id: ReviewStep; title: string; description: string; icon: LucideIcon }[]>(() => {
         const list: { id: ReviewStep; title: string; description: string; icon: LucideIcon }[] = [
@@ -428,7 +432,11 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
     const renderStepContent = () => {
         switch (currentStep) {
             case 'inbox': {
-                const inboxTasks = tasks.filter((task) => task.status === 'inbox');
+                const inboxTasks = tasks.filter((task) => (
+                    task.status === 'inbox'
+                    && !task.deletedAt
+                    && isTaskInActiveProject(task, projectMap)
+                ));
                 return (
                     <div className="space-y-4">
                         <div className="bg-muted/30 p-4 rounded-lg border border-border">
@@ -487,7 +495,11 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                 );
 
             case 'waiting': {
-                const waitingTasks = tasks.filter((task) => task.status === 'waiting');
+                const waitingTasks = tasks.filter((task) => (
+                    task.status === 'waiting'
+                    && !task.deletedAt
+                    && isTaskInActiveProject(task, projectMap)
+                ));
                 const waitingDue = waitingTasks.filter((task) => isDueForReview(task.reviewAt));
                 const waitingFuture = waitingTasks.filter((task) => !isDueForReview(task.reviewAt));
                 return (
@@ -648,7 +660,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
             }
 
             case 'projects': {
-                const activeProjects = projects.filter((project) => project.status === 'active');
+                const activeProjects = projects.filter((project) => project.status === 'active' && !project.deletedAt);
                 const dueProjects = activeProjects.filter((project) => isDueForReview(project.reviewAt));
                 const futureProjects = activeProjects.filter((project) => !isDueForReview(project.reviewAt));
                 const orderedProjects = [...dueProjects, ...futureProjects];
@@ -657,7 +669,12 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                         <p className="text-muted-foreground">{t('review.projectsHint')}</p>
                         <div className="space-y-4">
                             {orderedProjects.map((project) => {
-                                const projectTasks = tasks.filter((task) => task.projectId === project.id && task.status !== 'done' && task.status !== 'reference');
+                                const projectTasks = tasks.filter((task) => (
+                                    task.projectId === project.id
+                                    && !task.deletedAt
+                                    && task.status !== 'done'
+                                    && task.status !== 'reference'
+                                ));
                                 const hasNextAction = projectTasks.some((task) => task.status === 'next');
 
                                 return (
@@ -705,7 +722,11 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
             }
 
             case 'someday': {
-                const somedayTasks = tasks.filter((task) => task.status === 'someday');
+                const somedayTasks = tasks.filter((task) => (
+                    task.status === 'someday'
+                    && !task.deletedAt
+                    && isTaskInActiveProject(task, projectMap)
+                ));
                 const somedayDue = somedayTasks.filter((task) => isDueForReview(task.reviewAt));
                 const somedayFuture = somedayTasks.filter((task) => !isDueForReview(task.reviewAt));
                 return (

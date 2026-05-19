@@ -117,6 +117,72 @@ describe('widget-data', () => {
         expect(payload.items.map((item) => item.id)).toEqual(['next-due', 'next-now']);
     });
 
+    it('keeps deferred project tasks out of widget focus items and inbox count', () => {
+        const now = new Date().toISOString();
+        const data: AppData = {
+            ...baseData,
+            projects: [
+                {
+                    id: 'active-project',
+                    title: 'Active project',
+                    status: 'active',
+                    color: '#123456',
+                    order: 0,
+                    tagIds: [],
+                    createdAt: now,
+                    updatedAt: now,
+                },
+                {
+                    id: 'someday-project',
+                    title: 'Someday project',
+                    status: 'someday',
+                    color: '#654321',
+                    order: 1,
+                    tagIds: [],
+                    createdAt: now,
+                    updatedAt: now,
+                },
+            ],
+            tasks: [
+                {
+                    id: 'active-next',
+                    title: 'Active next',
+                    status: 'next',
+                    projectId: 'active-project',
+                    tags: [],
+                    contexts: [],
+                    createdAt: now,
+                    updatedAt: now,
+                },
+                {
+                    id: 'deferred-next',
+                    title: 'Deferred next',
+                    status: 'next',
+                    projectId: 'someday-project',
+                    tags: [],
+                    contexts: [],
+                    createdAt: now,
+                    updatedAt: now,
+                },
+                {
+                    id: 'deferred-inbox',
+                    title: 'Deferred inbox',
+                    status: 'inbox',
+                    projectId: 'someday-project',
+                    tags: [],
+                    contexts: [],
+                    createdAt: now,
+                    updatedAt: now,
+                },
+            ],
+        };
+
+        const payload = buildWidgetPayload(data, 'en');
+
+        expect(payload.items.map((item) => item.id)).toEqual(['active-next']);
+        expect(payload.inboxCount).toBe(0);
+    });
+
     it('does not let earlier non-widget tasks block a sequential project next task', () => {
         const now = new Date().toISOString();
         const data: AppData = {

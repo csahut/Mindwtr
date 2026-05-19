@@ -17,6 +17,7 @@ import {
   matchesHierarchicalToken,
   buildBulkTaskTokenUpdates,
   collectBulkTaskTokens,
+  isTaskInActiveProject,
   type Task,
   type TaskSortBy,
   type TaskStatus,
@@ -86,6 +87,7 @@ export function ContextsView() {
   const contextSourceTasks = tasks.filter((task) => (
     !task.deletedAt
     && task.status !== 'archived'
+    && isTaskInActiveProject(task, projectById)
     && taskMatchesAreaFilter(task, resolvedAreaFilter, projectById, areaById)
   ));
   const allContexts = getUsedTaskTokens(

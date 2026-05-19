@@ -1,7 +1,8 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
     addBreadcrumb,
     DEFAULT_PROJECT_COLOR,
+    isTaskInActiveProject,
     parseQuickAddDateCommands,
     tFallback,
     type AppData,
@@ -158,6 +159,7 @@ export function useInboxProcessingController({
         areas,
         settings,
     });
+    const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
 
     useEffect(() => {
         if (isProcessing) return;
@@ -165,12 +167,17 @@ export function useInboxProcessingController({
     }, [isProcessing, resetProcessingSession]);
 
     const startProcessing = useCallback(() => {
-        const inboxTasks = tasks.filter((task) => task.status === 'inbox' && matchesAreaFilter(task));
+        const inboxTasks = tasks.filter((task) => (
+            task.status === 'inbox'
+            && !task.deletedAt
+            && isTaskInActiveProject(task, projectMap)
+            && matchesAreaFilter(task)
+        ));
         if (inboxTasks.length === 0) return;
         hydrateProcessingTask(inboxTasks[0]);
         addBreadcrumb('inbox:start');
         setIsProcessing(true);
-    }, [tasks, hydrateProcessingTask, setIsProcessing, matchesAreaFilter]);
+    }, [tasks, hydrateProcessingTask, setIsProcessing, projectMap, matchesAreaFilter]);
 
     const closeProcessing = useCallback(() => {
         setIsProcessing(false);
@@ -180,8 +187,10 @@ export function useInboxProcessingController({
         const currentTaskId = processingTask?.id;
         const inboxTasks = tasks.filter((task) =>
             task.status === 'inbox'
+            && !task.deletedAt
             && task.id !== currentTaskId
             && !skippedIds.has(task.id)
+            && isTaskInActiveProject(task, projectMap)
             && matchesAreaFilter(task)
         );
         if (inboxTasks.length > 0) {
@@ -197,7 +206,7 @@ export function useInboxProcessingController({
         setSelectedAssignedTo('');
         setSelectedPriority(undefined);
         setSelectedTimeEstimate(undefined);
-    }, [hydrateProcessingTask, processingTask?.id, tasks, setIsProcessing, skippedIds, matchesAreaFilter]);
+    }, [hydrateProcessingTask, processingTask?.id, tasks, setIsProcessing, skippedIds, projectMap, matchesAreaFilter]);
 
     const handleSkip = useCallback(() => {
         if (processingTask) {

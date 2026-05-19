@@ -28,6 +28,7 @@ import {
   SAVED_FILTER_NO_PROJECT_ID,
   translateWithFallback,
   useTaskStore,
+  isTaskInActiveProject,
   isDueForReview,
   safeFormatDate,
   safeParseDate,
@@ -156,7 +157,10 @@ export default function FocusScreen() {
     projects.filter((project) => !project.deletedAt && projectMatchesAreaFilter(project, resolvedAreaFilter, areaById))
   ), [projects, resolvedAreaFilter, areaById]);
   const visibleTasks = useMemo(() => (
-    tasks.filter((task) => taskMatchesAreaFilter(task, resolvedAreaFilter, projectById, areaById))
+    tasks.filter((task) => (
+      isTaskInActiveProject(task, projectById)
+      && taskMatchesAreaFilter(task, resolvedAreaFilter, projectById, areaById)
+    ))
   ), [tasks, resolvedAreaFilter, projectById, areaById]);
   const baseActiveTasks = useMemo(() => (
     visibleTasks.filter((task) => (

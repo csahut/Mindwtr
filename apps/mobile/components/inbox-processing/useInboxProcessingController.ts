@@ -13,6 +13,7 @@ import {
   collectTaskTokenUsage,
   createAIProvider,
   hasTimeComponent,
+  isTaskInActiveProject,
   isSelectableProjectForTaskAssignment,
   normalizeClockTimeInput,
   safeFormatDate,
@@ -155,12 +156,14 @@ export function useInboxProcessingController({
   }, [selectedTimeEstimate, settings?.gtd?.timeEstimatePresets]);
 
   const inboxTasks = useMemo(() => {
+    const projectById = new Map(projects.map((project) => [project.id, project]));
     return tasks.filter((task) => {
       if (task.deletedAt) return false;
       if (task.status !== 'inbox') return false;
+      if (!isTaskInActiveProject(task, projectById)) return false;
       return true;
     });
-  }, [tasks]);
+  }, [projects, tasks]);
 
   const processingQueue = useMemo(
     () => inboxTasks.filter((task) => !skippedIds.has(task.id)),

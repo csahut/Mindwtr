@@ -8,6 +8,7 @@ import { X, Calendar as CalendarIcon, Target, Inbox, Clock, Sparkles, Star, Chec
 import {
     formatFocusTaskLimitText,
     useTaskStore,
+    isTaskInActiveProject,
     isDueForReview,
     normalizeFocusTaskLimit,
     safeFormatDate,
@@ -42,7 +43,7 @@ function isSameDay(a: Date, b: Date): boolean {
 }
 
 function DailyReviewFlow({ onClose }: { onClose: () => void }) {
-    const { tasks, settings, updateTask, deleteTask } = useTaskStore();
+    const { tasks, projects, settings, updateTask, deleteTask } = useTaskStore();
     const { isDark } = useTheme();
     const { t } = useLanguage();
     const tc = useThemeColors();
@@ -60,6 +61,7 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
     const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
     const includeFocusStep = settings.gtd?.dailyReview?.includeFocusStep !== false;
     const focusTaskLimit = normalizeFocusTaskLimit(settings.gtd?.focusTaskLimit);
+    const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
 
     const today = useMemo(() => new Date(), []);
     const tomorrow = useMemo(() => {
@@ -120,8 +122,13 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
     const tomorrowEvents = useMemo(() => getExternalEventsForDate(tomorrow), [externalEvents, tomorrow]);
 
     const activeTasks = useMemo(
-        () => tasks.filter((task) => !task.deletedAt && task.status !== 'done' && task.status !== 'reference'),
-        [tasks],
+        () => tasks.filter((task) => (
+            !task.deletedAt
+            && task.status !== 'done'
+            && task.status !== 'reference'
+            && isTaskInActiveProject(task, projectById)
+        )),
+        [projectById, tasks],
     );
 
     const inboxTasks = useMemo(

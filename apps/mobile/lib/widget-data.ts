@@ -7,6 +7,7 @@ import {
     SUPPORTED_LANGUAGES,
     getTranslationsSync,
     getSequentialFirstTaskIds,
+    isTaskInActiveProject,
     loadTranslations,
     sortTasksBy,
 } from '@mindwtr/core';
@@ -128,6 +129,7 @@ export function buildWidgetPayload(
     const tr = getTranslationsSync(language);
     const tasks = data.tasks || [];
     const projects = data.projects || [];
+    const projectById = new Map(projects.map((project) => [project.id, project]));
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -143,6 +145,7 @@ export function buildWidgetPayload(
     const activeTasks = tasks.filter((task) => {
         if (task.deletedAt) return false;
         if (task.status === 'archived' || task.status === 'done' || task.status === 'reference') return false;
+        if (!isTaskInActiveProject(task, projectById)) return false;
         return true;
     });
 

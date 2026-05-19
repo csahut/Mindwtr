@@ -86,4 +86,60 @@ describe('BoardView', () => {
         expect(getByRole('button', { name: /^show$/i })).toHaveAttribute('aria-expanded', 'false');
         expect(queryByRole('button', { name: 'Alpha project' })).not.toBeInTheDocument();
     });
+
+    it('hides tasks that belong to deferred projects', () => {
+        useTaskStore.setState({
+            tasks: [
+                {
+                    id: 'active-task',
+                    title: 'Active project next action',
+                    status: 'next',
+                    projectId: 'active-project',
+                    tags: [],
+                    contexts: [],
+                    createdAt: '2026-05-18T12:00:00.000Z',
+                    updatedAt: '2026-05-18T12:00:00.000Z',
+                },
+                {
+                    id: 'someday-task',
+                    title: 'Someday project next action',
+                    status: 'next',
+                    projectId: 'someday-project',
+                    tags: [],
+                    contexts: [],
+                    createdAt: '2026-05-18T12:00:00.000Z',
+                    updatedAt: '2026-05-18T12:00:00.000Z',
+                },
+            ],
+            projects: [
+                {
+                    id: 'active-project',
+                    title: 'Active project',
+                    status: 'active',
+                    color: '#123456',
+                    order: 0,
+                    tagIds: [],
+                    createdAt: '2026-05-18T12:00:00.000Z',
+                    updatedAt: '2026-05-18T12:00:00.000Z',
+                },
+                {
+                    id: 'someday-project',
+                    title: 'Someday project',
+                    status: 'someday',
+                    color: '#654321',
+                    order: 1,
+                    tagIds: [],
+                    createdAt: '2026-05-18T12:00:00.000Z',
+                    updatedAt: '2026-05-18T12:00:00.000Z',
+                },
+            ],
+            areas: [],
+            settings: {},
+        });
+
+        const { getByText, queryByText } = renderWithProviders();
+
+        expect(getByText('Active project next action')).toBeInTheDocument();
+        expect(queryByText('Someday project next action')).not.toBeInTheDocument();
+    });
 });

@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { useTaskStore } from '@mindwtr/core';
+import { isTaskInActiveProject, useTaskStore } from '@mindwtr/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import { useTheme } from '../../contexts/theme-context';
@@ -39,6 +39,7 @@ export function SomedayView() {
     .filter((task) => (
       !task.deletedAt
       && task.status === 'someday'
+      && isTaskInActiveProject(task, projectById)
       && taskMatchesAreaFilter(task, resolvedAreaFilter, projectById, areaById)
     ))
     .sort((a, b) => {

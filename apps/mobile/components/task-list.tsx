@@ -19,6 +19,7 @@ import {
   shallow,
   tFallback,
   isSelectableProjectForTaskAssignment,
+  isTaskInActiveProject,
 } from '@mindwtr/core';
 
 import { TaskEditModal } from './task-edit-modal';
@@ -323,6 +324,7 @@ function TaskListComponent({
       if (statusFilter === 'all' && t.status === 'reference') return false;
       const matchesStatus = statusFilter === 'all' ? true : t.status === statusFilter;
       const matchesProject = projectId ? t.projectId === projectId : true;
+      if (!projectId && !isTaskInActiveProject(t, projectById)) return false;
       if (showTimeEstimateFilters && !matchesSelectedTimeEstimates(t, selectedTimeEstimates)) return false;
       if (!taskMatchesAreaFilter(t, resolvedAreaFilter, projectById, areaById)) return false;
       return matchesStatus && matchesProject;

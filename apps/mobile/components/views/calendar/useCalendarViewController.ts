@@ -12,6 +12,7 @@ import {
   getEnglishI18nValue,
   hasTimeComponent,
   isSlotFreeForDay as isCalendarSlotFreeForDay,
+  isTaskInActiveProject,
   minutesToTimeEstimate,
   normalizeCalendarDurationMinutes,
   parseCalendarTimeOnDate,
@@ -293,7 +294,10 @@ export function useCalendarViewController() {
   }), [selectedDate, viewMode, weekStartTime]);
 
   const areaVisibleTasks = useMemo(() => (
-    tasks.filter((task) => taskMatchesAreaFilter(task, resolvedAreaFilter, projectById, areaById))
+    tasks.filter((task) => (
+      isTaskInActiveProject(task, projectById)
+      && taskMatchesAreaFilter(task, resolvedAreaFilter, projectById, areaById)
+    ))
   ), [tasks, resolvedAreaFilter, projectById, areaById]);
 
   const visibleTasks = areaVisibleTasks;

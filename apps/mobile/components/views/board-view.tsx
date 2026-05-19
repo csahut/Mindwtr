@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
-import { useTaskStore } from '@mindwtr/core';
+import { isTaskInActiveProject, useTaskStore } from '@mindwtr/core';
 import type { Task, TaskStatus } from '@mindwtr/core';
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useTheme } from '../../contexts/theme-context';
@@ -389,6 +389,7 @@ export function BoardView() {
     const activeTasks = tasks.filter((task) => (
       !task.deletedAt
       && task.status !== 'reference'
+      && isTaskInActiveProject(task, projectMap)
       && taskMatchesAreaFilter(task, resolvedAreaFilter, projectMap, areaById)
     ));
     const grouped: Record<string, Task[]> = {};

@@ -6,6 +6,7 @@ import {
     getProjectNextActionPromptData,
     getProjectsByArea,
     getProjectsByTag,
+    isTaskInActiveProject,
     isSelectableProjectForTaskAssignment,
     projectHasNextAction,
     shouldPromptForProjectNextAction,
@@ -155,6 +156,21 @@ describe('project-utils', () => {
         expect(isSelectableProjectForTaskAssignment(projects[4])).toBe(false);
         expect(isSelectableProjectForTaskAssignment(archivedProject)).toBe(false);
         expect(isSelectableProjectForTaskAssignment(completedProject)).toBe(false);
+    });
+
+    it('recognizes whether a task belongs to an active project surface', () => {
+        const projectMap = new Map(projects.map((project) => [project.id, project]));
+        const noProjectTask: Task = { id: 'no-project', title: 'Loose task', status: 'next', tags: [], contexts: [], createdAt: '', updatedAt: '' };
+        const activeProjectTask: Task = { ...noProjectTask, id: 'active-project', projectId: 'p1' };
+        const somedayProjectTask: Task = { ...noProjectTask, id: 'someday-project', projectId: 'p3' };
+        const deletedProjectTask: Task = { ...noProjectTask, id: 'deleted-project', projectId: 'p5' };
+        const missingProjectTask: Task = { ...noProjectTask, id: 'missing-project', projectId: 'missing' };
+
+        expect(isTaskInActiveProject(noProjectTask, projectMap)).toBe(true);
+        expect(isTaskInActiveProject(activeProjectTask, projectMap)).toBe(true);
+        expect(isTaskInActiveProject(somedayProjectTask, projectMap)).toBe(false);
+        expect(isTaskInActiveProject(deletedProjectTask, projectMap)).toBe(false);
+        expect(isTaskInActiveProject(missingProjectTask, projectMap)).toBe(true);
     });
 
     it('filters projects by tag', () => {

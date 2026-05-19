@@ -358,6 +358,33 @@ describe('FocusScreen', () => {
     ).toEqual(['available-next']);
   });
 
+  it('hides tasks that belong to deferred projects', () => {
+    storeState.projects = [
+      makeProject('active-project'),
+      makeProject('someday-project', { status: 'someday' }),
+    ];
+    storeState.tasks = [
+      makeTask('active-next', {
+        title: 'Active next',
+        projectId: 'active-project',
+      }),
+      makeTask('someday-next', {
+        title: 'Someday next',
+        projectId: 'someday-project',
+      }),
+    ];
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<FocusScreen />);
+    });
+
+    expect(
+      tree.root.findAllByType(SwipeableTaskItem).map((node) => node.props.task.id),
+    ).toEqual(['active-next']);
+  });
+
   it('does not show later sequential actions when the first action has a hidden future start', () => {
     storeState.projects = [makeProject('project-1', { isSequential: true })];
     storeState.settings = {

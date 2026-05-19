@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
-import { useTaskStore } from '@mindwtr/core';
+import { isTaskInActiveProject, useTaskStore } from '@mindwtr/core';
 import { TaskList } from '../../../components/task-list';
 import { InboxProcessingModal } from '../../../components/inbox-processing-modal';
 import { ErrorBoundary } from '../../../components/ErrorBoundary';
@@ -25,6 +25,7 @@ export default function InboxScreen() {
     return tasks.filter(t => {
       if (t.deletedAt) return false;
       if (t.status !== 'inbox') return false;
+      if (!isTaskInActiveProject(t, projectById)) return false;
       if (!taskMatchesAreaFilter(t, resolvedAreaFilter, projectById, areaById)) return false;
       return true;
     });
