@@ -110,8 +110,14 @@ flowchart TD
 | `next`     | Ready to do next   | Focus         |
 | `waiting`  | Delegated/blocked  | Waiting For   |
 | `someday`  | Future/maybe       | Someday/Maybe |
-| `done`     | Completed          | Done          |
-| `archived` | Finished and filed | Archived      |
+| `done`     | Recently completed | Done          |
+| `archived` | Completed and filed away | Archived      |
+
+Done and Archived are both closed states, but they serve different jobs:
+
+- **Done** is the recent completion log. Use it for tasks you may want to see during daily or weekly review.
+- **Archived** is filed history. Archived tasks are hidden from normal task lists, but stay available in the Archived view for search, restore, or permanent deletion.
+- **Auto-Archive** can move Done tasks to Archived after a set number of days. Set it to **Never** if you want Done to keep all completed tasks indefinitely.
 
 ### Contexts and Tags
 

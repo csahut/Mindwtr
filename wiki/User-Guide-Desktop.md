@@ -111,11 +111,11 @@ Kanban-style drag-and-drop board with columns:
 
 ### ✅ Done
 
-Completed tasks.
+Recently completed tasks. Use this as your short-term completion log for daily or weekly review.
 
 ### 📦 Archived
 
-Archived tasks. You can restore or permanently delete items here.
+Completed tasks that have been filed away. Archived tasks are hidden from normal task lists, but you can search, restore, or permanently delete them here.
 
 ### 📝 Weekly Review
 
@@ -450,7 +450,7 @@ Access Settings from the sidebar.
 - **Review Day/Time** — Customize when you want to be reminded
 
 ### GTD
-- **Auto-Archive** — Automatically move completed tasks to the Archive after a set number of days (default: 7 days)
+- **Auto-Archive** — Automatically move Done tasks to Archived after a set number of days (default: 7 days), or choose **Never** to keep completed tasks in Done
 - **Focus task limit** — Choose how many tasks can be marked for Today's Focus
 - **Features** — Optional signals you can enable when needed:
   - **Priorities** — Show a priority flag on tasks

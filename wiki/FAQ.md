@@ -150,6 +150,14 @@ Enable them in:
 Turn on **Priority** and **Estimated Time** there (and reorder fields if needed).
 
 
+### What is the difference between Done and Archived tasks?
+
+Use **Done** for tasks you have completed recently. Done tasks keep their completion date, stay visible in the Done view, and are useful during daily or weekly review when you want to see what was finished.
+
+Use **Archived** for completed tasks you want to file away. Archived tasks are hidden from normal task lists and remain available in the Archived view for search, restore, or permanent deletion. Archiving does not delete the task.
+
+In practice, treat Done as a short-term completion log and Archived as long-term history. The **Auto-Archive** setting can move Done tasks to Archived automatically after a chosen number of days, or you can set it to **Never** if you prefer to keep all completions in Done.
+
 
 ### How do recurring tasks work?
 

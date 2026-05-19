@@ -37,8 +37,8 @@ Tap the **Menu** tab to access additional views:
  - ⏳ **Waiting For** — Delegated items
  - 💭 **Someday/Maybe** — Future ideas
  - 📚 **Reference** — Reference material
- - ✅ **Done** — Completed tasks
- - 📦 **Archived** — Archived tasks
+ - ✅ **Done** — Recently completed tasks
+ - 📦 **Archived** — Completed tasks filed away from normal lists
  - 🗑️ **Trash** — Deleted tasks
  - ⚙️ **Settings** — App preferences
 
@@ -507,7 +507,7 @@ Customize how Mindwtr works for your GTD workflow:
 - Default: 10m, 30m, 1h, 2h, 3h, 4h, 4h+
 
 **Auto-Archive:**
-- Automatically move completed tasks to the Archive after a set number of days (default: 7 days)
+- Automatically move Done tasks to Archived after a set number of days (default: 7 days)
 - Set to "Never" to keep completions in the Done list indefinitely
 
 **Inbox Processing:**
