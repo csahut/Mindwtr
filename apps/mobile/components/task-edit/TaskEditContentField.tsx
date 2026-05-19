@@ -6,6 +6,7 @@ import { generateUUID, getAttachmentDisplayTitle, resolveAutoTextDirection } fro
 import { MarkdownFormatToolbar } from '../markdown-format-toolbar';
 import { MarkdownReferenceAutocomplete } from '../markdown-reference-autocomplete';
 import { MarkdownText } from '../markdown-text';
+import { getControlledTextInputSelection } from '../text-input-selection';
 import type { TaskEditFieldRendererProps } from './TaskEditFieldRenderer.types';
 
 type ContentFieldId = 'description' | 'attachments' | 'checklist';
@@ -116,7 +117,7 @@ export function TaskEditContentField({
                                 onBlur={() => setIsDescriptionInputFocused(false)}
                                 onChangeText={handleDescriptionChange}
                                 onSelectionChange={(event) => setDescriptionSelection(event.nativeEvent.selection)}
-                                selection={descriptionSelection}
+                                selection={getControlledTextInputSelection(descriptionSelection)}
                                 placeholder={t('taskEdit.descriptionPlaceholder')}
                                 multiline
                                 placeholderTextColor={tc.secondaryText}

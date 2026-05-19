@@ -31,6 +31,7 @@ import { KeyboardAccessoryHost } from './keyboard-accessory-host';
 import { MarkdownFormatToolbar } from './markdown-format-toolbar';
 import { MarkdownReferenceAutocomplete } from './markdown-reference-autocomplete';
 import { MarkdownText } from './markdown-text';
+import { getControlledTextInputSelection } from './text-input-selection';
 
 const selectionsEqual = (left: MarkdownSelection, right: MarkdownSelection) => (
     left.start === right.start && left.end === right.end
@@ -402,7 +403,7 @@ export function ExpandedMarkdownEditor({
                                             }
                                         }, 0);
                                     }}
-                                    selection={editorSelection}
+                                    selection={getControlledTextInputSelection(editorSelection)}
                                     onSelectionChange={handleSelectionChange}
                                     placeholder={placeholder}
                                     placeholderTextColor={tc.secondaryText}
