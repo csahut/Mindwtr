@@ -35,6 +35,12 @@ const STATUS_TOKENS: Record<string, TaskStatus> = {
 const ESCAPE_SENTINEL = '__MW_ESC__';
 const QUICK_ADD_ESCAPE_CHARS = new Set(['@', '#', '+', '/', '!']);
 const QUICK_ADD_COMMAND_BOUNDARY = String.raw`(?=\s\/(?:note:|start:|due:|review:|project:|area:|inbox\b|next\b|in-progress\b|waiting\b|someday\b|done\b|archived\b)|$)`;
+const QUICK_ADD_INLINE_CONTROL_BOUNDARY = String.raw`(?=\s(?:[@#+!]|\/(?:note:|start:|due:|review:|project:|area:|inbox\b|next\b|in-progress\b|waiting\b|someday\b|done\b|archived\b))|$)`;
+const SIMPLE_TASK_TOKEN_RE = /[@#][\p{L}\p{N}_-]+/gu;
+const RICH_TASK_TOKEN_RE = new RegExp(
+    String.raw`(?:^|\s)([@#](?![\s\p{L}\p{N}_-])[^@#+/!]+?)${QUICK_ADD_INLINE_CONTROL_BOUNDARY}`,
+    'gu',
+);
 const NATURAL_TIME_HINT_RE = /\b(?:\d{1,2}:\d{2}(?:\s*[ap]m)?|\d{1,2}\s*[ap]m|noon|midnight|morning|afternoon|evening|night|tonight)\b/i;
 const PURE_TIME_ONLY_RE = /^(?:at\s+)?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)?|noon|midnight)$/i;
 const BARE_MONTH_RE = /^(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)$/i;
@@ -151,6 +157,35 @@ function stripToken(source: string, token: string): string {
     return source.replace(token, '').replace(/\s{2,}/g, ' ').trim();
 }
 
+function getQuickAddTokenMatches(working: string, prefix: '@' | '#'): string[] {
+    const matches: Array<{ token: string; index: number }> = [];
+
+    for (const match of working.matchAll(SIMPLE_TASK_TOKEN_RE)) {
+        const token = match[0];
+        if (token.startsWith(prefix)) {
+            matches.push({ token, index: match.index ?? 0 });
+        }
+    }
+
+    for (const match of working.matchAll(RICH_TASK_TOKEN_RE)) {
+        const token = match[1]?.replace(/\s+/g, ' ').trim();
+        if (token?.startsWith(prefix)) {
+            const rawIndex = match.index ?? 0;
+            matches.push({ token, index: rawIndex + match[0].indexOf(match[1]) });
+        }
+    }
+
+    const seen = new Set<string>();
+    return matches
+        .sort((a, b) => a.index - b.index)
+        .map((match) => match.token)
+        .filter((token) => {
+            if (seen.has(token)) return false;
+            seen.add(token);
+            return true;
+        });
+}
+
 function parseDateCommand(
     command: 'start' | 'due' | 'review',
     working: string,
@@ -239,11 +274,11 @@ export function parseQuickAdd(input: string, projects?: Project[], now: Date = n
     const contexts = new Set<string>();
     const tags = new Set<string>();
 
-    const contextMatches = working.match(/@[\p{L}\p{N}_-]+/gu) || [];
+    const contextMatches = getQuickAddTokenMatches(working, '@');
     contextMatches.forEach((ctx) => contexts.add(ctx));
     contextMatches.forEach((ctx) => (working = stripToken(working, ctx)));
 
-    const tagMatches = working.match(/#[\p{L}\p{N}_-]+/gu) || [];
+    const tagMatches = getQuickAddTokenMatches(working, '#');
     tagMatches.forEach((tag) => tags.add(tag));
     tagMatches.forEach((tag) => (working = stripToken(working, tag)));
 

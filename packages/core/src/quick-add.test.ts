@@ -265,4 +265,32 @@ describe('quick-add', () => {
         expect(result.props.tags).toEqual(['#项目']);
         expect(result.props.status).toBe('next');
     });
+
+    it('supports emoji-starting tags selected from quick add suggestions', () => {
+        const now = new Date('2026-05-19T10:00:00Z');
+        const areas = [
+            { id: 'a1', name: 'Perso', color: '#111111', order: 0, createdAt: now.toISOString(), updatedAt: now.toISOString() },
+        ];
+
+        const result = parseQuickAdd(
+            'Inscription to the competition !Perso #🐴 - Horse riding /next',
+            undefined,
+            now,
+            areas as any,
+        );
+
+        expect(result.title).toBe('Inscription to the competition');
+        expect(result.props.areaId).toBe('a1');
+        expect(result.props.tags).toEqual(['#🐴 - Horse riding']);
+        expect(result.props.status).toBe('next');
+    });
+
+    it('keeps simple single-word tags from consuming following title text', () => {
+        const now = new Date('2026-05-19T10:00:00Z');
+        const result = parseQuickAdd('Email #project stakeholders /next', undefined, now);
+
+        expect(result.title).toBe('Email stakeholders');
+        expect(result.props.tags).toEqual(['#project']);
+        expect(result.props.status).toBe('next');
+    });
 });
