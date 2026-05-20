@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import {
   getQuickDate,
   isQuickDatePresetSelected,
@@ -39,12 +39,9 @@ export function QuickDateChips({
   const now = new Date();
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      style={[styles.scroller, style]}
-      contentContainerStyle={[styles.content, contentContainerStyle]}
+    <View
+      testID="quick-date-chips-row"
+      style={[styles.content, style, contentContainerStyle]}
     >
       {QUICK_DATE_PRESETS.map((preset) => {
         const labelConfig = QUICK_DATE_LABELS[preset];
@@ -79,15 +76,15 @@ export function QuickDateChips({
           </Pressable>
         );
       })}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroller: {
-    marginTop: 8,
-  },
   content: {
+    marginTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     paddingRight: 4,
   },
