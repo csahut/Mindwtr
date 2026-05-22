@@ -20,6 +20,44 @@ const baseInboxTask = {
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
 };
+const workArea = {
+  id: 'area-work',
+  name: 'Work',
+  color: '#2563eb',
+  order: 0,
+  createdAt: '2025-01-01T00:00:00.000Z',
+  updatedAt: '2025-01-01T00:00:00.000Z',
+};
+const homeArea = {
+  id: 'area-home',
+  name: 'Home',
+  color: '#16a34a',
+  order: 1,
+  createdAt: '2025-01-01T00:00:00.000Z',
+  updatedAt: '2025-01-01T00:00:00.000Z',
+};
+const workProject = {
+  id: 'project-work',
+  title: 'Work Project',
+  color: '#2563eb',
+  status: 'active',
+  order: 0,
+  tagIds: [],
+  areaId: workArea.id,
+  createdAt: '2025-01-01T00:00:00.000Z',
+  updatedAt: '2025-01-01T00:00:00.000Z',
+};
+const homeProject = {
+  id: 'project-home',
+  title: 'Home Project',
+  color: '#16a34a',
+  status: 'active',
+  order: 1,
+  tagIds: [],
+  areaId: homeArea.id,
+  createdAt: '2025-01-01T00:00:00.000Z',
+  updatedAt: '2025-01-01T00:00:00.000Z',
+};
 const storeState = {
   tasks: [{ ...baseInboxTask }] as any[],
   projects: [] as any[],
@@ -64,6 +102,12 @@ vi.mock('@mindwtr/core', () => {
       clarifyTask,
     })),
     hasTimeComponent: vi.fn((value?: string | null) => Boolean(value && /[T\s]\d{2}:\d{2}/.test(value))),
+    filterProjectsBySelectedArea: vi.fn((projects: any[], selectedAreaId?: string) => projects.filter((project: any) => (
+      !project.deletedAt
+      && project.status !== 'archived'
+      && project.status !== 'completed'
+      && (!selectedAreaId || project.areaId === selectedAreaId)
+    ))),
     QUICK_DATE_PRESETS: ['today', 'tomorrow', 'in_3_days', 'next_week', 'next_month', 'no_date'],
     getQuickDate: vi.fn((preset: string) => {
       const today = new Date(2025, 0, 1);
@@ -210,6 +254,17 @@ describe('InboxProcessingModal', () => {
     });
   };
 
+  const findPressableWithText = (root: ReturnType<typeof create>['root'], text: string) => {
+    let node: any = findNodeWithText(root, text);
+    while (node && typeof node.props?.onPress !== 'function') {
+      node = node.parent;
+    }
+    if (!node) {
+      throw new Error(`Pressable for "${text}" not found`);
+    }
+    return node;
+  };
+
   it('replaces the header next action with skip and saves edits before advancing', () => {
     mockSettings.features = undefined;
     mockSettings.gtd.inboxProcessing = {};
@@ -289,6 +344,70 @@ describe('InboxProcessingModal', () => {
     const root = tree!.root;
 
     expect(root.findAllByProps({ placeholder: 'inbox.addContextPlaceholder' })).toHaveLength(0);
+  });
+
+  it('filters project choices by selected area without preselecting the task area', () => {
+    storeState.tasks = [{ ...baseInboxTask, areaId: workArea.id }];
+    storeState.areas = [workArea, homeArea];
+    storeState.projects = [workProject, homeProject];
+    const onClose = vi.fn();
+    let tree: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<InboxProcessingModal visible onClose={onClose} />);
+    });
+
+    const root = tree!.root;
+
+    expect(findNodesWithText(root, 'Work Project').length).toBeGreaterThan(0);
+    expect(findNodesWithText(root, 'Home Project').length).toBeGreaterThan(0);
+
+    act(() => {
+      findPressableWithText(root, 'Work').props.onPress();
+    });
+
+    expect(findNodesWithText(root, 'Work Project').length).toBeGreaterThan(0);
+    expect(findNodesWithText(root, 'Home Project')).toHaveLength(0);
+  });
+
+  it('creates inbox processing projects in the selected area', async () => {
+    storeState.areas = [workArea, homeArea];
+    storeState.projects = [workProject, homeProject];
+    addProject.mockResolvedValueOnce({
+      id: 'project-created',
+      title: 'Created Project',
+      color: '#3b82f6',
+      status: 'active',
+      order: 2,
+      tagIds: [],
+      areaId: workArea.id,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+    });
+    const onClose = vi.fn();
+    let tree: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<InboxProcessingModal visible onClose={onClose} />);
+    });
+
+    const root = tree!.root;
+    const projectInput = root.findByProps({ placeholder: 'projects.addPlaceholder' });
+
+    act(() => {
+      findPressableWithText(root, 'Work').props.onPress();
+      projectInput.props.onChangeText('Created Project');
+    });
+
+    await act(async () => {
+      findPressableWithText(root, 'projects.create').props.onPress();
+    });
+
+    expect(addProject).toHaveBeenCalledWith(
+      'Created Project',
+      '#3b82f6',
+      { areaId: workArea.id },
+    );
   });
 
   it('suggests existing contexts and tags while typing without a prefix', () => {

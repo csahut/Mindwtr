@@ -12,9 +12,9 @@ import {
   DEFAULT_PROJECT_COLOR,
   collectTaskTokenUsage,
   createAIProvider,
+  filterProjectsBySelectedArea,
   hasTimeComponent,
   isTaskInActiveProject,
-  isSelectableProjectForTaskAssignment,
   normalizeClockTimeInput,
   safeFormatDate,
   safeParseDate,
@@ -279,18 +279,22 @@ export function useInboxProcessingController({
     return merged.slice(0, MAX_TOKEN_SUGGESTIONS);
   }, [selectedTags, suggestionTerms, tagSuggestionPool]);
 
+  const projectFilterAreaId = selectedAreaId || undefined;
+  const areaFilteredProjects = useMemo(
+    () => filterProjectsBySelectedArea(projects, projectFilterAreaId),
+    [projects, projectFilterAreaId],
+  );
   const filteredProjects = useMemo(() => {
-    const selectableProjects = projects.filter(isSelectableProjectForTaskAssignment);
-    if (!projectSearch.trim()) return selectableProjects;
+    if (!projectSearch.trim()) return areaFilteredProjects;
     const query = projectSearch.trim().toLowerCase();
-    return selectableProjects.filter((project) => project.title.toLowerCase().includes(query));
-  }, [projects, projectSearch]);
+    return areaFilteredProjects.filter((project) => project.title.toLowerCase().includes(query));
+  }, [areaFilteredProjects, projectSearch]);
 
   const hasExactProjectMatch = useMemo(() => {
     if (!projectSearch.trim()) return false;
     const query = projectSearch.trim().toLowerCase();
-    return projects.some((project) => project.title.toLowerCase() === query);
-  }, [projects, projectSearch]);
+    return areaFilteredProjects.some((project) => project.title.toLowerCase() === query);
+  }, [areaFilteredProjects, projectSearch]);
 
   const currentProject = useMemo(
     () => (selectedProjectId ? projects.find((project) => project.id === selectedProjectId) ?? null : null),
@@ -352,7 +356,7 @@ export function useInboxProcessingController({
     setNewContext('');
     setProjectSearch('');
     setSelectedProjectId(task?.projectId ?? null);
-    setSelectedAreaId(task?.projectId ? null : (task?.areaId ?? null));
+    setSelectedAreaId(null);
     resetTitleFocus();
     setProcessingTitle(task?.title ?? '');
     setProcessingDescription(task?.description ?? '');
@@ -647,16 +651,19 @@ export function useInboxProcessingController({
   const handleCreateProjectEarly = useCallback(async () => {
     const title = projectSearch.trim();
     if (!title) return;
-    const existing = projects.find((project) => project.title.toLowerCase() === title.toLowerCase());
+    const existing = areaFilteredProjects.find((project) => project.title.toLowerCase() === title.toLowerCase());
     if (existing) {
-      if (!isSelectableProjectForTaskAssignment(existing)) return;
       selectProjectEarly(existing.id);
       return;
     }
-    const created = await addProject(title, DEFAULT_PROJECT_COLOR);
+    const created = await addProject(
+      title,
+      DEFAULT_PROJECT_COLOR,
+      projectFilterAreaId ? { areaId: projectFilterAreaId } : undefined,
+    );
     if (!created) return;
     selectProjectEarly(created.id);
-  }, [addProject, projectSearch, projects, selectProjectEarly]);
+  }, [addProject, areaFilteredProjects, projectFilterAreaId, projectSearch, selectProjectEarly]);
 
   const finalizeNextAction = useCallback((projectId: string | null) => {
     applyProcessingEdits({
