@@ -42,6 +42,7 @@ import {
     coerceDesktopTextSize,
 } from './lib/text-size';
 import { saveStoredFullscreen } from './lib/window-state';
+import { installWebviewZoomShortcuts } from './lib/webview-zoom';
 import { subscribeNavigateEvent } from './lib/navigation-events';
 import { QUICK_ADD_SAVED_EVENT } from './lib/quick-add-saved-event';
 import { useUiStore } from './store/ui-store';
@@ -482,6 +483,14 @@ function App() {
             cancelled = true;
             if (unlistenResize) unlistenResize();
         };
+    }, []);
+
+    useEffect(() => {
+        if (!isTauriRuntime()) return;
+        return installWebviewZoomShortcuts({
+            storage: localStorage,
+            onError: (error) => void logError(error, { scope: 'window', step: 'setWebviewZoom' }),
+        });
     }, []);
 
     useEffect(() => {

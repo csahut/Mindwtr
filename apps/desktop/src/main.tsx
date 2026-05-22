@@ -13,6 +13,7 @@ import { isDiagnosticsEnabled, logError, logInfo, logWarn, setupGlobalErrorLoggi
 import { THEME_STORAGE_KEY, applyThemeMode, coerceDesktopThemeMode, resolveNativeTheme } from './lib/theme';
 import { TEXT_SIZE_STORAGE_KEY, applyDesktopTextSize, coerceDesktopTextSize } from './lib/text-size';
 import { loadStoredFullscreen } from './lib/window-state';
+import { restoreStoredWebviewZoom } from './lib/webview-zoom';
 import { isQuickAddWindowLocation } from './lib/quick-add-window';
 import {
     detectDesktopPlatform,
@@ -173,12 +174,28 @@ async function restoreFullscreenState() {
     }
 }
 
+async function restoreWebviewZoomState() {
+    if (!isTauriRuntime()) return;
+    try {
+        await restoreStoredWebviewZoom({ storage: localStorage });
+    } catch (error) {
+        void logWarn('Failed to restore webview zoom', {
+            scope: 'window',
+            extra: {
+                step: 'restoreWebviewZoom',
+                error: error instanceof Error ? error.message : String(error),
+            },
+        });
+    }
+}
+
 async function bootstrap() {
     await initStorage();
     setupGlobalErrorLogging();
     if (!isQuickAddWindow) {
         await logDesktopStartupContext().catch(() => undefined);
         await restoreFullscreenState();
+        await restoreWebviewZoomState();
     }
 
     if (!isQuickAddWindow && !isTauriRuntime() && 'serviceWorker' in navigator) {
