@@ -165,6 +165,25 @@ const getAddTaskButton = (tree: ReturnType<typeof create>) => {
   return button;
 };
 
+const flattenStyle = (style: unknown): Record<string, unknown> => {
+  if (Array.isArray(style)) {
+    return style.reduce<Record<string, unknown>>((acc, item) => ({
+      ...acc,
+      ...flattenStyle(item),
+    }), {});
+  }
+  return style && typeof style === 'object' ? style as Record<string, unknown> : {};
+};
+
+const getCaptureButtonInnerStyle = (tree: ReturnType<typeof create>) => {
+  const view = tree.root.findAll((node) => (
+    String(node.type) === 'View'
+    && flattenStyle(node.props.style).backgroundColor === '#3b82f6'
+  ))[0];
+  if (!view) throw new Error('Capture button inner view not found');
+  return flattenStyle(view.props.style);
+};
+
 const getMenuButton = (tree: ReturnType<typeof create>) => {
   const button = tree.root.findAllByType(TouchableOpacity).find(
     (node) => node.props.accessibilityLabel === 'Menu'
@@ -314,6 +333,21 @@ describe('mobile tab quick capture', () => {
     sheets = getQuickCaptureSheets(tree);
     expect(sheets).toHaveLength(1);
     expect(sheets[0]?.props.openRequestId).toBe(2);
+  });
+
+  it('keeps the primary capture button compact in the bottom bar', () => {
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<TabLayout />);
+    });
+
+    expect(getCaptureButtonInnerStyle(tree)).toEqual(expect.objectContaining({
+      width: 40,
+      height: 34,
+      borderRadius: 10,
+      marginTop: -2,
+    }));
   });
 
   it('opens the More sheet from the menu tab and navigates from its original calendar icon', () => {

@@ -426,9 +426,9 @@ function NativeTabBar({
             >
               <View style={[styles.captureButtonInner, { backgroundColor: tc.tint }]}>
                 {defaultAutoRecord ? (
-                  <Mic size={24} color={tc.onTint} strokeWidth={2.5} />
+                  <Mic size={22} color={tc.onTint} strokeWidth={2.5} />
                 ) : (
-                  <Plus size={24} color={tc.onTint} strokeWidth={3} />
+                  <Plus size={22} color={tc.onTint} strokeWidth={3} />
                 )}
               </View>
             </TouchableOpacity>
@@ -715,9 +715,9 @@ export default function TabLayout() {
             >
               <View style={[styles.captureButtonInner, { backgroundColor: captureColor }]}>
                 {defaultAutoRecord ? (
-                  <Mic size={24} color={tc.onTint} strokeWidth={2.5} />
+                  <Mic size={22} color={tc.onTint} strokeWidth={2.5} />
                 ) : (
-                  <Plus size={24} color={tc.onTint} strokeWidth={3} />
+                  <Plus size={22} color={tc.onTint} strokeWidth={3} />
                 )}
               </View>
             </TouchableOpacity>
@@ -847,17 +847,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   captureButtonInner: {
-    width: 52,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -4,
+    marginTop: -2,
     shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   moreOverlayContainer: {
     ...StyleSheet.absoluteFillObject,
