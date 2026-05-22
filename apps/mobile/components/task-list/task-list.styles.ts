@@ -37,12 +37,18 @@ export const styles = StyleSheet.create({
   },
   headerAccessoryRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     gap: 8,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 6,
+    alignItems: 'center',
+  },
+  headerAccessoryLeft: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  headerAccessoryRight: {
     alignItems: 'flex-end',
   },
   sortButton: {

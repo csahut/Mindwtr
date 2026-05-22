@@ -17,7 +17,7 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('lucide-react-native', () => ({
-  SlidersHorizontal: () => React.createElement('span', { 'data-icon': 'sliders-horizontal' }),
+  ArrowUpDown: () => React.createElement('span', { 'data-icon': 'arrow-up-down' }),
 }));
 
 const themeColors = {
@@ -57,7 +57,7 @@ describe('TaskListHeader', () => {
     const html = renderHeader();
 
     expect(html).toContain('aria-label="Sort: Created (newest)"');
-    expect(html).toContain('data-icon="sliders-horizontal"');
+    expect(html).toContain('data-icon="arrow-up-down"');
     expect(html).not.toContain('Inbox');
   });
 
@@ -65,6 +65,6 @@ describe('TaskListHeader', () => {
     const html = renderHeader({ showSort: false });
 
     expect(html).not.toContain('aria-label="Sort');
-    expect(html).not.toContain('data-icon="sliders-horizontal"');
+    expect(html).not.toContain('data-icon="arrow-up-down"');
   });
 });

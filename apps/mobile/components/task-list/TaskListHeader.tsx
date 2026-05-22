@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import type { TimeEstimate } from '@mindwtr/core';
-import { SlidersHorizontal } from 'lucide-react-native';
+import { ArrowUpDown } from 'lucide-react-native';
 
 import { MOBILE_TIME_ESTIMATE_OPTIONS, formatTimeEstimateChipLabel } from '../time-estimate-filter-utils';
 import { styles } from './task-list.styles';
@@ -66,7 +66,7 @@ export function TaskListHeader({
       accessibilityLabel={`${t('sort.label')}: ${sortByLabel}`}
       hitSlop={8}
     >
-      <SlidersHorizontal size={16} color={themeColors.secondaryText} strokeWidth={2} />
+      <ArrowUpDown size={16} color={themeColors.secondaryText} strokeWidth={2} />
     </TouchableOpacity>
   ) : null;
 
@@ -104,8 +104,8 @@ export function TaskListHeader({
         </View>
       ) : sortControl || headerAccessory ? (
         <View style={styles.headerAccessoryRow}>
-          {sortControl}
-          {headerAccessory}
+          <View style={styles.headerAccessoryLeft}>{sortControl}</View>
+          <View style={styles.headerAccessoryRight}>{headerAccessory}</View>
         </View>
       ) : null}
 
