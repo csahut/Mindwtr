@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import {
     getFrequentTaskTokens,
     getRecentTaskTokens,
+    filterProjectsBySelectedArea,
     isTaskInActiveProject,
     normalizeClockTimeInput,
     type AppData,
@@ -143,10 +144,11 @@ export function useInboxProcessingState({
     );
 
     const filteredProjects = useMemo(() => {
-        if (!projectSearch.trim()) return projects;
+        const areaFilteredProjects = filterProjectsBySelectedArea(projects, selectedAreaId || undefined);
+        if (!projectSearch.trim()) return areaFilteredProjects;
         const query = projectSearch.trim().toLowerCase();
-        return projects.filter((project) => project.title.toLowerCase().includes(query));
-    }, [projects, projectSearch]);
+        return areaFilteredProjects.filter((project) => project.title.toLowerCase().includes(query));
+    }, [projects, projectSearch, selectedAreaId]);
 
     const hasExactProjectMatch = useMemo(() => {
         if (!projectSearch.trim()) return false;
@@ -239,7 +241,7 @@ export function useInboxProcessingState({
         setProjectTitleDraft(task.title);
         setNextActionDraft('');
         setSelectedProjectId(task.projectId ?? null);
-        setSelectedAreaId(task.projectId ? null : (task.areaId ?? null));
+        setSelectedAreaId(null);
         const startDraft = getDateFieldDraft(task.startTime);
         setScheduleDate(startDraft.date);
         setScheduleTime(startDraft.time);

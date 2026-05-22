@@ -12,7 +12,7 @@ type InboxProcessorProps = {
     projects: Project[];
     areas: Area[];
     settings?: AppData['settings'];
-    addProject: (title: string, color: string) => Promise<Project | null>;
+    addProject: (title: string, color: string, initialProps?: Partial<Project>) => Promise<Project | null>;
     updateTask: (id: string, updates: Partial<Task>) => Promise<unknown>;
     deleteTask: (id: string) => Promise<unknown>;
     allContexts: string[];

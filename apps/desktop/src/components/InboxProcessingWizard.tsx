@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { ArrowRight, BookOpen, CheckCircle, ChevronLeft, ClipboardList, Clock, Trash2, User, X } from 'lucide-react';
-import { DEFAULT_PROJECT_COLOR, safeFormatDate, safeParseDate, tFallback, type Area, type Project, type Task, type TaskPriority, type TimeEstimate } from '@mindwtr/core';
+import { DEFAULT_PROJECT_COLOR, filterProjectsBySelectedArea, safeFormatDate, safeParseDate, tFallback, type Area, type Project, type Task, type TaskPriority, type TimeEstimate } from '@mindwtr/core';
 
 import { cn } from '../lib/utils';
 import {
@@ -88,7 +88,7 @@ export type InboxProcessingWizardProps = {
     projects: Project[];
     areas: Area[];
     filteredProjects: Project[];
-    addProject: (title: string, color: string) => Promise<Project | null>;
+    addProject: (title: string, color: string, initialProps?: Partial<Project>) => Promise<Project | null>;
     handleSetProject: (projectId: string | null) => void;
     hasExactProjectMatch: boolean;
     areaById: Map<string, Area>;
@@ -217,6 +217,11 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
         : null;
     const laterLabel = tFallback(t, 'process.later', 'Later');
     const laterHint = tFallback(t, 'process.laterHint', 'Set a start date and move this to Next.');
+    const compareLabels = (left: string, right: string) =>
+        left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
+    const sortedProjects = [...projects].sort((a, b) => compareLabels(a.title, b.title));
+    const projectFilterAreaId = selectedAreaId || undefined;
+    const areaFilteredProjects = filterProjectsBySelectedArea(sortedProjects, projectFilterAreaId);
 
     const stepLabel: Record<ProcessingStep, string> = {
         refine: t('process.refineTitle'),
@@ -332,35 +337,11 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
                                 rows={2}
                             />
                         </div>
-                        {showProjectInRefine && showProjectField && (
-                            <div className="space-y-1">
-                                <label className="text-[11px] text-muted-foreground font-medium">{t('taskEdit.projectLabel')}</label>
-                                <ProjectSelector
-                                    projects={projects}
-                                    value={selectedProjectId ?? ''}
-                                    onChange={(value) => {
-                                        const nextProjectId = value || null;
-                                        setSelectedProjectId(nextProjectId);
-                                        if (nextProjectId) {
-                                            setSelectedAreaId(null);
-                                        }
-                                    }}
-                                    onCreateProject={async (title) => {
-                                        const created = await addProject(title, DEFAULT_PROJECT_COLOR);
-                                        return created?.id ?? null;
-                                    }}
-                                    placeholder={t('process.project')}
-                                    noProjectLabel={t('process.noProject')}
-                                    searchPlaceholder={t('projects.search')}
-                                    noMatchesLabel={t('common.noMatches')}
-                                    createProjectLabel={t('projects.create')}
-                                />
-                            </div>
-                        )}
                         {showProjectInRefine && showAreaField && !selectedProjectId && (
                             <div className="space-y-1">
                                 <label className="text-[11px] text-muted-foreground font-medium">{t('taskEdit.areaLabel')}</label>
                                 <select
+                                    aria-label={t('taskEdit.areaLabel')}
                                     value={selectedAreaId ?? ''}
                                     onChange={(event) => setSelectedAreaId(event.target.value || null)}
                                     className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
@@ -372,6 +353,37 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
                                         </option>
                                     ))}
                                 </select>
+                            </div>
+                        )}
+                        {showProjectInRefine && showProjectField && (
+                            <div className="space-y-1">
+                                <label className="text-[11px] text-muted-foreground font-medium">{t('taskEdit.projectLabel')}</label>
+                                <ProjectSelector
+                                    projects={areaFilteredProjects}
+                                    allProjects={sortedProjects}
+                                    value={selectedProjectId ?? ''}
+                                    onChange={(value) => {
+                                        const nextProjectId = value || null;
+                                        setSelectedProjectId(nextProjectId);
+                                        if (nextProjectId) {
+                                            setSelectedAreaId(null);
+                                        }
+                                    }}
+                                    onCreateProject={async (title) => {
+                                        const created = await addProject(
+                                            title,
+                                            DEFAULT_PROJECT_COLOR,
+                                            projectFilterAreaId ? { areaId: projectFilterAreaId } : undefined,
+                                        );
+                                        return created?.id ?? null;
+                                    }}
+                                    placeholder={t('process.project')}
+                                    noProjectLabel={t('process.noProject')}
+                                    searchPlaceholder={t('projects.search')}
+                                    noMatchesLabel={t('common.noMatches')}
+                                    emptyLabel={projectFilterAreaId ? t('projects.noProjectsInArea') : undefined}
+                                    createProjectLabel={t('projects.create')}
+                                />
                             </div>
                         )}
                     </div>
@@ -871,6 +883,24 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
 
                     {convertToProject ? (
                         <div className="space-y-3">
+                            {showAreaField ? (
+                                <div className="space-y-1">
+                                    <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.areaLabel')}</label>
+                                    <select
+                                        aria-label={t('taskEdit.areaLabel')}
+                                        value={selectedAreaId ?? ''}
+                                        onChange={(event) => setSelectedAreaId(event.target.value || null)}
+                                        className="w-full bg-card border border-border rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    >
+                                        <option value="">{t('projects.noArea')}</option>
+                                        {areas.map((area) => (
+                                            <option key={area.id} value={area.id}>
+                                                {area.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            ) : null}
                             <div className="space-y-1">
                                 <label className="text-xs text-muted-foreground font-medium">{t('projects.title')}</label>
                                 <input
@@ -902,6 +932,7 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
                                 <div className="space-y-1">
                                     <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.areaLabel')}</label>
                                     <select
+                                        aria-label={t('taskEdit.areaLabel')}
                                         value={selectedAreaId ?? ''}
                                         onChange={(event) => setSelectedAreaId(event.target.value || null)}
                                         className="w-full bg-card border border-border rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -926,12 +957,16 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
                                                 if (!projectSearch.trim()) return;
                                                 e.preventDefault();
                                                 const title = projectSearch.trim();
-                                                const existing = projects.find((project) => project.title.toLowerCase() === title.toLowerCase());
+                                                const existing = filteredProjects.find((project) => project.title.toLowerCase() === title.toLowerCase());
                                                 if (existing) {
                                                     handleSetProject(existing.id);
                                                     return;
                                                 }
-                                                const created = await addProject(title, DEFAULT_PROJECT_COLOR);
+                                                const created = await addProject(
+                                                    title,
+                                                    DEFAULT_PROJECT_COLOR,
+                                                    projectFilterAreaId ? { areaId: projectFilterAreaId } : undefined,
+                                                );
                                                 if (!created) return;
                                                 handleSetProject(created.id);
                                                 setProjectSearch('');
@@ -945,7 +980,11 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
                                                 onClick={async () => {
                                                     const title = projectSearch.trim();
                                                     if (!title) return;
-                                                    const created = await addProject(title, DEFAULT_PROJECT_COLOR);
+                                                    const created = await addProject(
+                                                        title,
+                                                        DEFAULT_PROJECT_COLOR,
+                                                        projectFilterAreaId ? { areaId: projectFilterAreaId } : undefined,
+                                                    );
                                                     if (!created) return;
                                                     handleSetProject(created.id);
                                                     setProjectSearch('');

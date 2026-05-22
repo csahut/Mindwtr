@@ -367,6 +367,23 @@ export function TaskItemEditor({
                 </div>
             )}
             <div className="flex flex-wrap gap-4">
+                {showAreaField && (
+                    <div className="flex flex-col gap-1 flex-1 min-w-0">
+                        <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.areaLabel')}</label>
+                        <AreaSelector
+                            areas={sortedAreas}
+                            value={editAreaId}
+                            onChange={setEditAreaId}
+                            onCreateArea={onCreateArea}
+                            placeholder={t('taskEdit.noAreaOption')}
+                            noAreaLabel={t('taskEdit.noAreaOption')}
+                            searchPlaceholder={t('areas.search')}
+                            noMatchesLabel={t('common.noMatches')}
+                            createAreaLabel={t('areas.create')}
+                            className="w-full"
+                        />
+                    </div>
+                )}
                 {showProjectField && (
                     <div className="flex flex-col gap-1 flex-1 min-w-0">
                         <label className="text-xs text-muted-foreground font-medium">{t('projects.title')}</label>
@@ -399,23 +416,6 @@ export function TaskItemEditor({
                             searchPlaceholder={t('sections.search')}
                             noMatchesLabel={t('common.noMatches')}
                             createSectionLabel={t('projects.addSection')}
-                            className="w-full"
-                        />
-                    </div>
-                )}
-                {showAreaField && (
-                    <div className="flex flex-col gap-1 flex-1 min-w-0">
-                        <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.areaLabel')}</label>
-                        <AreaSelector
-                            areas={sortedAreas}
-                            value={editAreaId}
-                            onChange={setEditAreaId}
-                            onCreateArea={onCreateArea}
-                            placeholder={t('taskEdit.noAreaOption')}
-                            noAreaLabel={t('taskEdit.noAreaOption')}
-                            searchPlaceholder={t('areas.search')}
-                            noMatchesLabel={t('common.noMatches')}
-                            createAreaLabel={t('areas.create')}
                             className="w-full"
                         />
                     </div>

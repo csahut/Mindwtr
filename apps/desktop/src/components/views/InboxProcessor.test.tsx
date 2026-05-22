@@ -34,19 +34,83 @@ const createdProject: Project = {
     updatedAt: nowIso,
 };
 
+const workArea: Area = {
+    id: 'area-work',
+    name: 'Work',
+    color: '#2563eb',
+    order: 0,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+};
+
+const homeArea: Area = {
+    id: 'area-home',
+    name: 'Home',
+    color: '#16a34a',
+    order: 1,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+};
+
+const workProject: Project = {
+    id: 'project-work',
+    title: 'Work Project',
+    color: '#2563eb',
+    status: 'active',
+    order: 0,
+    tagIds: [],
+    areaId: workArea.id,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+};
+
+const homeProject: Project = {
+    id: 'project-home',
+    title: 'Home Project',
+    color: '#16a34a',
+    status: 'active',
+    order: 1,
+    tagIds: [],
+    areaId: homeArea.id,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+};
+
 type RenderResult = {
     addProject: ReturnType<typeof vi.fn>;
     updateTask: ReturnType<typeof vi.fn>;
     deleteTask: ReturnType<typeof vi.fn>;
 } & ReturnType<typeof render>;
 
-const renderInboxProcessor = (settings?: AppData['settings']): RenderResult => {
+type RenderInboxProcessorOptions = {
+    settings?: AppData['settings'];
+    tasks?: Task[];
+    projects?: Project[];
+    areas?: Area[];
+};
+
+const isRenderInboxProcessorOptions = (
+    options: AppData['settings'] | RenderInboxProcessorOptions | undefined,
+): options is RenderInboxProcessorOptions => (
+    !!options
+    && (
+        'settings' in options
+        || 'tasks' in options
+        || 'projects' in options
+        || 'areas' in options
+    )
+);
+
+const renderInboxProcessor = (options?: AppData['settings'] | RenderInboxProcessorOptions): RenderResult => {
+    const renderOptions = isRenderInboxProcessorOptions(options)
+        ? options
+        : { settings: options };
     const addProject = vi.fn(async () => createdProject);
     const updateTask = vi.fn(async () => undefined);
     const deleteTask = vi.fn(async () => undefined);
-    const tasks = [inboxTask];
-    const projects: Project[] = [];
-    const areas: Area[] = [];
+    const tasks = renderOptions.tasks ?? [inboxTask];
+    const projects = renderOptions.projects ?? [];
+    const areas = renderOptions.areas ?? [];
 
     const TestHarness = () => {
         const [isProcessing, setIsProcessing] = useState(false);
@@ -57,7 +121,7 @@ const renderInboxProcessor = (settings?: AppData['settings']): RenderResult => {
                 tasks={tasks}
                 projects={projects}
                 areas={areas}
-                settings={settings}
+                settings={renderOptions.settings}
                 addProject={addProject}
                 updateTask={updateTask}
                 deleteTask={deleteTask}
@@ -117,6 +181,75 @@ describe('InboxProcessor', () => {
 
         expect(getByText('process.quickDesc')).toBeTruthy();
         expect(queryByText('process.refineDesc')).toBeNull();
+    });
+
+    it('starts quick processing without preselecting the task area', () => {
+        const { getByRole, getByLabelText } = renderInboxProcessor({
+            settings: {
+                gtd: {
+                    inboxProcessing: {
+                        defaultMode: 'quick',
+                    },
+                },
+            },
+            tasks: [{ ...inboxTask, areaId: 'area-work' }],
+            areas: [workArea],
+        });
+
+        fireEvent.click(getByRole('button', { name: /process\.btn/i }));
+
+        expect((getByLabelText('taskEdit.areaLabel') as HTMLSelectElement).value).toBe('');
+    });
+
+    it('filters quick processing project choices by the selected area', () => {
+        const { getByRole, getByLabelText, queryByRole } = renderInboxProcessor({
+            settings: {
+                gtd: {
+                    inboxProcessing: {
+                        defaultMode: 'quick',
+                    },
+                },
+            },
+            areas: [workArea, homeArea],
+            projects: [workProject, homeProject],
+        });
+
+        fireEvent.click(getByRole('button', { name: /process\.btn/i }));
+        fireEvent.change(getByLabelText('taskEdit.areaLabel'), {
+            target: { value: 'area-work' },
+        });
+        fireEvent.click(getByRole('button', { name: 'process.project' }));
+
+        expect(getByRole('option', { name: 'Work Project' })).toBeTruthy();
+        expect(queryByRole('option', { name: 'Home Project' })).toBeNull();
+    });
+
+    it('shows area before project in guided project-first processing and filters projects', () => {
+        const { container, getByRole, getByLabelText, queryByRole } = renderInboxProcessor({
+            settings: {
+                gtd: {
+                    inboxProcessing: {
+                        projectFirst: true,
+                    },
+                },
+            },
+            areas: [workArea, homeArea],
+            projects: [workProject, homeProject],
+        });
+
+        fireEvent.click(getByRole('button', { name: /process\.btn/i }));
+
+        expect(container.innerHTML.indexOf('taskEdit.areaLabel')).toBeLessThan(
+            container.innerHTML.indexOf('taskEdit.projectLabel'),
+        );
+
+        fireEvent.change(getByLabelText('taskEdit.areaLabel'), {
+            target: { value: 'area-work' },
+        });
+        fireEvent.click(getByRole('button', { name: 'process.project' }));
+
+        expect(getByRole('option', { name: 'Work Project' })).toBeTruthy();
+        expect(queryByRole('option', { name: 'Home Project' })).toBeNull();
     });
 
     it('keeps processing cards from clipping project dropdowns', () => {

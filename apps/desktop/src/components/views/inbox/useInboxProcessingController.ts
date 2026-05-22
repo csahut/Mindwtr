@@ -27,7 +27,7 @@ type UseInboxProcessingControllerParams = {
     projects: Project[];
     areas: Area[];
     settings?: AppData['settings'];
-    addProject: (title: string, color: string) => Promise<Project | null>;
+    addProject: (title: string, color: string, initialProps?: Partial<Project>) => Promise<Project | null>;
     updateTask: (id: string, updates: Partial<Task>) => Promise<unknown>;
     deleteTask: (id: string) => Promise<unknown>;
     allContexts: string[];
@@ -160,6 +160,15 @@ export function useInboxProcessingController({
         settings,
     });
     const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
+
+    const handleSetSelectedAreaId = useCallback((areaId: string | null) => {
+        setSelectedAreaId(areaId);
+        setSelectedProjectId((currentProjectId) => {
+            if (!currentProjectId || !areaId) return currentProjectId;
+            const project = projectMap.get(currentProjectId);
+            return project?.areaId === areaId ? currentProjectId : null;
+        });
+    }, [projectMap, setSelectedAreaId, setSelectedProjectId]);
 
     useEffect(() => {
         if (isProcessing) return;
@@ -563,7 +572,11 @@ export function useInboxProcessingController({
         }
         try {
             const existing = projects.find((project) => project.title.toLowerCase() === projectTitle.toLowerCase());
-            const project = existing ?? await addProject(projectTitle, DEFAULT_PROJECT_COLOR);
+            const project = existing ?? await addProject(
+                projectTitle,
+                DEFAULT_PROJECT_COLOR,
+                showAreaField && selectedAreaId ? { areaId: selectedAreaId } : undefined,
+            );
             if (!project) return;
             const applied = applyProcessingEdits({
                 status: 'next',
@@ -594,12 +607,14 @@ export function useInboxProcessingController({
         processNext,
         projectTitleDraft,
         projects,
+        selectedAreaId,
         selectedAssignedTo,
         selectedContexts,
         selectedEnergyLevel,
         selectedPriority,
         selectedTimeEstimate,
         selectedTags,
+        showAreaField,
         showContextsField,
         showTagsField,
         showToast,
@@ -718,7 +733,7 @@ export function useInboxProcessingController({
             selectedProjectId,
             setSelectedProjectId,
             selectedAreaId,
-            setSelectedAreaId,
+            setSelectedAreaId: handleSetSelectedAreaId,
             showProjectField,
             showAreaField,
             convertToProject,
@@ -816,7 +831,7 @@ export function useInboxProcessingController({
         selectedProjectId,
         setSelectedProjectId,
         selectedAreaId,
-        setSelectedAreaId,
+        setSelectedAreaId: handleSetSelectedAreaId,
         showProjectField,
         showAreaField,
         showScheduleFields,
