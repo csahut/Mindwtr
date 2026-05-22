@@ -60,7 +60,6 @@ export default function InboxScreen() {
         title={t('inbox.title')}
         showHeader={false}
         enableBulkActions={false}
-        showSort={false}
         allowAdd={false}
         showQuickAddHelp={false}
         emptyText={t('inbox.empty')}

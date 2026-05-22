@@ -1,6 +1,7 @@
-import type React from 'react';
+import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import type { TimeEstimate } from '@mindwtr/core';
+import { SlidersHorizontal } from 'lucide-react-native';
 
 import { MOBILE_TIME_ESTIMATE_OPTIONS, formatTimeEstimateChipLabel } from '../time-estimate-filter-utils';
 import { styles } from './task-list.styles';
@@ -54,6 +55,21 @@ export function TaskListHeader({
   title,
   toggleTimeEstimate,
 }: TaskListHeaderProps) {
+  const sortControl = showSort ? (
+    <TouchableOpacity
+      onPress={onOpenSort}
+      style={[
+        styles.sortButton,
+        { borderColor: themeColors.border, backgroundColor: themeColors.filterBg },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${t('sort.label')}: ${sortByLabel}`}
+      hitSlop={8}
+    >
+      <SlidersHorizontal size={16} color={themeColors.secondaryText} strokeWidth={2} />
+    </TouchableOpacity>
+  ) : null;
+
   return (
     <>
       {showHeader ? (
@@ -67,18 +83,7 @@ export function TaskListHeader({
             </Text>
           </View>
           <View style={styles.headerActions}>
-            {showSort && (
-              <TouchableOpacity
-                onPress={onOpenSort}
-                style={[styles.sortButton, { borderColor: themeColors.border }]}
-                accessibilityRole="button"
-                accessibilityLabel={t('sort.label')}
-              >
-                <Text style={[styles.sortButtonText, { color: themeColors.secondaryText }]}>
-                  {sortByLabel}
-                </Text>
-              </TouchableOpacity>
-            )}
+            {sortControl}
             {headerAccessory}
             {enableBulkActions && (
               <TouchableOpacity
@@ -97,8 +102,9 @@ export function TaskListHeader({
             )}
           </View>
         </View>
-      ) : headerAccessory ? (
+      ) : sortControl || headerAccessory ? (
         <View style={styles.headerAccessoryRow}>
+          {sortControl}
           {headerAccessory}
         </View>
       ) : null}

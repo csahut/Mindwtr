@@ -47,12 +47,11 @@ export const styles = StyleSheet.create({
   },
   sortButton: {
     borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  sortButtonText: {
-    fontSize: 12,
+    borderRadius: 18,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   selectButton: {
     borderWidth: 1,
