@@ -458,6 +458,9 @@ export const deOverrides: Record<string, string> = {
         'projects.sequential': 'Sequenziell',
         'projects.sequentialTooltip': 'Sequenziell: Nur die erste Aufgabe wird in den Nächste Aktionen angezeigt',
         'projects.parallelTooltip': 'Parallel: Alle Aufgaben werden in den Nächste Aktionen angezeigt',
+        'projects.sequentialScope': 'Sequenzumfang',
+        'projects.sequentialAcrossSections': 'Über Abschnitte hinweg',
+        'projects.sequentialWithinSections': 'Innerhalb von Abschnitten',
         'projects.reviewAtHint': 'Erinnerungsdatum für eine Revision diese Projekts.',
         'projects.noNextAction': 'Keine Nächste Aktion',
         

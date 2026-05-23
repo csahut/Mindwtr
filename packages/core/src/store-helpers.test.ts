@@ -417,4 +417,15 @@ describe('derived store state helpers', () => {
 
         expect(derived.focusedProjectCount).toBe(2);
     });
+
+    it('derives section-scoped sequential project ids', () => {
+        const derived = computeProjectDerivedState([
+            createProject('project-wide', { isSequential: true }),
+            createProject('section-wide', { isSequential: true, sequentialScope: 'section' }),
+            createProject('parallel-section', { isSequential: false, sequentialScope: 'section' }),
+        ]);
+
+        expect([...derived.sequentialProjectIds]).toEqual(['project-wide', 'section-wide']);
+        expect([...derived.sequentialWithinSectionProjectIds]).toEqual(['section-wide']);
+    });
 });

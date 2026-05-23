@@ -1,4 +1,5 @@
 import type { AppData, Area, Project, Task } from './types';
+import { normalizeProjectSequentialScope } from './project-utils';
 import { normalizeTaskForLoad } from './task-status';
 import { SYNC_REPAIR_REV_BY } from './sync-types';
 import { isValidRevision, nextRevision, normalizeRevision } from './sync-revision';
@@ -84,6 +85,7 @@ export const normalizeProjectForSyncMerge = (project: Project): Project => {
         color: normalizeOptionalString(project.color) ?? '#6B7280',
         tagIds: normalizeStringArray(project.tagIds),
         isSequential: project.isSequential === true,
+        sequentialScope: normalizeProjectSequentialScope(project.sequentialScope),
         isFocused: project.isFocused === true,
         dueDate: normalizeOptionalString(project.dueDate),
         reviewAt: normalizeOptionalString(project.reviewAt),

@@ -517,13 +517,23 @@ export default function FocusScreen() {
   const sequentialProjectIds = useMemo(() => {
     return new Set(visibleProjects.filter((project) => project.isSequential).map((project) => project.id));
   }, [visibleProjects]);
+  const sequentialWithinSectionProjectIds = useMemo(() => {
+    return new Set(
+      visibleProjects
+        .filter((project) => project.isSequential && project.sequentialScope === 'section')
+        .map((project) => project.id)
+    );
+  }, [visibleProjects]);
 
   const { focusedTasks, schedule, nextActions, reviewDue } = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
     const { focusedTasks: allFocusedTasks, otherTasks: nonFocusedTasks } = splitFocusedTasks(filteredActiveTasks);
-    const sequentialFirstTaskIds = getFocusSequentialFirstTaskIds(baseActiveTasks, sequentialProjectIds, { now });
+    const sequentialFirstTaskIds = getFocusSequentialFirstTaskIds(baseActiveTasks, sequentialProjectIds, {
+      now,
+      sectionScopedProjectIds: sequentialWithinSectionProjectIds,
+    });
 
     const isSequentialBlocked = (task: Task) => {
       if (!task.projectId) return false;
@@ -570,7 +580,7 @@ export default function FocusScreen() {
       }),
       reviewDue: reviewDueItems,
     };
-  }, [baseActiveTasks, filteredActiveTasks, prioritiesEnabled, sequentialProjectIds]);
+  }, [baseActiveTasks, filteredActiveTasks, prioritiesEnabled, sequentialProjectIds, sequentialWithinSectionProjectIds]);
 
   const sections = useMemo<FocusSection[]>(() => {
     const buildTaskItems = (items: Task[], grouped = false): FocusListItem[] => (

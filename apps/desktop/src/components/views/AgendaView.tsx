@@ -197,7 +197,7 @@ export function AgendaView() {
         shallow
     );
     const getDerivedState = useTaskStore((state) => state.getDerivedState);
-    const { activeTasksByStatus, projectMap, sequentialProjectIds, tasksById } = getDerivedState();
+    const { activeTasksByStatus, projectMap, sequentialProjectIds, sequentialWithinSectionProjectIds, tasksById } = getDerivedState();
     const { t } = useLanguage();
     const { showListDetails, nextGroupBy, top3Only, setListOptions, collapseAllTaskDetails } = useUiStore((state) => ({
         showListDetails: state.listOptions.showDetails,
@@ -590,7 +590,10 @@ export function AgendaView() {
                 return aCreated - bCreated;
             });
         };
-        const sequentialFirstTasks = getFocusSequentialFirstTaskIds(baseActiveTasks, sequentialProjectIds, { now });
+        const sequentialFirstTasks = getFocusSequentialFirstTaskIds(baseActiveTasks, sequentialProjectIds, {
+            now,
+            sectionScopedProjectIds: sequentialWithinSectionProjectIds,
+        });
         const isSequentialBlocked = (task: Task) => {
             if (!task.projectId) return false;
             if (!sequentialProjectIds.has(task.projectId)) return false;
@@ -634,7 +637,7 @@ export function AgendaView() {
             }),
             reviewDue: sortWith(reviewDue, (task) => safeParseDate(task.reviewAt)?.getTime() ?? Number.POSITIVE_INFINITY),
         };
-    }, [baseActiveTasks, filteredActiveTasks, reviewDueCandidates, prioritiesEnabled, sequentialProjectIds]);
+    }, [baseActiveTasks, filteredActiveTasks, reviewDueCandidates, prioritiesEnabled, sequentialProjectIds, sequentialWithinSectionProjectIds]);
     const nextActionGroups = useMemo(() => {
         if (nextGroupBy === 'none') return [] as TaskGroup[];
         if (nextGroupBy === 'area') {

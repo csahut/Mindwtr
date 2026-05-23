@@ -504,6 +504,9 @@ export const itOverrides: Record<string, string> = {
         'projects.parallel': 'Parallelo',
         'projects.sequentialTooltip': 'Sequenziale: solo la prima attività compare in Prossime azioni',
         'projects.parallelTooltip': 'Parallelo: tutte le attività compaiono in Prossime azioni',
+        'projects.sequentialScope': 'Ambito sequenziale',
+        'projects.sequentialAcrossSections': 'Tra sezioni',
+        'projects.sequentialWithinSections': 'Dentro le sezioni',
         'projects.reviewAtHint': 'Data di promemoria per rivedere questo progetto.',
         'projects.noNextAction': 'Nessuna prossima azione',
 

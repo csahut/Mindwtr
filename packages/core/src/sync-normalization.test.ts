@@ -44,6 +44,7 @@ describe('sync normalization', () => {
             areaId: '',
             areaTitle: '   ',
             isSequential: 'true',
+            sequentialScope: 'not-a-scope',
         } as unknown as Project;
         const area = {
             ...createMockArea('area-1', '2025-12-31T23:00:00.000Z'),
@@ -78,6 +79,7 @@ describe('sync normalization', () => {
             areaId: undefined,
             areaTitle: undefined,
             isSequential: false,
+            sequentialScope: undefined,
         });
         expect(once.areas[0]).toMatchObject({
             color: undefined,

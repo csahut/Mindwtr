@@ -2,6 +2,11 @@ import type { Project, Task, TaskStatus } from './types';
 
 const CLOSED_PROJECT_TASK_STATUSES = new Set<TaskStatus>(['done', 'archived', 'reference']);
 
+export function normalizeProjectSequentialScope(value: unknown): Project['sequentialScope'] {
+    if (value === 'section' || value === 'project') return value;
+    return undefined;
+}
+
 const getTaskProjectOrder = (task: Task): number => {
     if (Number.isFinite(task.order)) return task.order as number;
     if (Number.isFinite(task.orderNum)) return task.orderNum as number;

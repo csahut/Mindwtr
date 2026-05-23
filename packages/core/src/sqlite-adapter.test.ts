@@ -156,6 +156,7 @@ describeSqlite('SqliteAdapter', () => {
                     order: 0,
                     tagIds: ['tag-1'],
                     isSequential: true,
+                    sequentialScope: 'section',
                     isFocused: false,
                     dueDate: '2026-03-31',
                     rev: 7,
@@ -250,6 +251,7 @@ describeSqlite('SqliteAdapter', () => {
         expect(project.title).toBe('Mindwtr');
         expect(project.tagIds).toEqual(['tag-1']);
         expect(project.isSequential).toBe(true);
+        expect(project.sequentialScope).toBe('section');
         expect(project.isFocused).toBe(false);
         expect(project.dueDate).toBe('2026-03-31');
         expect(project.rev).toBe(7);

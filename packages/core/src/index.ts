@@ -16,6 +16,7 @@ export type {
     FilterSettings,
     PendingRemoteAttachmentDelete,
     Project,
+    ProjectSequentialScope,
     GtdSettings,
     MigrationSettings,
     MobileQuickAccessView,

@@ -264,6 +264,17 @@ describe('task-utils', () => {
 
             expect([...firstTaskIds]).toEqual(['older']);
         });
+
+        it('returns the first active task per section for section-scoped sequential projects', () => {
+            const firstTaskIds = getSequentialFirstTaskIds([
+                { id: 'phase-a-second', projectId: 'p1', sectionId: 'section-a', order: 2, orderNum: undefined, createdAt: '2026-04-02T00:00:00.000Z' },
+                { id: 'phase-a-first', projectId: 'p1', sectionId: 'section-a', order: 1, orderNum: undefined, createdAt: '2026-04-01T00:00:00.000Z' },
+                { id: 'phase-b-first', projectId: 'p1', sectionId: 'section-b', order: 3, orderNum: undefined, createdAt: '2026-04-03T00:00:00.000Z' },
+                { id: 'phase-b-second', projectId: 'p1', sectionId: 'section-b', order: 4, orderNum: undefined, createdAt: '2026-04-04T00:00:00.000Z' },
+            ], new Set(['p1']), { sectionScopedProjectIds: new Set(['p1']) });
+
+            expect([...firstTaskIds]).toEqual(['phase-a-first', 'phase-b-first']);
+        });
     });
 
     describe('getFocusSequentialFirstTaskIds', () => {
@@ -326,6 +337,16 @@ describe('task-utils', () => {
             ], new Set(['p1']), { now });
 
             expect([...firstTaskIds]).toEqual(['future-start']);
+        });
+
+        it('returns the first Focus candidate from each section when the sequential project is section-scoped', () => {
+            const firstTaskIds = getFocusSequentialFirstTaskIds([
+                { id: 'section-a-first', projectId: 'p1', sectionId: 'section-a', status: 'next', order: 1, orderNum: undefined, createdAt: '2026-04-01T00:00:00.000Z' },
+                { id: 'section-a-second', projectId: 'p1', sectionId: 'section-a', status: 'next', order: 2, orderNum: undefined, createdAt: '2026-04-02T00:00:00.000Z' },
+                { id: 'section-b-first', projectId: 'p1', sectionId: 'section-b', status: 'next', order: 3, orderNum: undefined, createdAt: '2026-04-03T00:00:00.000Z' },
+            ], new Set(['p1']), { now, sectionScopedProjectIds: new Set(['p1']) });
+
+            expect([...firstTaskIds]).toEqual(['section-a-first', 'section-b-first']);
         });
     });
 });

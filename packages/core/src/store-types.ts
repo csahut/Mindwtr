@@ -146,6 +146,7 @@ export type DerivedState = {
     allContexts: string[];
     allTags: string[];
     sequentialProjectIds: Set<string>;
+    sequentialWithinSectionProjectIds: Set<string>;
     focusedCount: number;
     focusedProjectCount: number;
 };

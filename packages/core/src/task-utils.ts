@@ -40,9 +40,17 @@ type TaskStartVisibilityOptions = {
 
 type FocusSequentialOptions = {
     now?: Date;
+    sectionScopedProjectIds?: ReadonlySet<string>;
 };
 
 type SequentialTaskOrderFields = Pick<Task, 'createdAt' | 'order' | 'orderNum'>;
+type SequentialGroupingFields = Pick<Task, 'projectId'> & Partial<Pick<Task, 'sectionId'>>;
+
+type SequentialFirstTaskOptions = {
+    sectionScopedProjectIds?: ReadonlySet<string>;
+};
+
+const NO_SECTION_GROUP = '__no_section__';
 
 const safeTime = (value: string | undefined, fallback: number): number => {
     if (!value) return fallback;
@@ -92,6 +100,17 @@ function getSequentialTaskOrderKey<T extends SequentialTaskOrderFields>(task: T,
     return hasOrder
         ? taskOrder
         : (safeParseDate(task.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY);
+}
+
+function getSequentialTaskGroupKey<T extends SequentialGroupingFields>(
+    task: T,
+    sectionScopedProjectIds?: ReadonlySet<string>,
+): string | null {
+    if (!task.projectId) return null;
+    if (sectionScopedProjectIds?.has(task.projectId)) {
+        return `${task.projectId}:${task.sectionId || NO_SECTION_GROUP}`;
+    }
+    return task.projectId;
 }
 
 export function rescheduleTask(task: Task, newDueDate?: string): Task {
@@ -146,21 +165,23 @@ export function shouldShowTaskForStart(
     return !isTaskFutureStart(task, options.now);
 }
 
-export function getSequentialFirstTaskIds<T extends Pick<Task, 'createdAt' | 'id' | 'order' | 'orderNum' | 'projectId'>>(
+export function getSequentialFirstTaskIds<T extends Pick<Task, 'createdAt' | 'id' | 'order' | 'orderNum' | 'projectId'> & Partial<Pick<Task, 'sectionId'>>>(
     tasks: T[],
     sequentialProjectIds: ReadonlySet<string>,
+    options: SequentialFirstTaskOptions = {},
 ): Set<string> {
-    const tasksByProject = new Map<string, T[]>();
+    const tasksByGroup = new Map<string, T[]>();
     for (const task of tasks) {
-        if (!task.projectId) continue;
+        const groupKey = getSequentialTaskGroupKey(task, options.sectionScopedProjectIds);
+        if (!groupKey || !task.projectId) continue;
         if (!sequentialProjectIds.has(task.projectId)) continue;
-        const list = tasksByProject.get(task.projectId) ?? [];
+        const list = tasksByGroup.get(groupKey) ?? [];
         list.push(task);
-        tasksByProject.set(task.projectId, list);
+        tasksByGroup.set(groupKey, list);
     }
 
     const firstTaskIds = new Set<string>();
-    tasksByProject.forEach((tasksForProject) => {
+    tasksByGroup.forEach((tasksForProject) => {
         const hasOrder = tasksForProject.some((task) => Number.isFinite(task.order) || Number.isFinite(task.orderNum));
         let firstTaskId: string | null = null;
         let bestKey = Number.POSITIVE_INFINITY;
@@ -221,25 +242,26 @@ function getFocusSequentialScheduleKey(
 }
 
 export function getFocusSequentialFirstTaskIds<
-    T extends Pick<Task, 'createdAt' | 'dueDate' | 'id' | 'isFocusedToday' | 'order' | 'orderNum' | 'projectId' | 'reviewAt' | 'startTime' | 'status'>
+    T extends Pick<Task, 'createdAt' | 'dueDate' | 'id' | 'isFocusedToday' | 'order' | 'orderNum' | 'projectId' | 'reviewAt' | 'startTime' | 'status'> & Partial<Pick<Task, 'sectionId'>>
 >(
     tasks: T[],
     sequentialProjectIds: ReadonlySet<string>,
     options: FocusSequentialOptions = {},
 ): Set<string> {
     const now = options.now ?? new Date();
-    const tasksByProject = new Map<string, T[]>();
+    const tasksByGroup = new Map<string, T[]>();
     for (const task of tasks) {
-        if (!task.projectId) continue;
+        const groupKey = getSequentialTaskGroupKey(task, options.sectionScopedProjectIds);
+        if (!groupKey || !task.projectId) continue;
         if (!sequentialProjectIds.has(task.projectId)) continue;
         if (!isFocusSequentialCandidate(task, { now })) continue;
-        const list = tasksByProject.get(task.projectId) ?? [];
+        const list = tasksByGroup.get(groupKey) ?? [];
         list.push(task);
-        tasksByProject.set(task.projectId, list);
+        tasksByGroup.set(groupKey, list);
     }
 
     const firstTaskIds = new Set<string>();
-    tasksByProject.forEach((tasksForProject) => {
+    tasksByGroup.forEach((tasksForProject) => {
         const hasOrder = tasksForProject.some((task) => Number.isFinite(task.order) || Number.isFinite(task.orderNum));
         let firstTaskId: string | null = null;
         let bestScheduleRank = Number.POSITIVE_INFINITY;

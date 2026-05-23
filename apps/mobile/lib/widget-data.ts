@@ -141,6 +141,11 @@ export function buildWidgetPayload(
     const sequentialProjectIds = new Set(
         projects.filter((project) => project.isSequential && !project.deletedAt).map((project) => project.id)
     );
+    const sequentialWithinSectionProjectIds = new Set(
+        projects
+            .filter((project) => project.isSequential && project.sequentialScope === 'section' && !project.deletedAt)
+            .map((project) => project.id)
+    );
 
     const activeTasks = tasks.filter((task) => {
         if (task.deletedAt) return false;
@@ -170,6 +175,7 @@ export function buildWidgetPayload(
             && (!isPlannedForFuture(task) || isScheduleCandidate(task))
         )),
         sequentialProjectIds,
+        { sectionScopedProjectIds: sequentialWithinSectionProjectIds },
     );
     const isSequentialBlocked = (task: AppData['tasks'][number]) => {
         if (!task.projectId) return false;

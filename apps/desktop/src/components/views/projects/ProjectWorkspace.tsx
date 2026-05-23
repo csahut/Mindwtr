@@ -905,6 +905,8 @@ export function ProjectWorkspace({
                                         }}
                                         isSequential={selectedProject.isSequential === true}
                                         onToggleSequential={() => updateProject(selectedProject.id, { isSequential: !selectedProject.isSequential })}
+                                        sequentialScope={selectedProject.sequentialScope ?? 'project'}
+                                        onSequentialScopeChange={(sequentialScope) => updateProject(selectedProject.id, { sequentialScope })}
                                         status={selectedProject.status}
                                         onChangeStatus={(status) => updateProject(selectedProject.id, { status })}
                                         dueDateValue={toDateInputValue(selectedProject.dueDate)}

@@ -187,6 +187,15 @@ export function ProjectDetailModal({
     const showCompletedLabel = showCompletedTasks
         ? tFallback(t, 'common.hideCompleted', 'Hide completed')
         : tFallback(t, 'common.showCompleted', 'Show completed');
+    const sequentialScopeLabel = tFallback(t, 'projects.sequentialScope', 'Sequential Scope');
+    const sequentialAcrossSectionsLabel = tFallback(t, 'projects.sequentialAcrossSections', 'Across sections');
+    const sequentialWithinSectionsLabel = tFallback(t, 'projects.sequentialWithinSections', 'Within sections');
+    const resolvedSequentialScope = selectedProject?.sequentialScope === 'section' ? 'section' : 'project';
+    const setSelectedProjectSequentialScope = (sequentialScope: Project['sequentialScope']) => {
+        if (!selectedProject) return;
+        updateProject(selectedProject.id, { sequentialScope });
+        onSetSelectedProject({ ...selectedProject, sequentialScope });
+    };
     const completedToggle = selectedProject && selectedProject.status !== 'archived' ? (
         <TouchableOpacity
             accessibilityLabel={showCompletedLabel}
@@ -374,6 +383,43 @@ export function ProjectDetailModal({
 
                                 {showProjectMeta && (
                                     <>
+                                        {selectedProject.isSequential && (
+                                            <View style={[styles.reviewContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
+                                                <Text style={[styles.reviewLabel, { color: tc.text }]}>{sequentialScopeLabel}</Text>
+                                                <View style={styles.sequentialScopeOptions}>
+                                                    {(['project', 'section'] as const).map((scope) => {
+                                                        const selected = resolvedSequentialScope === scope;
+                                                        return (
+                                                            <TouchableOpacity
+                                                                key={scope}
+                                                                accessibilityRole="button"
+                                                                accessibilityState={{ selected }}
+                                                                onPress={() => setSelectedProjectSequentialScope(scope)}
+                                                                style={[
+                                                                    styles.sequentialScopeButton,
+                                                                    {
+                                                                        backgroundColor: selected ? tc.tint : tc.inputBg,
+                                                                        borderColor: selected ? tc.tint : tc.border,
+                                                                    },
+                                                                ]}
+                                                            >
+                                                                <Text
+                                                                    style={[
+                                                                        styles.sequentialScopeText,
+                                                                        { color: selected ? tc.onTint : tc.text },
+                                                                    ]}
+                                                                >
+                                                                    {scope === 'section'
+                                                                        ? sequentialWithinSectionsLabel
+                                                                        : sequentialAcrossSectionsLabel}
+                                                                </Text>
+                                                            </TouchableOpacity>
+                                                        );
+                                                    })}
+                                                </View>
+                                            </View>
+                                        )}
+
                                         <View style={[styles.reviewContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
                                             <Text style={[styles.reviewLabel, { color: tc.text }]}>{t('projects.areaLabel')}</Text>
                                             <TouchableOpacity

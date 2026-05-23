@@ -263,6 +263,26 @@ export const projectsScreenStyles = StyleSheet.create({
     sequentialToggleTextActive: {
         color: '#FFFFFF',
     },
+    sequentialScopeOptions: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 8,
+    },
+    sequentialScopeButton: {
+        flex: 1,
+        minHeight: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 8,
+        borderWidth: 1,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+    },
+    sequentialScopeText: {
+        fontSize: 12,
+        fontWeight: '700',
+        textAlign: 'center',
+    },
     statusBlock: {
         borderBottomWidth: 1,
     },

@@ -71,6 +71,8 @@ export type TaskEditorPresentation = 'inline' | 'modal';
 
 export type InboxProcessingMode = 'guided' | 'quick';
 
+export type ProjectSequentialScope = 'project' | 'section';
+
 export interface Project {
     id: string;
     title: string;
@@ -79,6 +81,7 @@ export interface Project {
     order: number; // Sort order within an Area
     tagIds: string[]; // Array of Tag IDs
     isSequential?: boolean; // If true, only first incomplete task shows in Next Actions
+    sequentialScope?: ProjectSequentialScope; // 'project' = one stream, 'section' = first incomplete task per section
     isFocused?: boolean; // If true, this project is a priority focus (max 5 allowed)
     supportNotes?: string;
     attachments?: Attachment[];

@@ -13,6 +13,7 @@ import { normalizeTaskStatus } from './task-status';
 import { normalizeRecurrenceForLoad } from './recurrence';
 import { logWarn } from './logger';
 import { normalizeSavedFilter, normalizeSavedFilters } from './saved-filters';
+import { normalizeProjectSequentialScope } from './project-utils';
 
 export interface SqliteClient {
     run(sql: string, params?: unknown[]): Promise<void>;
@@ -470,6 +471,7 @@ export class SqliteAdapter {
             { name: 'orderNum', sql: 'ALTER TABLE projects ADD COLUMN orderNum INTEGER' },
             { name: 'tagIds', sql: 'ALTER TABLE projects ADD COLUMN tagIds TEXT' },
             { name: 'isSequential', sql: 'ALTER TABLE projects ADD COLUMN isSequential INTEGER' },
+            { name: 'sequentialScope', sql: 'ALTER TABLE projects ADD COLUMN sequentialScope TEXT' },
             { name: 'isFocused', sql: 'ALTER TABLE projects ADD COLUMN isFocused INTEGER' },
             { name: 'supportNotes', sql: 'ALTER TABLE projects ADD COLUMN supportNotes TEXT' },
             { name: 'attachments', sql: 'ALTER TABLE projects ADD COLUMN attachments TEXT' },
@@ -706,6 +708,7 @@ export class SqliteAdapter {
             order: orderNumRaw === null || orderNumRaw === undefined ? fallbackOrder : Number(orderNumRaw),
             tagIds: toStringArray(fromJson<unknown>(row.tagIds, [])),
             isSequential: fromBool(row.isSequential),
+            sequentialScope: normalizeProjectSequentialScope(row.sequentialScope),
             isFocused: fromBool(row.isFocused),
             supportNotes: row.supportNotes as string | undefined,
             attachments: toAttachments(fromJson<unknown>(row.attachments, undefined)),
@@ -1028,6 +1031,7 @@ export class SqliteAdapter {
                     'orderNum',
                     'tagIds',
                     'isSequential',
+                    'sequentialScope',
                     'isFocused',
                     'supportNotes',
                     'attachments',
@@ -1049,6 +1053,7 @@ export class SqliteAdapter {
                     Number.isFinite(project.order) ? project.order : 0,
                     toJson(project.tagIds ?? []),
                     toBool(project.isSequential),
+                    normalizeProjectSequentialScope(project.sequentialScope) ?? null,
                     toBool(project.isFocused),
                     project.supportNotes ?? null,
                     toJson(project.attachments),
@@ -1068,6 +1073,7 @@ export class SqliteAdapter {
                  orderNum=excluded.orderNum,
                  tagIds=excluded.tagIds,
                  isSequential=excluded.isSequential,
+                 sequentialScope=excluded.sequentialScope,
                  isFocused=excluded.isFocused,
                  supportNotes=excluded.supportNotes,
                  attachments=excluded.attachments,

@@ -430,6 +430,43 @@ describe('FocusScreen', () => {
     ).toEqual(['available-next']);
   });
 
+  it('shows the first next action from each section for section-scoped sequential projects', () => {
+    storeState.projects = [makeProject('project-1', { isSequential: true, sequentialScope: 'section' })];
+    storeState.tasks = [
+      makeTask('section-a-first', {
+        status: 'next',
+        projectId: 'project-1',
+        sectionId: 'section-a',
+        order: 0,
+        orderNum: 0,
+      }),
+      makeTask('section-a-second', {
+        status: 'next',
+        projectId: 'project-1',
+        sectionId: 'section-a',
+        order: 1,
+        orderNum: 1,
+      }),
+      makeTask('section-b-first', {
+        status: 'next',
+        projectId: 'project-1',
+        sectionId: 'section-b',
+        order: 2,
+        orderNum: 2,
+      }),
+    ];
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<FocusScreen />);
+    });
+
+    expect(
+      tree.root.findAllByType(SwipeableTaskItem).map((node) => node.props.task.id),
+    ).toEqual(['section-a-first', 'section-b-first']);
+  });
+
   it('hides tasks that belong to deferred projects', () => {
     storeState.projects = [
       makeProject('active-project'),
