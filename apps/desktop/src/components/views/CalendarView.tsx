@@ -1,10 +1,15 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type DragEvent } from 'react';
 import { format, getMonth, isSameDay, isSameMonth, isToday } from 'date-fns';
 import { CalendarDays, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { safeFormatDate } from '@mindwtr/core';
 
 import { ErrorBoundary } from '../ErrorBoundary';
 import { cn } from '../../lib/utils';
+import {
+    getCalendarTaskDragTaskId,
+    hasCalendarTaskDragData,
+    setCalendarTaskDragData,
+} from '../../lib/calendar-task-drag';
 import { CalendarOpenTaskModal, CalendarTaskComposerModal } from './calendar/CalendarModals';
 import { CalendarSelectedDayPanel } from './calendar/CalendarSelectedDayPanel';
 import {
@@ -53,12 +58,48 @@ export function CalendarView() {
         timelineDays,
         t,
         toggleExternalCalendar,
+        updateTaskDateFromDrop,
+        updateTaskStartTimeFromDrop,
         viewFilterQuery,
         viewMode,
         visibleSearchMatchCount,
         weekdayHeaders,
         yearOptions,
     } = controller;
+    const handleCalendarTaskDragStart = useCallback((event: DragEvent<HTMLElement>, taskId: string) => {
+        event.stopPropagation();
+        setCalendarTaskDragData(event.dataTransfer, taskId, {
+            variant: 'calendar-block',
+        });
+    }, []);
+    const handleCalendarTaskDragOver = useCallback((event: DragEvent<HTMLElement>) => {
+        if (!hasCalendarTaskDragData(event.dataTransfer)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+    }, []);
+    const handleDropOnDueDate = useCallback((event: DragEvent<HTMLElement>, date: Date) => {
+        const taskId = getCalendarTaskDragTaskId(event.dataTransfer);
+        if (!taskId) return;
+        event.preventDefault();
+        event.stopPropagation();
+        void updateTaskDateFromDrop(taskId, date);
+    }, [updateTaskDateFromDrop]);
+    const handleDropOnTimelineSlot = useCallback((event: DragEvent<HTMLElement>, date: Date) => {
+        const taskId = getCalendarTaskDragTaskId(event.dataTransfer);
+        if (!taskId) return;
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        const rawMinutes = ((event.clientY - rect.top) / DESKTOP_HOUR_HEIGHT) * 60;
+        const snapped = Math.round(rawMinutes / DESKTOP_GRID_SNAP_MINUTES) * DESKTOP_GRID_SNAP_MINUTES;
+        const maxMinutes = (DESKTOP_DAY_END_HOUR - DESKTOP_DAY_START_HOUR) * 60 - DESKTOP_GRID_SNAP_MINUTES;
+        const clamped = Math.max(0, Math.min(maxMinutes, snapped));
+        const start = new Date(date);
+        start.setHours(DESKTOP_DAY_START_HOUR, clamped, 0, 0);
+
+        event.preventDefault();
+        event.stopPropagation();
+        void updateTaskStartTimeFromDrop(taskId, start);
+    }, [updateTaskStartTimeFromDrop]);
     const timelineScrollKey = viewMode === 'day' || viewMode === 'week'
         ? `${viewMode}:${timelineDays.map(dayKey).join('|')}`
         : '';
@@ -270,7 +311,10 @@ export function CalendarView() {
                                     !isSameMonth(day, currentMonth) && "bg-muted/50 text-muted-foreground",
                                     isSelected && "ring-2 ring-primary"
                                 )}
+                                data-calendar-drop-date={dayKey(day)}
                                 onClick={() => openDayViewForDate(day)}
+                                onDragOver={handleCalendarTaskDragOver}
+                                onDrop={(event) => handleDropOnDueDate(event, day)}
                                 title={resolveText('calendar.openDayView', 'Open day view')}
                             >
                                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -323,6 +367,7 @@ export function CalendarView() {
                                                 type="button"
                                                 data-task-id={task.id}
                                                 data-task-edit-trigger
+                                                draggable
                                                 className={cn(
                                                     "block w-full truncate rounded px-1.5 py-1 text-left text-xs focus:outline-none focus:ring-2 focus:ring-primary/40",
                                                     item.kind === 'scheduled'
@@ -330,6 +375,7 @@ export function CalendarView() {
                                                         : "border-l-[3px] border-destructive/70 bg-background/60 text-foreground"
                                                 )}
                                                 title={task.title}
+                                                onDragStart={(event) => handleCalendarTaskDragStart(event, task.id)}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     openTaskFromCalendar(task);
@@ -396,7 +442,13 @@ export function CalendarView() {
                             {timelineDays.map((day) => {
                                 const allDayItems = getAllDayItemsForDay(day).slice(0, 4);
                                 return (
-                                    <div key={dayKey(day)} className="min-h-12 space-y-1 border-r border-border p-2 last:border-r-0">
+                                    <div
+                                        key={dayKey(day)}
+                                        data-calendar-all-day-drop-date={dayKey(day)}
+                                        className="min-h-12 space-y-1 border-r border-border p-2 last:border-r-0"
+                                        onDragOver={handleCalendarTaskDragOver}
+                                        onDrop={(event) => handleDropOnDueDate(event, day)}
+                                    >
                                         {allDayItems.map((item) => {
                                             if (item.kind === 'event') {
                                                 return (
@@ -416,6 +468,8 @@ export function CalendarView() {
                                                     type="button"
                                                     data-task-id={item.task.id}
                                                     data-task-edit-trigger
+                                                    draggable
+                                                    onDragStart={(event) => handleCalendarTaskDragStart(event, item.task.id)}
                                                     onClick={() => openTaskFromCalendar(item.task)}
                                                     className="block w-full truncate rounded border-l-[3px] border-destructive/70 bg-background/70 px-2 py-1 text-left text-xs hover:bg-muted"
                                                     title={item.title}
@@ -453,8 +507,11 @@ export function CalendarView() {
                                     return (
                                         <div
                                             key={dayKey(day)}
+                                            data-calendar-timed-drop-date={dayKey(day)}
                                             className={cn("relative border-r border-border last:border-r-0", isToday(day) && "bg-primary/5")}
                                             style={{ height: (DESKTOP_DAY_END_HOUR - DESKTOP_DAY_START_HOUR) * DESKTOP_HOUR_HEIGHT }}
+                                            onDragOver={handleCalendarTaskDragOver}
+                                            onDrop={(event) => handleDropOnTimelineSlot(event, day)}
                                             onClick={(event) => {
                                                 const rect = event.currentTarget.getBoundingClientRect();
                                                 const rawMinutes = ((event.clientY - rect.top) / DESKTOP_HOUR_HEIGHT) * 60;
@@ -509,9 +566,11 @@ export function CalendarView() {
                                                         data-calendar-block
                                                         data-task-id={item.task.id}
                                                         data-task-edit-trigger
+                                                        draggable
                                                         className="absolute z-10 overflow-hidden rounded bg-primary px-2 py-1 text-left text-xs text-primary-foreground shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/40"
                                                         style={commonStyle}
                                                         title={`${item.title} ${timeLabel}`}
+                                                        onDragStart={(event) => handleCalendarTaskDragStart(event, item.task.id)}
                                                         onClick={(event) => {
                                                             event.stopPropagation();
                                                             openTaskFromCalendar(item.task);
@@ -541,7 +600,13 @@ export function CalendarView() {
                                 const items = getCalendarItemsForDate(day);
                                 if (items.length === 0) return null;
                                 return (
-                                    <section key={dayKey(day)} className="grid gap-3 px-4 py-3 md:grid-cols-[9rem_minmax(0,1fr)]">
+                                    <section
+                                        key={dayKey(day)}
+                                        data-calendar-schedule-drop-date={dayKey(day)}
+                                        className="grid gap-3 px-4 py-3 md:grid-cols-[9rem_minmax(0,1fr)]"
+                                        onDragOver={handleCalendarTaskDragOver}
+                                        onDrop={(event) => handleDropOnDueDate(event, day)}
+                                    >
                                         <div>
                                             <div className={cn("text-sm font-semibold", isToday(day) && "text-primary")}>{format(day, 'EEE, MMM d')}</div>
                                             {isToday(day) && <div className="mt-1 text-xs font-medium text-primary">{resolveText('calendar.today', 'Today')}</div>}
@@ -571,6 +636,8 @@ export function CalendarView() {
                                                         type="button"
                                                         data-task-id={item.task.id}
                                                         data-task-edit-trigger
+                                                        draggable
+                                                        onDragStart={(event) => handleCalendarTaskDragStart(event, item.task.id)}
                                                         onClick={() => openTaskFromCalendar(item.task)}
                                                         className={cn(
                                                             "flex w-full items-center gap-3 rounded px-3 py-2 text-left text-sm hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/40",

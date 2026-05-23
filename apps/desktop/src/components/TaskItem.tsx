@@ -1,4 +1,4 @@
-import { useState, memo, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
+import { useState, memo, useEffect, useRef, useCallback, useMemo, type DragEvent, type ReactNode } from 'react';
 import {
     DEFAULT_PROJECT_COLOR,
     Task,
@@ -40,6 +40,7 @@ import { dispatchNavigateEvent } from '../lib/navigation-events';
 import { dispatchContextsTokenSelection } from '../lib/contexts-view-state';
 import { reportError } from '../lib/report-error';
 import { resolveNativeDateInputLocale } from '../lib/native-date-input-locale';
+import { setCalendarTaskDragData } from '../lib/calendar-task-drag';
 import { useTaskItemStoreState, useTaskItemUiState } from './Task/useTaskItemStoreState';
 
 interface TaskItemProps {
@@ -258,6 +259,7 @@ export const TaskItem = memo(function TaskItem({
     const isStagnant = (task.pushCount ?? 0) > 3;
     const effectiveReadOnly = readOnly || task.status === 'done';
     const effectiveFocusToggle = effectiveReadOnly ? undefined : focusToggle;
+    const canCalendarDrag = !actionsOverlay && !dragHandle && !selectionMode && !isEditing && !effectiveReadOnly;
     const handleToggleChecklistItem = useCallback((index: number) => {
         if (effectiveReadOnly) return;
         const checklist = task.checklist || [];
@@ -1048,13 +1050,22 @@ export const TaskItem = memo(function TaskItem({
         task.id,
         toggleTaskExpanded,
     ]);
+    const handleCalendarDragStart = useCallback((event: DragEvent<HTMLDivElement>) => {
+        if (!canCalendarDrag) {
+            event.preventDefault();
+            return;
+        }
+        setCalendarTaskDragData(event.dataTransfer, task.id);
+    }, [canCalendarDrag, task.id]);
 
     return (
         <>
             <div
                 ref={taskRootRef}
                 data-task-id={task.id}
+                draggable={canCalendarDrag}
                 tabIndex={-1}
+                onDragStart={handleCalendarDragStart}
                 onClickCapture={onSelect ? () => onSelect?.() : undefined}
                 onDoubleClick={(event) => {
                     if (!enableDoubleClickEdit || selectionMode || effectiveReadOnly || isEditing) return;
@@ -1066,6 +1077,7 @@ export const TaskItem = memo(function TaskItem({
                     "group rounded-lg hover:bg-muted/50 dark:hover:bg-muted/20 transition-colors animate-in fade-in slide-in-from-bottom-2",
                     isCompact ? "p-2.5" : "px-3 py-3",
                     "focus-within:ring-2 focus-within:ring-inset focus-within:ring-primary/40 focus-within:bg-primary/5",
+                    canCalendarDrag && "cursor-grab active:cursor-grabbing",
                     isSelected && "ring-2 ring-inset ring-primary/40 bg-primary/5",
                     isHighlighted && "ring-2 ring-inset ring-primary/70 bg-primary/5"
                 )}

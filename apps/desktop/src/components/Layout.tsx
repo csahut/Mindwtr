@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import {
     Calendar,
     Inbox,
@@ -32,6 +32,7 @@ import { ToastHost } from './ToastHost';
 import { AREA_FILTER_ALL, resolveAreaFilter, taskMatchesAreaFilter } from '../lib/area-filter';
 import { SyncService } from '../lib/sync-service';
 import { SidebarAreaFilter } from './ui/SidebarAreaFilter';
+import { hasCalendarTaskDragData } from '../lib/calendar-task-drag';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -88,6 +89,7 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
     }), shallow);
     const { t } = useLanguage();
     const isCollapsed = settings?.sidebarCollapsed ?? false;
+    const calendarDragNavTimeoutRef = useRef<number | null>(null);
     const isFocusMode = useUiStore((state) => state.isFocusMode);
     const showToast = useUiStore((state) => state.showToast);
     const isObsidianEnabled = useObsidianStore((state) => state.config.enabled);
@@ -306,6 +308,42 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
             return next;
         });
     }, []);
+    const clearCalendarDragNavTimeout = useCallback(() => {
+        if (calendarDragNavTimeoutRef.current === null) return;
+        window.clearTimeout(calendarDragNavTimeoutRef.current);
+        calendarDragNavTimeoutRef.current = null;
+    }, []);
+
+    useEffect(() => clearCalendarDragNavTimeout, [clearCalendarDragNavTimeout]);
+
+    const handleCalendarNavDragEnter = useCallback((event: DragEvent<HTMLButtonElement>) => {
+        if (!hasCalendarTaskDragData(event.dataTransfer)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        if (currentView === 'calendar' || calendarDragNavTimeoutRef.current !== null) return;
+        calendarDragNavTimeoutRef.current = window.setTimeout(() => {
+            onViewChange('calendar');
+            calendarDragNavTimeoutRef.current = null;
+        }, 350);
+    }, [currentView, onViewChange]);
+    const handleCalendarNavDragOver = useCallback((event: DragEvent<HTMLButtonElement>) => {
+        if (!hasCalendarTaskDragData(event.dataTransfer)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+    }, []);
+    const handleCalendarNavDragLeave = useCallback((event: DragEvent<HTMLButtonElement>) => {
+        const relatedTarget = event.relatedTarget;
+        if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) return;
+        clearCalendarDragNavTimeout();
+    }, [clearCalendarDragNavTimeout]);
+    const handleCalendarNavDrop = useCallback((event: DragEvent<HTMLButtonElement>) => {
+        if (!hasCalendarTaskDragData(event.dataTransfer)) return;
+        event.preventDefault();
+        clearCalendarDragNavTimeout();
+        if (currentView !== 'calendar') {
+            onViewChange('calendar');
+        }
+    }, [clearCalendarDragNavTimeout, currentView, onViewChange]);
 
     const triggerSearch = () => {
         window.dispatchEvent(new CustomEvent('mindwtr:open-search'));
@@ -504,6 +542,10 @@ export function Layout({ children, currentView, onViewChange }: LayoutProps) {
                                     <button
                                         key={item.id}
                                         onClick={() => onViewChange(item.id)}
+                                        onDragEnter={item.id === 'calendar' ? handleCalendarNavDragEnter : undefined}
+                                        onDragOver={item.id === 'calendar' ? handleCalendarNavDragOver : undefined}
+                                        onDragLeave={item.id === 'calendar' ? handleCalendarNavDragLeave : undefined}
+                                        onDrop={item.id === 'calendar' ? handleCalendarNavDrop : undefined}
                                         data-sidebar-item
                                         data-view={item.id}
                                         className={cn(

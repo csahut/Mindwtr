@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, createEvent, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Task } from '@mindwtr/core';
 
@@ -6,6 +6,7 @@ import { LanguageProvider } from '../../contexts/language-context';
 import { CalendarView } from './CalendarView';
 import { combineDateAndTime } from './calendar/useDesktopCalendarController';
 import { fetchExternalCalendarEvents } from '../../lib/external-calendar-events';
+import { setCalendarTaskDragData } from '../../lib/calendar-task-drag';
 
 const storeMocks = vi.hoisted(() => ({
     taskStoreState: {
@@ -97,10 +98,31 @@ const openNewTaskComposerForDay = async (dayText: string) => {
     });
 };
 
+const createTaskDragDataTransfer = (taskId: string): DataTransfer => {
+    const values = new Map<string, string>();
+    const types: string[] = [];
+    const dataTransfer = {
+        dropEffect: 'none' as DataTransfer['dropEffect'],
+        effectAllowed: 'all' as DataTransfer['effectAllowed'],
+        types,
+        getData: vi.fn((type: string) => values.get(type) ?? ''),
+        setData: vi.fn((type: string, value: string) => {
+            values.set(type, value);
+            if (!types.includes(type)) types.push(type);
+        }),
+    } as unknown as DataTransfer;
+    setCalendarTaskDragData(dataTransfer, taskId);
+    return dataTransfer;
+};
+
 describe('CalendarView', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-04-03T14:48:00.000Z'));
+        Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+            configurable: true,
+            value: vi.fn(),
+        });
         window.history.replaceState(null, '', '/');
         window.localStorage.clear();
         storeMocks.taskStoreState.tasks = [];
@@ -322,5 +344,131 @@ describe('CalendarView', () => {
 
         expect(screen.queryByText('Date-only start')).not.toBeInTheDocument();
         expect(screen.getByText('Timed start')).toBeInTheDocument();
+    });
+
+    it('sets a task due date when dropped on a month day', async () => {
+        storeMocks.taskStoreState.tasks = [
+            makeTask({
+                id: 'drop-task',
+                title: 'Drop me',
+            }),
+        ];
+
+        renderCalendar();
+        await flushCalendarEffects();
+
+        const dropTarget = document.querySelector('[data-calendar-drop-date="2026-04-04"]') as HTMLElement;
+        expect(dropTarget).toBeTruthy();
+
+        const dataTransfer = createTaskDragDataTransfer('drop-task');
+        await act(async () => {
+            fireEvent.dragOver(dropTarget, { dataTransfer });
+            fireEvent.drop(dropTarget, { dataTransfer });
+            await Promise.resolve();
+        });
+
+        expect(storeMocks.taskStoreState.updateTask).toHaveBeenCalledWith('drop-task', {
+            dueDate: '2026-04-04',
+        });
+    });
+
+    it('schedules a task when dropped on a timed calendar slot', async () => {
+        window.history.replaceState(null, '', '/?calendarView=week&calendarDate=2026-04-03');
+        storeMocks.taskStoreState.tasks = [
+            makeTask({
+                id: 'timed-drop-task',
+                title: 'Schedule me',
+            }),
+        ];
+
+        renderCalendar();
+        await flushCalendarEffects();
+
+        const dropTarget = document.querySelector('[data-calendar-timed-drop-date="2026-04-03"]') as HTMLElement;
+        expect(dropTarget).toBeTruthy();
+        Object.defineProperty(dropTarget, 'getBoundingClientRect', {
+            value: () => ({
+                bottom: 24 * 56,
+                height: 24 * 56,
+                left: 0,
+                right: 320,
+                top: 0,
+                width: 320,
+                x: 0,
+                y: 0,
+                toJSON: () => ({}),
+            }),
+        });
+
+        const dataTransfer = createTaskDragDataTransfer('timed-drop-task');
+        await act(async () => {
+            const dragOverEvent = createEvent.dragOver(dropTarget, { dataTransfer });
+            Object.defineProperty(dragOverEvent, 'clientY', { value: 9 * 56 });
+            fireEvent(dropTarget, dragOverEvent);
+            const dropEvent = createEvent.drop(dropTarget, { dataTransfer });
+            Object.defineProperty(dropEvent, 'clientY', { value: 9 * 56 });
+            fireEvent(dropTarget, dropEvent);
+            await Promise.resolve();
+        });
+
+        expect(storeMocks.taskStoreState.updateTask).toHaveBeenCalledWith('timed-drop-task', {
+            startTime: new Date(2026, 3, 3, 9, 0).toISOString(),
+        });
+    });
+
+    it('moves an existing calendar task by dragging it to another day', async () => {
+        storeMocks.taskStoreState.tasks = [
+            makeTask({
+                id: 'calendar-drag-task',
+                title: 'Move me',
+                dueDate: '2026-04-03T12:00:00',
+            }),
+        ];
+
+        renderCalendar();
+        await flushCalendarEffects();
+
+        const taskButton = screen.getByRole('button', { name: /Move me/i });
+        const dropTarget = document.querySelector('[data-calendar-drop-date="2026-04-05"]') as HTMLElement;
+        expect(dropTarget).toBeTruthy();
+
+        const dataTransfer = createTaskDragDataTransfer('');
+        await act(async () => {
+            fireEvent.dragStart(taskButton, { dataTransfer });
+            fireEvent.drop(dropTarget, { dataTransfer });
+            await Promise.resolve();
+        });
+
+        expect(storeMocks.taskStoreState.updateTask).toHaveBeenCalledWith('calendar-drag-task', {
+            dueDate: '2026-04-05',
+        });
+    });
+
+    it('moves an existing timed calendar task to another day without turning it into a deadline', async () => {
+        storeMocks.taskStoreState.tasks = [
+            makeTask({
+                id: 'calendar-timed-drag-task',
+                title: 'Move timed task',
+                startTime: '2026-04-03T11:15:00',
+            }),
+        ];
+
+        renderCalendar();
+        await flushCalendarEffects();
+
+        const taskButton = screen.getByRole('button', { name: /Move timed task/i });
+        const dropTarget = document.querySelector('[data-calendar-drop-date="2026-04-05"]') as HTMLElement;
+        expect(dropTarget).toBeTruthy();
+
+        const dataTransfer = createTaskDragDataTransfer('');
+        await act(async () => {
+            fireEvent.dragStart(taskButton, { dataTransfer });
+            fireEvent.drop(dropTarget, { dataTransfer });
+            await Promise.resolve();
+        });
+
+        expect(storeMocks.taskStoreState.updateTask).toHaveBeenCalledWith('calendar-timed-drag-task', {
+            startTime: new Date(2026, 3, 5, 11, 15).toISOString(),
+        });
     });
 });

@@ -1,9 +1,11 @@
 import { format } from 'date-fns';
+import type { DragEvent } from 'react';
 import { Check, Clock, MoreHorizontal, Plus, X } from 'lucide-react';
 import { safeFormatDate, safeParseDate } from '@mindwtr/core';
 
 import { cn } from '../../../lib/utils';
 import { reportError } from '../../../lib/report-error';
+import { setCalendarTaskDragData } from '../../../lib/calendar-task-drag';
 import type { DesktopCalendarController } from './useDesktopCalendarController';
 
 type CalendarSelectedDayPanelController = Pick<
@@ -75,6 +77,10 @@ export function CalendarSelectedDayPanel({ controller }: CalendarSelectedDayPane
         timeEstimateToMinutes,
         updateTask,
     } = controller;
+    const handleTaskDragStart = (event: DragEvent<HTMLElement>, taskId: string) => {
+        event.stopPropagation();
+        setCalendarTaskDragData(event.dataTransfer, taskId);
+    };
 
     if (!selectedDate) return null;
 
@@ -188,6 +194,8 @@ export function CalendarSelectedDayPanel({ controller }: CalendarSelectedDayPane
                                     <div
                                         key={id}
                                         data-task-id={task.id}
+                                        draggable
+                                        onDragStart={(event) => handleTaskDragStart(event, task.id)}
                                         className={cn(
                                             "group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted/50",
                                             kind === 'scheduled' ? "bg-primary/5" : "border-l-[3px] border-destructive/70 bg-background/60"

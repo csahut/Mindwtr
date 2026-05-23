@@ -759,6 +759,46 @@ export function useDesktopCalendarController() {
         setEditingTimeTaskId(null);
         setEditingTimeValue('');
     };
+    const updateTaskDateFromDrop = useCallback(async (taskId: string, date: Date) => {
+        const task = tasks.find((candidate) => candidate.id === taskId);
+        if (!task) return;
+
+        try {
+            if (hasTimeComponent(task.startTime)) {
+                const existingStart = task.startTime ? safeParseDate(task.startTime) : null;
+                if (existingStart) {
+                    const nextStart = new Date(date);
+                    nextStart.setHours(
+                        existingStart.getHours(),
+                        existingStart.getMinutes(),
+                        existingStart.getSeconds(),
+                        existingStart.getMilliseconds(),
+                    );
+                    await updateTask(task.id, { startTime: nextStart.toISOString() });
+                }
+            } else {
+                await updateTask(task.id, { dueDate: formatDateInputValue(date) });
+            }
+            setCurrentMonth(date);
+            setSelectedDate(date);
+            setScheduleError(null);
+        } catch (error) {
+            reportError('Failed to reschedule task from calendar drop', error);
+        }
+    }, [tasks, updateTask]);
+    const updateTaskStartTimeFromDrop = useCallback(async (taskId: string, start: Date) => {
+        const task = tasks.find((candidate) => candidate.id === taskId);
+        if (!task) return;
+
+        try {
+            await updateTask(task.id, { startTime: start.toISOString() });
+            setCurrentMonth(start);
+            setSelectedDate(start);
+            setScheduleError(null);
+        } catch (error) {
+            reportError('Failed to schedule task from calendar drop', error);
+        }
+    }, [tasks, updateTask]);
     const monthNames = useMemo(() => getCalendarMonthNames(calendarLocale), [calendarLocale]);
     const weekdayHeaders = useMemo(
         () => getCalendarWeekdayHeaders(calendarLocale, weekStartsOn),
@@ -1123,6 +1163,8 @@ export function useDesktopCalendarController() {
         t,
         toggleExternalCalendar,
         updateTask,
+        updateTaskDateFromDrop,
+        updateTaskStartTimeFromDrop,
         updateTaskComposerDuration,
         updateTaskComposerEndTime,
         updateTaskComposerStart,
