@@ -183,7 +183,7 @@ describe('sync-helpers sanitizeAppDataForRemote', () => {
                     preferences: now,
                 },
                 theme: 'dark',
-                appearance: { density: 'compact', textSize: 'large', mobileQuickAccessView: 'contexts' },
+                appearance: { density: 'compact', textSize: 'small', mobileQuickAccessView: 'contexts' },
                 keybindingStyle: 'emacs',
                 globalQuickAddShortcut: 'ctrl+alt+m',
                 language: 'zh',
@@ -220,7 +220,7 @@ describe('sync-helpers sanitizeAppDataForRemote', () => {
         expect(sanitized.settings.syncPreferences).toEqual(data.settings.syncPreferences);
         expect(sanitized.settings.syncPreferencesUpdatedAt).toEqual(data.settings.syncPreferencesUpdatedAt);
         expect(sanitized.settings.theme).toBe('dark');
-        expect(sanitized.settings.appearance).toEqual({ density: 'compact', textSize: 'large', mobileQuickAccessView: 'contexts' });
+        expect(sanitized.settings.appearance).toEqual({ density: 'compact', textSize: 'small', mobileQuickAccessView: 'contexts' });
         expect(sanitized.settings.keybindingStyle).toBe('emacs');
         expect(sanitized.settings.externalCalendars).toEqual([
             { id: 'cal-1', name: 'Work', url: 'https://example.com/work.ics', enabled: true },

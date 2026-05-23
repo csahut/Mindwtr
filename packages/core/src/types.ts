@@ -324,7 +324,7 @@ export interface FeatureSettings {
 
 export interface AppearanceSettings {
     density?: 'comfortable' | 'compact';
-    textSize?: 'default' | 'large' | 'extra-large';
+    textSize?: 'small' | 'default' | 'large' | 'extra-large';
     showTaskAge?: boolean;
     showFutureStarts?: boolean;
     unassignedAreaColor?: string;

@@ -285,6 +285,10 @@
     --mindwtr-text-scale: 1;
   }
 
+  html[data-text-size='small'] {
+    --mindwtr-text-scale: 0.875;
+  }
+
   html[data-text-size='large'] {
     --mindwtr-text-scale: 1.125;
   }

@@ -51,6 +51,7 @@ const DENSITY_VALUE_FLAGS: Record<DensityValue, true> = {
 };
 
 const TEXT_SIZE_VALUE_FLAGS: Record<TextSizeValue, true> = {
+    small: true,
     default: true,
     large: true,
     'extra-large': true,

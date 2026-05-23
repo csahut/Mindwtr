@@ -101,4 +101,24 @@ describe('SettingsMainPage', () => {
 
         expect(onWeekStartChange).toHaveBeenCalledWith('monday');
     });
+
+    it('offers the small text size preset', () => {
+        const onTextSizeChange = vi.fn();
+        const { getByRole } = render(
+            <SettingsMainPage
+                {...baseProps}
+                textSizeMode="small"
+                onTextSizeChange={onTextSizeChange}
+            />,
+        );
+
+        const select = getByRole('combobox', { name: 'Text size' });
+        expect(select).toHaveValue('small');
+
+        fireEvent.change(select, {
+            target: { value: 'large' },
+        });
+
+        expect(onTextSizeChange).toHaveBeenCalledWith('large');
+    });
 });

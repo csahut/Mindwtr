@@ -9,7 +9,7 @@ const FLATPAK_QUICK_ADD_COMMAND = 'flatpak run tech.dongdongbh.mindwtr --quick-a
 
 type ThemeMode = 'system' | 'light' | 'dark' | 'eink' | 'nord' | 'sepia';
 type DensityMode = 'comfortable' | 'compact';
-type TextSizeMode = 'default' | 'large' | 'extra-large';
+type TextSizeMode = 'small' | 'default' | 'large' | 'extra-large';
 type WeekStart = 'sunday' | 'monday' | 'saturday';
 type DateFormatSetting = 'system' | 'dmy' | 'mdy' | 'ymd';
 type TimeFormatSetting = 'system' | '12h' | '24h';
@@ -26,6 +26,7 @@ type Labels = {
     densityCompact: string;
     textSize: string;
     textSizeDesc: string;
+    textSizeSmall: string;
     textSizeDefault: string;
     textSizeLarge: string;
     textSizeExtraLarge: string;
@@ -272,10 +273,12 @@ export function SettingsMainPage({
                 </SettingsRow>
                 <SettingsRow title={t.textSize} description={t.textSizeDesc}>
                     <select
+                        aria-label={t.textSize}
                         value={textSizeMode}
                         onChange={(e) => onTextSizeChange(e.target.value as TextSizeMode)}
                         className={selectCls}
                     >
+                        <option value="small">{t.textSizeSmall}</option>
                         <option value="default">{t.textSizeDefault}</option>
                         <option value="large">{t.textSizeLarge}</option>
                         <option value="extra-large">{t.textSizeExtraLarge}</option>

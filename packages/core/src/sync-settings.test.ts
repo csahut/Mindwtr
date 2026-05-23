@@ -191,7 +191,7 @@ describe('Sync Logic', () => {
             const incoming: AppData = {
                 ...mockAppData(),
                 settings: {
-                    appearance: { density: 'compact', textSize: 'large', mobileQuickAccessView: 'calendar' },
+                    appearance: { density: 'compact', textSize: 'small', mobileQuickAccessView: 'calendar' },
                     syncPreferences: { appearance: true },
                     syncPreferencesUpdatedAt: {
                         preferences: '2024-01-02T00:00:00.000Z',
@@ -202,7 +202,7 @@ describe('Sync Logic', () => {
 
             const merged = mergeAppData(local, incoming);
 
-            expect(merged.settings.appearance).toEqual({ density: 'compact', textSize: 'large', mobileQuickAccessView: 'calendar' });
+            expect(merged.settings.appearance).toEqual({ density: 'compact', textSize: 'small', mobileQuickAccessView: 'calendar' });
         });
 
         it('merges synced future-start visibility preference', () => {
