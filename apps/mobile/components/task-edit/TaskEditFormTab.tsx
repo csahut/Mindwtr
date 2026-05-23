@@ -58,6 +58,8 @@ type TaskEditFormTabProps = {
     suspendKeyboardHandling?: boolean;
 };
 
+const TASK_FORM_BASE_BOTTOM_PADDING = 32;
+
 export function TaskEditFormTab({
     t,
     tc,
@@ -99,31 +101,45 @@ export function TaskEditFormTab({
     const formScrollRef = React.useRef<ScrollView | null>(null);
     const formScrollOffsetRef = React.useRef(0);
     const keyboardTopRef = React.useRef(Dimensions.get('window').height);
+    const [keyboardBottomInset, setKeyboardBottomInset] = React.useState(0);
     const aiWorkingLabel = t('ai.working');
     const aiWorkingText = aiWorkingLabel === 'ai.working' ? 'Working...' : aiWorkingLabel;
 
     React.useEffect(() => {
-        if (suspendKeyboardHandling) return;
+        if (suspendKeyboardHandling) {
+            keyboardTopRef.current = Dimensions.get('window').height;
+            setKeyboardBottomInset(0);
+            return;
+        }
         if (typeof Keyboard?.addListener !== 'function') return;
         const updateKeyboardTop = (event: { endCoordinates?: { screenY?: number; height?: number } }) => {
             const windowHeight = Dimensions.get('window').height;
             const endCoords = event.endCoordinates;
+            let nextKeyboardTop = windowHeight;
             if (typeof endCoords?.screenY === 'number') {
-                keyboardTopRef.current = endCoords.screenY;
-                return;
+                nextKeyboardTop = endCoords.screenY;
+            } else if (typeof endCoords?.height === 'number') {
+                nextKeyboardTop = Math.max(0, windowHeight - endCoords.height);
             }
-            if (typeof endCoords?.height === 'number') {
-                keyboardTopRef.current = Math.max(0, windowHeight - endCoords.height);
-                return;
-            }
-            keyboardTopRef.current = windowHeight;
+            keyboardTopRef.current = nextKeyboardTop;
+            setKeyboardBottomInset(Platform.OS === 'ios' ? Math.max(0, windowHeight - nextKeyboardTop) : 0);
         };
         const resetKeyboardTop = () => {
             keyboardTopRef.current = Dimensions.get('window').height;
+            setKeyboardBottomInset(0);
         };
-        const showListener = Keyboard.addListener('keyboardDidShow', updateKeyboardTop);
-        const changeListener = Keyboard.addListener('keyboardDidChangeFrame', updateKeyboardTop);
-        const hideListener = Keyboard.addListener('keyboardDidHide', resetKeyboardTop);
+        const showListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            updateKeyboardTop
+        );
+        const changeListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidChangeFrame',
+            updateKeyboardTop
+        );
+        const hideListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            resetKeyboardTop
+        );
         return () => {
             showListener.remove();
             changeListener.remove();
@@ -234,14 +250,20 @@ export function TaskEditFormTab({
     return (
         <View style={[styles.tabPage, { width: containerWidth || '100%' }]}>
             <KeyboardAvoidingView
-                behavior={suspendKeyboardHandling ? undefined : (Platform.OS === 'ios' ? 'padding' : 'height')}
+                behavior={suspendKeyboardHandling ? undefined : (Platform.OS === 'android' ? 'height' : undefined)}
                 style={{ flex: 1 }}
                 keyboardVerticalOffset={0}
             >
                 <ScrollView
                     ref={formScrollRef}
                     style={styles.content}
-                    contentContainerStyle={styles.contentContainer}
+                    contentContainerStyle={[
+                        styles.contentContainer,
+                        keyboardBottomInset > 0
+                            ? { paddingBottom: TASK_FORM_BASE_BOTTOM_PADDING + keyboardBottomInset }
+                            : null,
+                    ]}
+                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                     keyboardShouldPersistTaps="handled"
                     scrollEnabled={!suspendKeyboardHandling}
                     onScroll={(event) => {
