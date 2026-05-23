@@ -1303,7 +1303,7 @@ export class SyncService {
     private static async writeRemoteDataByBackend(
         context: SyncExecutionContext,
         data: AppData,
-        helpers: Pick<SyncExecutionHelpers, 'createFetchWithAbort' | 'ensureNetworkStillAvailable' | 'runDropboxWithRetry'>
+        helpers: Pick<SyncExecutionHelpers, 'createFetchWithAbort' | 'ensureNetworkStillAvailable' | 'requestFollowUp' | 'runDropboxWithRetry'>
     ): Promise<void> {
         helpers.ensureNetworkStillAvailable();
         if (context.backend === 'cloudkit') {
