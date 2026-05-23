@@ -87,6 +87,7 @@ export interface TaskListProps {
   projectReorderMode?: boolean;
   onProjectReorderModeChange?: (active: boolean) => void;
   includeArchived?: boolean;
+  includeDone?: boolean;
 }
 
 // ... inside TaskList component
@@ -113,6 +114,7 @@ function TaskListComponent({
   projectReorderMode: projectReorderModeProp,
   onProjectReorderModeChange,
   includeArchived = false,
+  includeDone = true,
 }: TaskListProps) {
   const { isDark } = useTheme();
   const { t, language } = useLanguage();
@@ -322,6 +324,7 @@ function TaskListComponent({
       // Filter out soft-deleted tasks
       if (t.deletedAt) return false;
       if (statusFilter === 'all' && t.status === 'reference') return false;
+      if (statusFilter === 'all' && !includeDone && t.status === 'done') return false;
       const matchesStatus = statusFilter === 'all' ? true : t.status === statusFilter;
       const matchesProject = projectId ? t.projectId === projectId : true;
       if (!projectId && !isTaskInActiveProject(t, projectById)) return false;
@@ -330,7 +333,7 @@ function TaskListComponent({
       return matchesStatus && matchesProject;
     });
     return filtered;
-  }, [tasks, statusFilter, projectId, selectedTimeEstimates, showTimeEstimateFilters, resolvedAreaFilter, projectById, areaById]);
+  }, [tasks, statusFilter, includeDone, projectId, selectedTimeEstimates, showTimeEstimateFilters, resolvedAreaFilter, projectById, areaById]);
 
   const orderedTasks = useMemo(() => {
     if (projectId && enableProjectReorder) {

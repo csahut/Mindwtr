@@ -11,7 +11,7 @@ import {
 } from '@mindwtr/core';
 import { DndContext, PointerSensor, MeasuringStrategy, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, FileText, Folder, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCircle2, ChevronDown, ChevronRight, FileText, Folder, Pencil, Plus, Trash2 } from 'lucide-react';
 
 import { PromptModal } from '../../PromptModal';
 import { TaskItem } from '../../TaskItem';
@@ -72,6 +72,7 @@ type ProjectWorkspaceProps = {
     onDuplicateProject: (projectId: string) => Promise<void> | void;
     onManageAreas: () => void;
     onRequestQuickArea: (projectId: string) => void;
+    onToggleShowCompletedTasks: () => void;
     projects: Project[];
     reorderProjectTasks: (
         projectId: string,
@@ -89,6 +90,7 @@ type ProjectWorkspaceProps = {
     selectedProjectId: string | null;
     setHighlightTask: (taskId: string | null) => void;
     setSelectedProjectId: (taskId: string | null) => void;
+    showCompletedTasks: boolean;
     showToast: ShowToast;
     sortedAreas: Area[];
     t: (key: string) => string;
@@ -107,12 +109,17 @@ type ProjectWorkspaceProps = {
     ) => Promise<StoreActionResult | void> | StoreActionResult | void;
 };
 
-export function shouldShowProjectWorkspaceTask(task: Task, project?: Project): boolean {
+export function shouldShowProjectWorkspaceTask(
+    task: Task,
+    project?: Project,
+    showCompletedTasks = false,
+): boolean {
     if (!project) return false;
     if (task.deletedAt || task.projectId !== project.id) return false;
     if (task.status === 'reference') return false;
     if (project.status === 'archived') return task.status === 'done' || task.status === 'archived';
-    return task.status !== 'done' && task.status !== 'archived';
+    if (task.status === 'done') return showCompletedTasks;
+    return task.status !== 'archived';
 }
 
 export function ProjectWorkspace({
@@ -133,6 +140,7 @@ export function ProjectWorkspace({
     onDuplicateProject,
     onManageAreas,
     onRequestQuickArea,
+    onToggleShowCompletedTasks,
     projects,
     reorderSections,
     reorderProjectTasks,
@@ -143,6 +151,7 @@ export function ProjectWorkspace({
     selectedProjectId,
     setHighlightTask,
     setSelectedProjectId,
+    showCompletedTasks,
     showToast,
     sortedAreas,
     t,
@@ -237,8 +246,8 @@ export function ProjectWorkspace({
     }, [allTasks, normalizedSearchQuery, selectedProjectId]);
 
     const projectTasks = useMemo(
-        () => projectAllTasks.filter((task) => shouldShowProjectWorkspaceTask(task, selectedProject)),
-        [projectAllTasks, selectedProject],
+        () => projectAllTasks.filter((task) => shouldShowProjectWorkspaceTask(task, selectedProject, showCompletedTasks)),
+        [projectAllTasks, selectedProject, showCompletedTasks],
     );
 
     const sortProjectTasks = useCallback((items: Task[]) => {
@@ -647,6 +656,7 @@ export function ProjectWorkspace({
     );
 
     const visibleAttachments = (selectedProject?.attachments || []).filter((attachment) => !attachment.deletedAt);
+    const completedProjectTaskCount = projectAllTasks.filter((task) => task.status === 'done').length;
     const projectProgress = (() => {
         if (!selectedProjectId) return null;
         if (isArchivedProject) {
@@ -659,7 +669,7 @@ export function ProjectWorkspace({
             };
         }
         const doneCount = projectAllTasks.filter((task) => task.status === 'done').length;
-        const remainingCount = projectTasks.length;
+        const remainingCount = projectAllTasks.filter((task) => shouldShowProjectWorkspaceTask(task, selectedProject, false)).length;
         return {
             doneCount,
             remainingCount,
@@ -959,15 +969,44 @@ export function ProjectWorkspace({
                                         {t('projects.sectionsLabel')}
                                     </div>
                                     {!isArchivedProject && (
-                                        <button
-                                            type="button"
-                                            onClick={handleAddSection}
-                                            aria-label={t('projects.addSection')}
-                                            className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/40"
-                                        >
-                                            <Plus className="h-3.5 w-3.5" />
-                                            {t('projects.addSection')}
-                                        </button>
+                                        <div className="flex flex-wrap items-center justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={onToggleShowCompletedTasks}
+                                                aria-label={showCompletedTasks
+                                                    ? resolveText('common.hideCompleted', 'Hide completed')
+                                                    : resolveText('common.showCompleted', 'Show completed')}
+                                                aria-pressed={showCompletedTasks}
+                                                className={cn(
+                                                    'inline-flex items-center gap-2 whitespace-nowrap rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                                                    showCompletedTasks
+                                                        ? 'border-primary/40 bg-primary/10 text-primary'
+                                                        : 'border-border bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground'
+                                                )}
+                                            >
+                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                {showCompletedTasks
+                                                    ? resolveText('common.hideCompleted', 'Hide completed')
+                                                    : resolveText('common.showCompleted', 'Show completed')}
+                                                {!showCompletedTasks && completedProjectTaskCount > 0 && (
+                                                    <span
+                                                        aria-hidden="true"
+                                                        className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                                    >
+                                                        {completedProjectTaskCount}
+                                                    </span>
+                                                )}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleAddSection}
+                                                aria-label={t('projects.addSection')}
+                                                className="inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-border bg-background px-2.5 py-1.5 text-xs transition-colors hover:bg-muted/40"
+                                            >
+                                                <Plus className="h-3.5 w-3.5" />
+                                                {t('projects.addSection')}
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                                 {tasksContent}

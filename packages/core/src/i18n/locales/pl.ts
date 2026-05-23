@@ -851,6 +851,8 @@ export const plOverrides: Record<string, string> = {
         'common.play': 'Odtwórz',
         'common.pause': 'Wstrzymaj',
         'common.done': 'Gotowe',
+        'common.showCompleted': 'Pokaż ukończone',
+        'common.hideCompleted': 'Ukryj ukończone',
         'common.undo': 'Cofnij',
         'common.skip': 'Pomiń',
         'common.clear': 'Wyczyść',

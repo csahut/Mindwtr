@@ -873,6 +873,8 @@ export const ptOverrides: Record<string, string> = {
         'common.play': 'Jogar',
         'common.pause': 'Pausa',
         'common.done': 'Feito',
+        'common.showCompleted': 'Mostrar concluídas',
+        'common.hideCompleted': 'Ocultar concluídas',
         'common.undo': 'Desfazer',
         'common.skip': 'Pular',
         'common.clear': 'Claro',

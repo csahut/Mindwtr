@@ -55,12 +55,14 @@ const NO_TAGS = '__none__';
 type ProjectsPersistedViewState = {
     showDeferredProjects: boolean;
     showArchivedProjects: boolean;
+    showCompletedProjectTasks: boolean;
     selectedTag: string;
 };
 
 const DEFAULT_PROJECTS_VIEW_STATE: ProjectsPersistedViewState = {
     showDeferredProjects: false,
     showArchivedProjects: false,
+    showCompletedProjectTasks: false,
     selectedTag: ALL_TAGS,
 };
 
@@ -75,6 +77,9 @@ function sanitizeProjectsViewState(value: unknown, fallback: ProjectsPersistedVi
         showArchivedProjects: typeof parsed.showArchivedProjects === 'boolean'
             ? parsed.showArchivedProjects
             : fallback.showArchivedProjects,
+        showCompletedProjectTasks: typeof parsed.showCompletedProjectTasks === 'boolean'
+            ? parsed.showCompletedProjectTasks
+            : fallback.showCompletedProjectTasks,
         selectedTag: typeof parsed.selectedTag === 'string' && parsed.selectedTag.trim()
             ? parsed.selectedTag
             : fallback.selectedTag,
@@ -157,6 +162,7 @@ export function ProjectsView() {
     );
     const showDeferredProjects = persistedViewState.showDeferredProjects;
     const showArchivedProjects = persistedViewState.showArchivedProjects;
+    const showCompletedProjectTasks = persistedViewState.showCompletedProjectTasks;
     const selectedTag = persistedViewState.selectedTag;
     const [collapsedAreas, setCollapsedAreas] = useState<Record<string, boolean>>(loadCollapsedAreas);
     useEffect(() => { saveCollapsedAreas(collapsedAreas); }, [collapsedAreas]);
@@ -185,6 +191,12 @@ export function ProjectsView() {
         setPersistedViewState((current) => ({
             ...current,
             showArchivedProjects: typeof value === 'function' ? value(current.showArchivedProjects) : value,
+        }));
+    }, [setPersistedViewState]);
+    const setShowCompletedProjectTasks = useCallback((value: boolean | ((current: boolean) => boolean)) => {
+        setPersistedViewState((current) => ({
+            ...current,
+            showCompletedProjectTasks: typeof value === 'function' ? value(current.showCompletedProjectTasks) : value,
         }));
     }, [setPersistedViewState]);
     const setSelectedTag = useCallback((value: string) => {
@@ -637,9 +649,11 @@ export function ProjectsView() {
                         selectedProjectId={selectedProjectId}
                         setHighlightTask={setHighlightTask}
                         setSelectedProjectId={setSelectedProjectId}
+                        showCompletedTasks={showCompletedProjectTasks}
                         showToast={showToast}
                         sortedAreas={sortedAreas}
                         t={t}
+                        onToggleShowCompletedTasks={() => setShowCompletedProjectTasks((prev) => !prev)}
                         undoNotificationsEnabled={settings?.undoNotificationsEnabled !== false}
                         updateProject={updateProject}
                         updateSection={updateSection}

@@ -10,6 +10,10 @@ vi.mock('@expo/vector-icons', () => ({
     Ionicons: () => null,
 }));
 
+vi.mock('lucide-react-native', () => ({
+    CheckCircle2: () => null,
+}));
+
 vi.mock('react-native-safe-area-context', () => ({
     SafeAreaView: ({ children }: any) => children,
 }));
@@ -79,14 +83,25 @@ describe('ProjectDetailModal archived projects', () => {
             allowAdd: false,
             enableProjectReorder: false,
             includeArchived: true,
+            includeDone: true,
         });
     });
 
-    it('keeps normal task controls for non-archived projects', () => {
+    it('keeps normal task controls and hides done tasks for non-archived projects by default', () => {
         expect(getProjectDetailTaskListOptions(project('active'))).toEqual({
             allowAdd: true,
             enableProjectReorder: true,
             includeArchived: false,
+            includeDone: false,
+        });
+    });
+
+    it('shows done tasks for active projects when the completed toggle is on', () => {
+        expect(getProjectDetailTaskListOptions(project('active'), true)).toEqual({
+            allowAdd: true,
+            enableProjectReorder: true,
+            includeArchived: false,
+            includeDone: true,
         });
     });
 });

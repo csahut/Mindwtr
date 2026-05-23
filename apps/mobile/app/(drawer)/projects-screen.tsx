@@ -84,6 +84,7 @@ export default function ProjectsScreen() {
   const [collapsedAreas, setCollapsedAreas] = useState<Record<string, boolean>>({});
   const [showDeferredProjects, setShowDeferredProjects] = useState(false);
   const [showArchivedProjects, setShowArchivedProjects] = useState(false);
+  const [showCompletedProjectTasks, setShowCompletedProjectTasks] = useState(false);
   const {
     areaById,
     resolvedAreaFilter: selectedAreaFilter,
@@ -712,6 +713,7 @@ export default function ProjectsScreen() {
         onSetShowProjectMeta={setShowProjectMeta}
         onSetShowReviewPicker={setShowReviewPicker}
         onSetShowStatusMenu={setShowStatusMenu}
+        onToggleShowCompletedTasks={() => setShowCompletedProjectTasks((current) => !current)}
         overlayVisible={!!selectedProject}
         presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'}
         selectedProject={selectedProject}
@@ -727,6 +729,7 @@ export default function ProjectsScreen() {
         showProjectMeta={showProjectMeta}
         showReviewPicker={showReviewPicker}
         showStatusMenu={showStatusMenu}
+        showCompletedTasks={showCompletedProjectTasks}
         statusPalette={statusPalette}
         t={t}
         tc={tc}

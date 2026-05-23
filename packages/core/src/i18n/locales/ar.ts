@@ -922,6 +922,8 @@ export const arOverrides: Record<string, string> = {
         'common.play': 'يلعب',
         'common.pause': 'يوقف',
         'common.done': 'منتهي',
+        'common.showCompleted': 'إظهار المكتملة',
+        'common.hideCompleted': 'إخفاء المكتملة',
         'common.undo': 'تراجع',
         'common.skip': 'يتخطى',
         'common.clear': 'واضح',

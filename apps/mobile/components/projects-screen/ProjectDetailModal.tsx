@@ -19,8 +19,10 @@ import {
     type MarkdownToolbarResult,
     type Project,
     safeParseDate,
+    tFallback,
 } from '@mindwtr/core';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { CheckCircle2 } from 'lucide-react-native';
 import type { ThemeColors } from '@/hooks/use-theme-colors';
 import { KeyboardAccessoryHost } from '../../components/keyboard-accessory-host';
 import { ExpandedMarkdownEditor } from '../../components/expanded-markdown-editor';
@@ -63,6 +65,7 @@ type ProjectDetailModalProps = {
     onSetShowProjectMeta: React.Dispatch<React.SetStateAction<boolean>>;
     onSetShowReviewPicker: React.Dispatch<React.SetStateAction<boolean>>;
     onSetShowStatusMenu: React.Dispatch<React.SetStateAction<boolean>>;
+    onToggleShowCompletedTasks: () => void;
     onDownloadAttachment: (attachment: Attachment) => void | Promise<void>;
     onOpenAttachment: (attachment: Attachment) => void | Promise<void>;
     overlayVisible: boolean;
@@ -80,6 +83,7 @@ type ProjectDetailModalProps = {
     showProjectMeta: boolean;
     showReviewPicker: boolean;
     showStatusMenu: boolean;
+    showCompletedTasks: boolean;
     statusPalette: Record<Project['status'], { bg: string; border: string; text: string }>;
     t: (key: string) => string;
     tc: ThemeColors;
@@ -155,6 +159,7 @@ export function ProjectDetailModal({
     onSetShowProjectMeta,
     onSetShowReviewPicker,
     onSetShowStatusMenu,
+    onToggleShowCompletedTasks,
     overlayVisible,
     presentationStyle,
     selectedProjectAreaName,
@@ -170,6 +175,7 @@ export function ProjectDetailModal({
     showProjectMeta,
     showReviewPicker,
     showStatusMenu,
+    showCompletedTasks,
     statusPalette,
     t,
     tc,
@@ -177,7 +183,40 @@ export function ProjectDetailModal({
 }: ProjectDetailModalProps) {
     const [projectTaskReorderMode, setProjectTaskReorderMode] = React.useState(false);
     const safeAreaEdges = getProjectDetailModalSafeAreaEdges(presentationStyle);
-    const taskListOptions = getProjectDetailTaskListOptions(selectedProject);
+    const taskListOptions = getProjectDetailTaskListOptions(selectedProject, showCompletedTasks);
+    const showCompletedLabel = showCompletedTasks
+        ? tFallback(t, 'common.hideCompleted', 'Hide completed')
+        : tFallback(t, 'common.showCompleted', 'Show completed');
+    const completedToggle = selectedProject && selectedProject.status !== 'archived' ? (
+        <TouchableOpacity
+            accessibilityLabel={showCompletedLabel}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: showCompletedTasks }}
+            onPress={onToggleShowCompletedTasks}
+            style={[
+                styles.completedToggleButton,
+                {
+                    backgroundColor: showCompletedTasks ? `${tc.tint}20` : tc.filterBg,
+                    borderColor: showCompletedTasks ? tc.tint : tc.border,
+                },
+            ]}
+            testID="project-show-completed-toggle"
+        >
+            <CheckCircle2
+                size={16}
+                color={showCompletedTasks ? tc.tint : tc.secondaryText}
+                strokeWidth={2.2}
+            />
+            <Text
+                style={[
+                    styles.completedToggleText,
+                    { color: showCompletedTasks ? tc.tint : tc.secondaryText },
+                ]}
+            >
+                {showCompletedLabel}
+            </Text>
+        </TouchableOpacity>
+    ) : null;
 
     React.useEffect(() => {
         setProjectTaskReorderMode(false);
@@ -595,6 +634,7 @@ export function ProjectDetailModal({
                                 <TaskList
                                     statusFilter="all"
                                     title={selectedProject.title}
+                                    headerAccessory={completedToggle}
                                     showHeader={false}
                                     showTimeEstimateFilters={false}
                                     projectId={selectedProject.id}
@@ -604,6 +644,7 @@ export function ProjectDetailModal({
                                     showSort={false}
                                     enableProjectReorder={taskListOptions.enableProjectReorder}
                                     includeArchived={taskListOptions.includeArchived}
+                                    includeDone={taskListOptions.includeDone}
                                     projectReorderMode={projectTaskReorderMode}
                                     onProjectReorderModeChange={setProjectTaskReorderMode}
                                 />
@@ -641,11 +682,12 @@ export function getProjectDetailModalSafeAreaEdges(presentationStyle: ProjectDet
         : ['left', 'right', 'bottom'] as const;
 }
 
-export function getProjectDetailTaskListOptions(selectedProject: Project | null) {
+export function getProjectDetailTaskListOptions(selectedProject: Project | null, showCompletedTasks = false) {
     const isArchived = selectedProject?.status === 'archived';
     return {
         allowAdd: !isArchived,
         enableProjectReorder: !isArchived,
         includeArchived: isArchived,
+        includeDone: isArchived || showCompletedTasks,
     };
 }

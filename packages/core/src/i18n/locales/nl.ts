@@ -208,6 +208,8 @@ export const nlOverrides: Record<string, string> = {
         'areas.edit': 'Gebied bewerken',
         'common.search': 'Zoeken',
         'common.done': 'Klaar',
+        'common.showCompleted': 'Voltooide tonen',
+        'common.hideCompleted': 'Voltooide verbergen',
         'common.days': 'dagen',
         'common.undo': 'Ongedaan maken',
         'settings.density': 'Dikte',

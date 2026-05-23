@@ -99,6 +99,20 @@ export const projectsScreenStyles = StyleSheet.create({
     projectDetailScroll: {
         paddingBottom: 24,
     },
+    completedToggleButton: {
+        minHeight: 34,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 999,
+        borderWidth: 1,
+    },
+    completedToggleText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
     projectContent: {
         flex: 1,
     },

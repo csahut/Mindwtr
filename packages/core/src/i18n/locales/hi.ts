@@ -853,6 +853,8 @@ export const hiOverrides: Record<string, string> = {
         'common.play': 'खेल',
         'common.pause': 'विराम',
         'common.done': 'हो गया',
+        'common.showCompleted': 'पूर्ण कार्य दिखाएँ',
+        'common.hideCompleted': 'पूर्ण कार्य छिपाएँ',
         'common.undo': 'पूर्ववत करें',
         'common.skip': 'छोडना',
         'common.clear': 'स्पष्ट',

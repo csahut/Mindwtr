@@ -884,6 +884,8 @@ export const deOverrides: Record<string, string> = {
         'common.close': 'Schließen',
         'common.play': 'Abspielen',
         'common.done': 'Erledigt',
+        'common.showCompleted': 'Erledigte anzeigen',
+        'common.hideCompleted': 'Erledigte ausblenden',
         'common.undo': 'Rückgängig',
         'common.skip': 'Überspringen',
         'common.clear': 'Leeren',

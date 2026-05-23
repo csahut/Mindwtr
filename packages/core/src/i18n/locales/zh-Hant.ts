@@ -1000,6 +1000,8 @@ export const zhHant: Record<string, string> = {
         'common.play': '播放',
         'common.pause': '暫停',
         'common.done': '完成',
+        'common.showCompleted': '顯示已完成',
+        'common.hideCompleted': '隱藏已完成',
         'common.undo': '撤銷',
         'common.skip': '跳過',
         'common.clear': '清除',

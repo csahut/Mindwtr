@@ -760,6 +760,8 @@ export const esOverrides: Record<string, string> = {
         'common.back': 'Atrás',
         'common.close': 'Cerrar',
         'common.done': 'Hecho',
+        'common.showCompleted': 'Mostrar completadas',
+        'common.hideCompleted': 'Ocultar completadas',
         'common.undo': 'Deshacer',
         'common.skip': 'Omitir',
         'common.clear': 'Limpiar',

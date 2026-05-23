@@ -993,6 +993,8 @@ export const itOverrides: Record<string, string> = {
         'common.play': 'Riproduci',
         'common.pause': 'Pausa',
         'common.done': 'Fatto',
+        'common.showCompleted': 'Mostra completate',
+        'common.hideCompleted': 'Nascondi completate',
         'common.undo': 'Annulla',
         'common.skip': 'Salta',
         'common.clear': 'Azzera',

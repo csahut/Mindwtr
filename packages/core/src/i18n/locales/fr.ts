@@ -862,6 +862,8 @@ export const frOverrides: Record<string, string> = {
         'common.close': 'Fermer',
         'common.play': 'Jouer',
         'common.done': 'Fait',
+        'common.showCompleted': 'Afficher les tâches terminées',
+        'common.hideCompleted': 'Masquer les tâches terminées',
         'common.undo': 'Annuler',
         'common.skip': 'Passer',
         'common.clear': 'Clair',
