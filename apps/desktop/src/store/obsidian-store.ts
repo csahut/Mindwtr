@@ -259,8 +259,8 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
 
         const scanKey = buildScanKey(config);
         const startedAt = new Date().toISOString();
-        let scanPromise!: Promise<void>;
-        scanPromise = (async () => {
+        const currentScan: { promise: Promise<void> | null } = { promise: null };
+        const scanPromise = (async () => {
             set({ isScanning: true, error: null });
             try {
                 const result = await ObsidianService.scanVault(config);
@@ -301,11 +301,12 @@ export const useObsidianStore = createWithEqualityFn<ObsidianStoreState>()((set,
                     error: toErrorMessage(error, 'Failed to scan Obsidian vault.'),
                 });
             } finally {
-                if (activeScan?.promise === scanPromise) {
+                if (activeScan?.promise === currentScan.promise) {
                     activeScan = null;
                 }
             }
         })();
+        currentScan.promise = scanPromise;
         activeScan = { key: scanKey, promise: scanPromise };
         return scanPromise;
     },
