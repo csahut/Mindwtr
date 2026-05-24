@@ -1,5 +1,8 @@
 use crate::*;
 
+const QUICK_ADD_WINDOW_WIDTH: f64 = 620.0;
+const QUICK_ADD_WINDOW_HEIGHT: f64 = 420.0;
+
 #[tauri::command]
 pub(crate) fn consume_quick_add_pending(
     state: tauri::State<'_, QuickAddPending>,
@@ -184,16 +187,61 @@ pub(crate) fn create_quick_add_window(app: &tauri::AppHandle) -> Result<(), Stri
         tauri::WebviewUrl::App(QUICK_ADD_WINDOW_URL.into()),
     )
     .title("Quick Add")
-    .inner_size(620.0, 420.0)
+    .inner_size(QUICK_ADD_WINDOW_WIDTH, QUICK_ADD_WINDOW_HEIGHT)
     .resizable(false)
     .decorations(false)
     .always_on_top(true)
     .skip_taskbar(true)
     .visible(false)
-    .center()
     .build()
     .map(|_| ())
     .map_err(|error| format!("Failed to create quick add window: {error}"))
+}
+
+fn quick_add_window_physical_size(scale_factor: f64) -> tauri::PhysicalSize<u32> {
+    tauri::LogicalSize::new(QUICK_ADD_WINDOW_WIDTH, QUICK_ADD_WINDOW_HEIGHT)
+        .to_physical(scale_factor)
+}
+
+fn centered_quick_add_position(
+    work_area: &tauri::PhysicalRect<i32, u32>,
+    window_size: &tauri::PhysicalSize<u32>,
+) -> tauri::PhysicalPosition<i32> {
+    let x_offset = work_area.size.width.saturating_sub(window_size.width) / 2;
+    let y_offset = work_area.size.height.saturating_sub(window_size.height) / 2;
+    tauri::PhysicalPosition::new(
+        work_area.position.x + x_offset as i32,
+        work_area.position.y + y_offset as i32,
+    )
+}
+
+fn quick_add_target_monitor(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+) -> Option<tauri::Monitor> {
+    app.cursor_position()
+        .ok()
+        .and_then(|position| {
+            app.monitor_from_point(position.x, position.y)
+                .ok()
+                .flatten()
+        })
+        .or_else(|| window.current_monitor().ok().flatten())
+        .or_else(|| app.primary_monitor().ok().flatten())
+}
+
+fn center_quick_add_window(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
+    let Some(monitor) = quick_add_target_monitor(app, window) else {
+        if let Err(error) = window.center() {
+            log::warn!("Failed to center quick add window: {error}");
+        }
+        return;
+    };
+    let window_size = quick_add_window_physical_size(monitor.scale_factor());
+    let position = centered_quick_add_position(monitor.work_area(), &window_size);
+    if let Err(error) = window.set_position(position) {
+        log::warn!("Failed to position quick add window: {error}");
+    }
 }
 
 pub(crate) fn show_quick_add_window(app: &tauri::AppHandle) {
@@ -204,6 +252,7 @@ pub(crate) fn show_quick_add_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window(QUICK_ADD_WINDOW_LABEL) {
         let _ = window.set_skip_taskbar(true);
         let _ = window.unminimize();
+        center_quick_add_window(app, &window);
         let _ = window.show();
         let _ = window.set_focus();
         let payload = QuickAddEventPayload {
@@ -215,4 +264,45 @@ pub(crate) fn show_quick_add_window(app: &tauri::AppHandle) {
 
     log::warn!("Quick add window unavailable; falling back to the main window.");
     show_main_and_emit(app);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn centered_quick_add_position_uses_monitor_work_area() {
+        let work_area = tauri::PhysicalRect {
+            position: tauri::PhysicalPosition::new(100, -20),
+            size: tauri::PhysicalSize::new(1200, 800),
+        };
+        let window_size = tauri::PhysicalSize::new(620, 420);
+
+        assert_eq!(
+            centered_quick_add_position(&work_area, &window_size),
+            tauri::PhysicalPosition::new(390, 170)
+        );
+    }
+
+    #[test]
+    fn centered_quick_add_position_clamps_to_work_area_when_window_is_larger() {
+        let work_area = tauri::PhysicalRect {
+            position: tauri::PhysicalPosition::new(-1280, 0),
+            size: tauri::PhysicalSize::new(500, 300),
+        };
+        let window_size = tauri::PhysicalSize::new(620, 420);
+
+        assert_eq!(
+            centered_quick_add_position(&work_area, &window_size),
+            tauri::PhysicalPosition::new(-1280, 0)
+        );
+    }
+
+    #[test]
+    fn quick_add_window_physical_size_uses_monitor_scale_factor() {
+        assert_eq!(
+            quick_add_window_physical_size(2.0),
+            tauri::PhysicalSize::new(1240, 840)
+        );
+    }
 }
