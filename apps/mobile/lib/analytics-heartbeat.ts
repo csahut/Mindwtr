@@ -4,7 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
   generateUUID,
+  resetHeartbeatOptOutMarker,
   sendDailyHeartbeat,
+  sendHeartbeatOptOut,
   type AppSettings,
 } from '@mindwtr/core';
 
@@ -114,6 +116,15 @@ async function buildMobileHeartbeatOptions(config: MobileAnalyticsHeartbeatConfi
     storage: AsyncStorage,
     fetcher: fetch,
   };
+}
+
+export async function sendMobileAnalyticsOptOut(config: MobileAnalyticsHeartbeatConfig): Promise<boolean> {
+  if (!canSendMobileAnalyticsHeartbeat(config)) return false;
+  return sendHeartbeatOptOut(await buildMobileHeartbeatOptions(config));
+}
+
+export async function resetMobileAnalyticsOptOutMarker(): Promise<void> {
+  await resetHeartbeatOptOutMarker(AsyncStorage);
 }
 
 export async function sendMobileDailyHeartbeat(
