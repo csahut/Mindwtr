@@ -191,11 +191,12 @@ type DateFieldProps = {
     dateInputClassName: string;
     timeInput: ReactNode;
     onDateChange: (value: string) => void;
+    onCalendarSelect?: (value: string) => void;
     onClear: () => void;
     hasValue: boolean;
 };
 
-function DateField({
+export function DateField({
     t,
     label,
     dateAriaLabel,
@@ -206,6 +207,7 @@ function DateField({
     dateInputClassName,
     timeInput,
     onDateChange,
+    onCalendarSelect,
     onClear,
     hasValue,
 }: DateFieldProps) {
@@ -305,6 +307,7 @@ function DateField({
         const nextDateValue = safeFormatDate(date, 'yyyy-MM-dd');
         setDraftDateValue(formatDateInputDisplay(nextDateValue, dateInputOrder));
         onDateChange(nextDateValue);
+        onCalendarSelect?.(nextDateValue);
         if (!closeAfterSelect) return;
         setIsCalendarOpen(false);
         window.setTimeout(() => inputRef.current?.focus(), 0);

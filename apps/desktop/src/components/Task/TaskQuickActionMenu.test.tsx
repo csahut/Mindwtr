@@ -46,6 +46,7 @@ const renderMenu = (overrides: Partial<ComponentProps<typeof TaskQuickActionMenu
         x: 16,
         y: 16,
         t,
+        dateFormatSetting: 'system',
         nativeDateInputLocale: 'en-US',
         contextOptions: [],
         areas: [],
@@ -119,6 +120,20 @@ describe('TaskQuickActionMenu', () => {
         expect(props.onClose).toHaveBeenCalledTimes(1);
     });
 
+    it('closes the due date mini calendar when clicking elsewhere in the quick panel', () => {
+        const props = renderMenu({ task: { ...task, dueDate: '2026-04-12' } });
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Due Date…' }));
+
+        const panel = screen.getByRole('dialog', { name: 'Due Date' });
+        fireEvent.focus(within(panel).getByLabelText('Due Date'));
+        expect(screen.getByRole('dialog', { name: 'Due Date calendar' })).toBeInTheDocument();
+
+        fireEvent.pointerDown(within(panel).getByRole('button', { name: 'Cancel' }));
+
+        expect(screen.queryByRole('dialog', { name: 'Due Date calendar' })).not.toBeInTheDocument();
+        expect(props.onClose).not.toHaveBeenCalled();
+    });
+
     it('saves a start date from the quick action panel', async () => {
         const onUpdateTask = vi.fn(async () => ({ success: true as const }));
         const props = renderMenu({ onUpdateTask });
@@ -136,6 +151,48 @@ describe('TaskQuickActionMenu', () => {
 
         await waitFor(() => {
             expect(onUpdateTask).toHaveBeenCalledWith({ startTime: '2026-02-04T09:30' });
+        });
+        expect(props.onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('applies a due date from the mini calendar and closes the menu', async () => {
+        const onUpdateTask = vi.fn(async () => ({ success: true as const }));
+        const props = renderMenu({
+            task: { ...task, dueDate: '2026-04-12' },
+            onUpdateTask,
+        });
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Due Date…' }));
+        const panel = screen.getByRole('dialog', { name: 'Due Date' });
+        fireEvent.focus(within(panel).getByLabelText('Due Date'));
+
+        fireEvent.pointerDown(screen.getByRole('button', { name: /April 19, 2026/i }));
+
+        await waitFor(() => {
+            expect(onUpdateTask).toHaveBeenCalledWith({ dueDate: '2026-04-19' });
+        });
+        expect(props.onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses the configured date format when saving quick action date text', async () => {
+        const onUpdateTask = vi.fn(async () => ({ success: true as const }));
+        const props = renderMenu({
+            task: { ...task, dueDate: '2026-04-12' },
+            dateFormatSetting: 'dmy',
+            nativeDateInputLocale: 'en-GB-u-fw-mon',
+            onUpdateTask,
+        });
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Due Date…' }));
+        const panel = screen.getByRole('dialog', { name: 'Due Date' });
+        const input = within(panel).getByLabelText('Due Date') as HTMLInputElement;
+
+        expect(input.value).toBe('12/04/2026');
+        fireEvent.change(input, { target: { value: '19/04/2026' } });
+        fireEvent.click(within(panel).getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onUpdateTask).toHaveBeenCalledWith({ dueDate: '2026-04-19' });
         });
         expect(props.onClose).toHaveBeenCalledTimes(1);
     });

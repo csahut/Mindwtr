@@ -1145,6 +1145,7 @@ export const TaskItem = memo(function TaskItem({
                     x={quickActionMenu.x}
                     y={quickActionMenu.y}
                     t={t}
+                    dateFormatSetting={settings?.dateFormat}
                     nativeDateInputLocale={nativeDateInputLocale}
                     contextOptions={popularContextOptions}
                     areas={areas}
