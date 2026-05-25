@@ -38,9 +38,12 @@ const t = (key: string) => {
         'task.aria.reviewDate': 'Review date',
         'task.aria.reviewTime': 'Review time',
         'task.aria.description': 'Description',
+        'task.aria.location': 'Location',
         'task.aria.recurrence': 'Recurrence',
         'taskEdit.descriptionLabel': 'Description',
         'taskEdit.descriptionPlaceholder': 'Add notes...',
+        'taskEdit.locationLabel': 'Location',
+        'taskEdit.locationPlaceholder': 'Add location',
         'taskEdit.recurrenceLabel': 'Recurrence',
         'recurrence.none': 'None',
         'recurrence.daily': 'Daily',
@@ -102,6 +105,7 @@ const createData = (overrides: Partial<TaskItemFieldRendererData> = {}): TaskIte
     editTimeEstimate: '',
     editContexts: '',
     editTags: '',
+    editLocation: '',
     language: 'en',
     dateFormatSetting: 'system',
     nativeDateInputLocale: 'en-US',
@@ -133,6 +137,7 @@ const createHandlers = (): TaskItemFieldRendererHandlers => ({
     setEditTimeEstimate: vi.fn(),
     setEditContexts: vi.fn(),
     setEditTags: vi.fn(),
+    setEditLocation: vi.fn(),
     updateTask: vi.fn(),
     resetTaskChecklist: vi.fn(),
 });
@@ -173,6 +178,25 @@ function DescriptionPreviewHarness() {
 describe('TaskItemFieldRenderer date clear buttons', () => {
     afterEach(() => {
         cleanup();
+    });
+
+    it('edits the location field through the configurable renderer', () => {
+        const handlers = createHandlers();
+
+        const { getByLabelText } = render(
+            <TaskItemFieldRenderer
+                fieldId="location"
+                data={createData({ editLocation: 'Office' })}
+                handlers={handlers}
+            />
+        );
+
+        const input = getByLabelText('Location');
+        expect(input).toHaveValue('Office');
+
+        fireEvent.change(input, { target: { value: 'Home' } });
+
+        expect(handlers.setEditLocation).toHaveBeenCalledWith('Home');
     });
 
     it.each([

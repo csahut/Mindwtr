@@ -954,6 +954,8 @@ export function GtdSettingsScreen({
                 return t('taskEdit.contextsLabel');
             case 'description':
                 return t('taskEdit.descriptionLabel');
+            case 'location':
+                return t('taskEdit.locationLabel');
             case 'tags':
                 return t('taskEdit.tagsLabel');
             case 'timeEstimate':

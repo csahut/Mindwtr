@@ -68,8 +68,6 @@ interface TaskItemEditorProps {
     };
     sectionOpenDefaults: Record<TaskEditorSectionId, boolean>;
     renderField: (fieldId: TaskEditorFieldId) => ReactNode;
-    editLocation: string;
-    setEditLocation: (value: string) => void;
     language: string;
     inputContexts: string[];
     isDoneActionActive?: boolean;
@@ -127,8 +125,6 @@ export function TaskItemEditor({
     sectionCounts,
     sectionOpenDefaults,
     renderField,
-    editLocation,
-    setEditLocation,
     language,
     inputContexts,
     isDoneActionActive = false,
@@ -519,17 +515,6 @@ export function TaskItemEditor({
                                     <div key={fieldId}>{renderField(fieldId)}</div>
                                 ))
                             )}
-                            <div className="flex flex-col gap-1">
-                                <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.locationLabel')}</label>
-                                <input
-                                    type="text"
-                                    aria-label={t('task.aria.location')}
-                                    value={editLocation}
-                                    onChange={(e) => setEditLocation(e.target.value)}
-                                    placeholder={t('taskEdit.locationPlaceholder')}
-                                    className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground placeholder:text-muted-foreground"
-                                />
-                            </div>
                         </div>
                     )}
                 </div>

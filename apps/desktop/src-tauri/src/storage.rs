@@ -104,6 +104,7 @@ pub(crate) fn open_sqlite(app: &tauri::AppHandle) -> Result<Connection, String> 
     ensure_projects_due_date_column(&conn)?;
     ensure_projects_area_order_index(&conn)?;
     ensure_sync_revision_columns(&conn)?;
+    ensure_tasks_fts_schema(&conn)?;
     ensure_fts_triggers(&conn)?;
     ensure_fts_populated(&conn, false)?;
     Ok(conn)
@@ -405,19 +406,46 @@ fn ensure_projects_area_order_index(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
-fn ensure_fts_triggers(conn: &Connection) -> Result<(), String> {
-    let has_v2: Option<i64> = conn
-        .query_row(
-            "SELECT version FROM schema_migrations WHERE version = 2 LIMIT 1",
-            [],
-            |row| row.get(0),
-        )
-        .optional()
+fn ensure_tasks_fts_schema(conn: &Connection) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(tasks_fts)")
         .map_err(|e| e.to_string())?;
-    if has_v2.is_some() {
-        return Ok(());
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?;
+    for column in columns {
+        if column.map_err(|e| e.to_string())? == "location" {
+            return Ok(());
+        }
     }
 
+    conn.execute("DROP TRIGGER IF EXISTS tasks_ai", [])
+        .map_err(|e| e.to_string())?;
+    conn.execute("DROP TRIGGER IF EXISTS tasks_ad", [])
+        .map_err(|e| e.to_string())?;
+    conn.execute("DROP TRIGGER IF EXISTS tasks_au", [])
+        .map_err(|e| e.to_string())?;
+    conn.execute("DROP TABLE IF EXISTS tasks_fts", [])
+        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
+          id UNINDEXED,
+          title,
+          description,
+          tags,
+          contexts,
+          location,
+          content=''
+        )",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn ensure_fts_triggers(conn: &Connection) -> Result<(), String> {
+    conn.execute("DROP TRIGGER IF EXISTS tasks_ai", [])
+        .map_err(|e| e.to_string())?;
     conn.execute("DROP TRIGGER IF EXISTS tasks_ad", [])
         .map_err(|e| e.to_string())?;
     conn.execute("DROP TRIGGER IF EXISTS tasks_au", [])
@@ -428,37 +456,45 @@ fn ensure_fts_triggers(conn: &Connection) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     conn.execute(
+        "CREATE TRIGGER tasks_ai AFTER INSERT ON tasks BEGIN
+          INSERT INTO tasks_fts (rowid, title, description, tags, contexts, location)
+          VALUES (new.rowid, new.title, coalesce(new.description, ''), coalesce(new.tags, ''), coalesce(new.contexts, ''), coalesce(new.location, ''));
+        END",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
         "CREATE TRIGGER tasks_ad AFTER DELETE ON tasks BEGIN
-          INSERT INTO tasks_fts (tasks_fts, id, title, description, tags, contexts)
-          VALUES ('delete', old.id, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''));
+          INSERT INTO tasks_fts (tasks_fts, rowid, title, description, tags, contexts, location)
+          VALUES ('delete', old.rowid, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''), coalesce(old.location, ''));
         END",
         [],
     )
     .map_err(|e| e.to_string())?;
     conn.execute(
         "CREATE TRIGGER tasks_au AFTER UPDATE ON tasks BEGIN
-          INSERT INTO tasks_fts (tasks_fts, id, title, description, tags, contexts)
-          VALUES ('delete', old.id, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''));
-          INSERT INTO tasks_fts (id, title, description, tags, contexts)
-          VALUES (new.id, new.title, coalesce(new.description, ''), coalesce(new.tags, ''), coalesce(new.contexts, ''));
+          INSERT INTO tasks_fts (tasks_fts, rowid, title, description, tags, contexts, location)
+          VALUES ('delete', old.rowid, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''), coalesce(old.location, ''));
+          INSERT INTO tasks_fts (rowid, title, description, tags, contexts, location)
+          VALUES (new.rowid, new.title, coalesce(new.description, ''), coalesce(new.tags, ''), coalesce(new.contexts, ''), coalesce(new.location, ''));
         END",
         [],
     )
     .map_err(|e| e.to_string())?;
     conn.execute(
         "CREATE TRIGGER projects_ad AFTER DELETE ON projects BEGIN
-          INSERT INTO projects_fts (projects_fts, id, title, supportNotes, tagIds, areaTitle)
-          VALUES ('delete', old.id, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
+          INSERT INTO projects_fts (projects_fts, rowid, title, supportNotes, tagIds, areaTitle)
+          VALUES ('delete', old.rowid, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
         END",
         [],
     )
     .map_err(|e| e.to_string())?;
     conn.execute(
         "CREATE TRIGGER projects_au AFTER UPDATE ON projects BEGIN
-          INSERT INTO projects_fts (projects_fts, id, title, supportNotes, tagIds, areaTitle)
-          VALUES ('delete', old.id, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
-          INSERT INTO projects_fts (id, title, supportNotes, tagIds, areaTitle)
-          VALUES (new.id, new.title, coalesce(new.supportNotes, ''), coalesce(new.tagIds, ''), coalesce(new.areaTitle, ''));
+          INSERT INTO projects_fts (projects_fts, rowid, title, supportNotes, tagIds, areaTitle)
+          VALUES ('delete', old.rowid, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
+          INSERT INTO projects_fts (rowid, title, supportNotes, tagIds, areaTitle)
+          VALUES (new.rowid, new.title, coalesce(new.supportNotes, ''), coalesce(new.tagIds, ''), coalesce(new.areaTitle, ''));
         END",
         [],
     )
@@ -494,14 +530,14 @@ fn ensure_fts_populated(conn: &Connection, force_rebuild: bool) -> Result<(), St
         .unwrap_or(0);
     let missing_tasks: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM tasks WHERE id NOT IN (SELECT id FROM tasks_fts)",
+            "SELECT COUNT(*) FROM tasks WHERE rowid NOT IN (SELECT rowid FROM tasks_fts)",
             [],
             |row| row.get(0),
         )
         .unwrap_or(0);
     let extra_tasks: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM tasks_fts WHERE id NOT IN (SELECT id FROM tasks)",
+            "SELECT COUNT(*) FROM tasks_fts WHERE rowid NOT IN (SELECT rowid FROM tasks)",
             [],
             |row| row.get(0),
         )
@@ -510,8 +546,8 @@ fn ensure_fts_populated(conn: &Connection, force_rebuild: bool) -> Result<(), St
         conn.execute("INSERT INTO tasks_fts(tasks_fts) VALUES('delete-all')", [])
             .map_err(|e| e.to_string())?;
         conn.execute(
-            "INSERT INTO tasks_fts (id, title, description, tags, contexts)
-             SELECT id, title, coalesce(description, ''), coalesce(tags, ''), coalesce(contexts, '') FROM tasks",
+            "INSERT INTO tasks_fts (rowid, title, description, tags, contexts, location)
+             SELECT rowid, title, coalesce(description, ''), coalesce(tags, ''), coalesce(contexts, ''), coalesce(location, '') FROM tasks",
             [],
         )
         .map_err(|e| e.to_string())?;
@@ -522,14 +558,14 @@ fn ensure_fts_populated(conn: &Connection, force_rebuild: bool) -> Result<(), St
         .unwrap_or(0);
     let missing_projects: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM projects WHERE id NOT IN (SELECT id FROM projects_fts)",
+            "SELECT COUNT(*) FROM projects WHERE rowid NOT IN (SELECT rowid FROM projects_fts)",
             [],
             |row| row.get(0),
         )
         .unwrap_or(0);
     let extra_projects: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM projects_fts WHERE id NOT IN (SELECT id FROM projects)",
+            "SELECT COUNT(*) FROM projects_fts WHERE rowid NOT IN (SELECT rowid FROM projects)",
             [],
             |row| row.get(0),
         )
@@ -541,15 +577,14 @@ fn ensure_fts_populated(conn: &Connection, force_rebuild: bool) -> Result<(), St
         )
         .map_err(|e| e.to_string())?;
         conn.execute(
-            "INSERT INTO projects_fts (id, title, supportNotes, tagIds, areaTitle)
-             SELECT id, title, coalesce(supportNotes, ''), coalesce(tagIds, ''), coalesce(areaTitle, '') FROM projects",
+            "INSERT INTO projects_fts (rowid, title, supportNotes, tagIds, areaTitle)
+             SELECT rowid, title, coalesce(supportNotes, ''), coalesce(tagIds, ''), coalesce(areaTitle, '') FROM projects",
             [],
         )
         .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
-
 fn json_str(value: Option<&Value>) -> Option<String> {
     value.and_then(|v| serde_json::to_string(v).ok())
 }
@@ -1604,7 +1639,7 @@ pub(crate) fn search_fts(app: tauri::AppHandle, query: String) -> Result<Value, 
     let mut limited = false;
 
     let mut task_stmt = conn
-        .prepare("SELECT t.* FROM tasks_fts f JOIN tasks t ON f.id = t.id WHERE tasks_fts MATCH ?1 AND t.deletedAt IS NULL LIMIT ?2")
+        .prepare("SELECT t.* FROM tasks_fts f JOIN tasks t ON f.rowid = t.rowid WHERE tasks_fts MATCH ?1 AND t.deletedAt IS NULL LIMIT ?2")
         .map_err(|e| e.to_string())?;
     let task_rows = task_stmt
         .query_map(
@@ -1622,7 +1657,7 @@ pub(crate) fn search_fts(app: tauri::AppHandle, query: String) -> Result<Value, 
     }
 
     let mut project_stmt = conn
-        .prepare("SELECT p.* FROM projects_fts f JOIN projects p ON f.id = p.id WHERE projects_fts MATCH ?1 AND p.deletedAt IS NULL LIMIT ?2")
+        .prepare("SELECT p.* FROM projects_fts f JOIN projects p ON f.rowid = p.rowid WHERE projects_fts MATCH ?1 AND p.deletedAt IS NULL LIMIT ?2")
         .map_err(|e| e.to_string())?;
     let project_rows = project_stmt
         .query_map(params![fts_query, SEARCH_RESULT_QUERY_LIMIT], |row| {
@@ -1800,6 +1835,37 @@ mod tests {
         assert!(index_names
             .iter()
             .any(|name| name == "idx_tasks_assignedTo"));
+    }
+
+    #[test]
+    fn ensure_tasks_fts_schema_recreates_legacy_index_with_location() {
+        let conn = Connection::open_in_memory().expect("should open in-memory db");
+        conn.execute_batch(
+            r#"
+            CREATE VIRTUAL TABLE tasks_fts USING fts5(
+              id UNINDEXED,
+              title,
+              description,
+              tags,
+              contexts,
+              content=''
+            );
+            "#,
+        )
+        .expect("should create legacy fts table");
+
+        ensure_tasks_fts_schema(&conn).expect("should recreate tasks FTS table");
+
+        let mut stmt = conn
+            .prepare("PRAGMA table_info(tasks_fts)")
+            .expect("should inspect fts columns");
+        let column_names: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))
+            .expect("should read fts columns")
+            .map(|row| row.expect("column row"))
+            .collect();
+
+        assert!(column_names.iter().any(|name| name == "location"));
     }
 
     #[test]

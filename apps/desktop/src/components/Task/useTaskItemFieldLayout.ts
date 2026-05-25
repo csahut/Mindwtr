@@ -25,6 +25,7 @@ type UseTaskItemFieldLayoutParams = {
     editReviewAt: string;
     editStartTime: string;
     editTags: string;
+    editLocation: string;
     editTimeEstimate: TimeEstimate | '';
     prioritiesEnabled: boolean;
     timeEstimatesEnabled: boolean;
@@ -48,6 +49,7 @@ export function useTaskItemFieldLayout({
     editReviewAt,
     editStartTime,
     editTags,
+    editLocation,
     editTimeEstimate,
     prioritiesEnabled,
     timeEstimatesEnabled,
@@ -116,6 +118,8 @@ export function useTaskItemFieldLayout({
                 return Boolean(editContexts.trim());
             case 'description':
                 return Boolean(editDescription.trim());
+            case 'location':
+                return Boolean(editLocation.trim());
             case 'tags':
                 return Boolean(editTags.trim());
             case 'timeEstimate':
@@ -143,6 +147,7 @@ export function useTaskItemFieldLayout({
         editDescription,
         editDueDate,
         editEnergyLevel,
+        editLocation,
         editPriority,
         editProjectId,
         editRecurrence,

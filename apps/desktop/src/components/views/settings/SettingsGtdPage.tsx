@@ -79,6 +79,7 @@ type Labels = {
     taskEditorFieldAssignedTo: string;
     taskEditorFieldContexts: string;
     taskEditorFieldDescription: string;
+    taskEditorFieldLocation: string;
     taskEditorFieldTags: string;
     taskEditorFieldTimeEstimate: string;
     taskEditorFieldRecurrence: string;
@@ -323,6 +324,8 @@ export function SettingsGtdPage({
                 return t.taskEditorFieldContexts;
             case 'description':
                 return t.taskEditorFieldDescription;
+            case 'location':
+                return t.taskEditorFieldLocation;
             case 'tags':
                 return t.taskEditorFieldTags;
             case 'timeEstimate':

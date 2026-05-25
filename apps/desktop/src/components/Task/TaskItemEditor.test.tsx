@@ -80,8 +80,6 @@ const baseProps: Parameters<typeof TaskItemEditor>[0] = {
         details: false,
     },
     renderField: (fieldId) => <div>{`field:${fieldId}`}</div>,
-    editLocation: '',
-    setEditLocation: vi.fn(),
     language: 'en',
     inputContexts: [],
     onDuplicateTask: vi.fn(),

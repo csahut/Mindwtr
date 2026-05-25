@@ -9,7 +9,7 @@ import { MarkdownText } from '../markdown-text';
 import { getControlledTextInputSelection } from '../text-input-selection';
 import type { TaskEditFieldRendererProps } from './TaskEditFieldRenderer.types';
 
-type ContentFieldId = 'description' | 'attachments' | 'checklist';
+type ContentFieldId = 'description' | 'location' | 'attachments' | 'checklist';
 
 type TaskEditContentFieldProps = TaskEditFieldRendererProps & {
     fieldId: ContentFieldId;
@@ -128,6 +128,26 @@ export function TaskEditContentField({
                             />
                         </>
                     )}
+                </View>
+            );
+        case 'location':
+            return (
+                <View style={styles.formGroup}>
+                    <Text style={[styles.label, { color: tc.secondaryText }]}>{t('taskEdit.locationLabel')}</Text>
+                    <TextInput
+                        style={[styles.input, inputStyle]}
+                        value={String(editedTask.location ?? '')}
+                        onChangeText={(location) => setEditedTask((prev) => ({ ...prev, location }))}
+                        placeholder={t('taskEdit.locationPlaceholder')}
+                        placeholderTextColor={tc.secondaryText}
+                        accessibilityLabel={t('taskEdit.locationLabel')}
+                        accessibilityHint={t('taskEdit.locationPlaceholder')}
+                        onFocus={(event) => {
+                            if (event.nativeEvent.target) {
+                                handleInputFocus(event.nativeEvent.target);
+                            }
+                        }}
+                    />
                 </View>
             );
         case 'attachments':

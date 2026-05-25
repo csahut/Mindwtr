@@ -495,6 +495,33 @@ describeSqlite('SqliteAdapter', () => {
         expect(results.projects[0]).not.toHaveProperty('supportNotes');
     });
 
+    it('indexes task locations in full text search', async () => {
+        const now = new Date().toISOString();
+        await adapter.saveData({
+            tasks: [
+                {
+                    id: 'task-location',
+                    title: 'Unrelated task',
+                    status: 'next',
+                    contexts: [],
+                    tags: [],
+                    location: 'Main Office',
+                    createdAt: now,
+                    updatedAt: now,
+                },
+            ],
+            projects: [],
+            areas: [],
+            sections: [],
+            settings: {},
+        });
+
+        const results = await adapter.searchAll('office');
+
+        expect(results.tasks.map((task) => task.id)).toEqual(['task-location']);
+        expect(results.tasks[0]?.location).toBe('Main Office');
+    });
+
     it('derives stable fallback order when project/section orderNum is null', async () => {
         const now = new Date().toISOString();
         await adapter.saveData({

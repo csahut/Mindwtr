@@ -489,6 +489,7 @@ export type TaskItemFieldRendererData = {
     editTimeEstimate: TimeEstimate | '';
     editContexts: string;
     editTags: string;
+    editLocation: string;
     language: string;
     dateFormatSetting?: string | null;
     nativeDateInputLocale: string;
@@ -519,6 +520,7 @@ export type TaskItemFieldRendererHandlers = {
     setEditTimeEstimate: (value: TimeEstimate | '') => void;
     setEditContexts: (value: string) => void;
     setEditTags: (value: string) => void;
+    setEditLocation: (value: string) => void;
     updateTask: (taskId: string, updates: Partial<Task>) => void;
     resetTaskChecklist: (taskId: string) => void;
 };
@@ -556,6 +558,7 @@ export function TaskItemFieldRenderer({
         editTimeEstimate,
         editContexts,
         editTags,
+        editLocation,
         language,
         dateFormatSetting,
         nativeDateInputLocale,
@@ -609,6 +612,7 @@ export function TaskItemFieldRenderer({
         setEditTimeEstimate,
         setEditContexts,
         setEditTags,
+        setEditLocation,
         updateTask,
         resetTaskChecklist,
     } = handlers;
@@ -1096,6 +1100,20 @@ export function TaskItemFieldRenderer({
             return <ContextsField t={t} value={editContexts} options={popularContextOptions} onChange={setEditContexts} />;
         case 'tags':
             return <TagsField t={t} value={editTags} options={popularTagOptions} onChange={setEditTags} />;
+        case 'location':
+            return (
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.locationLabel')}</label>
+                    <input
+                        type="text"
+                        aria-label={t('task.aria.location')}
+                        value={editLocation}
+                        onChange={(event) => setEditLocation(event.target.value)}
+                        placeholder={t('taskEdit.locationPlaceholder')}
+                        className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground placeholder:text-muted-foreground"
+                    />
+                </div>
+            );
         case 'checklist':
             return (
                 <ChecklistField

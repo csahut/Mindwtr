@@ -314,6 +314,7 @@ export class SqliteAdapter {
         }
         // FTS operations are optional - don't block startup if they fail
         try {
+            await this.ensureFtsSchema();
             await this.ensureFtsTriggers();
             await this.ensureFtsPopulated();
         } catch (error) {
@@ -335,46 +336,71 @@ export class SqliteAdapter {
         await this.schemaReadyPromise;
     }
 
+    private async ensureFtsSchema() {
+        const columns = await this.client.all<{ name?: string }>('PRAGMA table_info(tasks_fts)');
+        const hasLocation = columns.some((column) => column.name === 'location');
+        if (hasLocation) return;
+
+        await this.client.run('DROP TRIGGER IF EXISTS tasks_ai');
+        await this.client.run('DROP TRIGGER IF EXISTS tasks_ad');
+        await this.client.run('DROP TRIGGER IF EXISTS tasks_au');
+        await this.client.run('DROP TABLE IF EXISTS tasks_fts');
+        await this.client.run(`
+            CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
+              id UNINDEXED,
+              title,
+              description,
+              tags,
+              contexts,
+              location,
+              content=''
+            )
+        `);
+    }
+
     private async ensureFtsTriggers() {
         // Recreate FTS triggers to use proper contentless FTS5 delete syntax
         // Old triggers used "DELETE FROM tasks_fts WHERE id = ..." which fails on contentless tables
         try {
-            const migrations = await this.client.all<{ version: number }>('SELECT version FROM schema_migrations');
-            const hasV2 = migrations.some((m) => m.version === 2);
-            if (hasV2) return;
-
-            // Drop old triggers and recreate with correct syntax
+            // Drop old triggers and recreate with current indexed columns.
+            await this.client.run('DROP TRIGGER IF EXISTS tasks_ai');
             await this.client.run('DROP TRIGGER IF EXISTS tasks_ad');
             await this.client.run('DROP TRIGGER IF EXISTS tasks_au');
             await this.client.run('DROP TRIGGER IF EXISTS projects_ad');
             await this.client.run('DROP TRIGGER IF EXISTS projects_au');
 
             await this.client.run(`
+                CREATE TRIGGER tasks_ai AFTER INSERT ON tasks BEGIN
+                  INSERT INTO tasks_fts (rowid, title, description, tags, contexts, location)
+                  VALUES (new.rowid, new.title, coalesce(new.description, ''), coalesce(new.tags, ''), coalesce(new.contexts, ''), coalesce(new.location, ''));
+                END
+            `);
+            await this.client.run(`
                 CREATE TRIGGER tasks_ad AFTER DELETE ON tasks BEGIN
-                  INSERT INTO tasks_fts (tasks_fts, id, title, description, tags, contexts)
-                  VALUES ('delete', old.id, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''));
+                  INSERT INTO tasks_fts (tasks_fts, rowid, title, description, tags, contexts, location)
+                  VALUES ('delete', old.rowid, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''), coalesce(old.location, ''));
                 END
             `);
             await this.client.run(`
                 CREATE TRIGGER tasks_au AFTER UPDATE ON tasks BEGIN
-                  INSERT INTO tasks_fts (tasks_fts, id, title, description, tags, contexts)
-                  VALUES ('delete', old.id, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''));
-                  INSERT INTO tasks_fts (id, title, description, tags, contexts)
-                  VALUES (new.id, new.title, coalesce(new.description, ''), coalesce(new.tags, ''), coalesce(new.contexts, ''));
+                  INSERT INTO tasks_fts (tasks_fts, rowid, title, description, tags, contexts, location)
+                  VALUES ('delete', old.rowid, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''), coalesce(old.location, ''));
+                  INSERT INTO tasks_fts (rowid, title, description, tags, contexts, location)
+                  VALUES (new.rowid, new.title, coalesce(new.description, ''), coalesce(new.tags, ''), coalesce(new.contexts, ''), coalesce(new.location, ''));
                 END
             `);
             await this.client.run(`
                 CREATE TRIGGER projects_ad AFTER DELETE ON projects BEGIN
-                  INSERT INTO projects_fts (projects_fts, id, title, supportNotes, tagIds, areaTitle)
-                  VALUES ('delete', old.id, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
+                  INSERT INTO projects_fts (projects_fts, rowid, title, supportNotes, tagIds, areaTitle)
+                  VALUES ('delete', old.rowid, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
                 END
             `);
             await this.client.run(`
                 CREATE TRIGGER projects_au AFTER UPDATE ON projects BEGIN
-                  INSERT INTO projects_fts (projects_fts, id, title, supportNotes, tagIds, areaTitle)
-                  VALUES ('delete', old.id, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
-                  INSERT INTO projects_fts (id, title, supportNotes, tagIds, areaTitle)
-                  VALUES (new.id, new.title, coalesce(new.supportNotes, ''), coalesce(new.tagIds, ''), coalesce(new.areaTitle, ''));
+                  INSERT INTO projects_fts (projects_fts, rowid, title, supportNotes, tagIds, areaTitle)
+                  VALUES ('delete', old.rowid, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
+                  INSERT INTO projects_fts (rowid, title, supportNotes, tagIds, areaTitle)
+                  VALUES (new.rowid, new.title, coalesce(new.supportNotes, ''), coalesce(new.tagIds, ''), coalesce(new.areaTitle, ''));
                 END
             `);
 
@@ -605,11 +631,11 @@ export class SqliteAdapter {
             }>(
                 `SELECT
                     (SELECT COUNT(*) FROM tasks_fts) as task_count,
-                    (SELECT COUNT(*) FROM (SELECT id FROM tasks EXCEPT SELECT id FROM tasks_fts)) as task_missing,
-                    (SELECT COUNT(*) FROM (SELECT id FROM tasks_fts EXCEPT SELECT id FROM tasks)) as task_extra,
+                    (SELECT COUNT(*) FROM (SELECT rowid FROM tasks EXCEPT SELECT rowid FROM tasks_fts)) as task_missing,
+                    (SELECT COUNT(*) FROM (SELECT rowid FROM tasks_fts EXCEPT SELECT rowid FROM tasks)) as task_extra,
                     (SELECT COUNT(*) FROM projects_fts) as project_count,
-                    (SELECT COUNT(*) FROM (SELECT id FROM projects EXCEPT SELECT id FROM projects_fts)) as project_missing,
-                    (SELECT COUNT(*) FROM (SELECT id FROM projects_fts EXCEPT SELECT id FROM projects)) as project_extra
+                    (SELECT COUNT(*) FROM (SELECT rowid FROM projects EXCEPT SELECT rowid FROM projects_fts)) as project_missing,
+                    (SELECT COUNT(*) FROM (SELECT rowid FROM projects_fts EXCEPT SELECT rowid FROM projects)) as project_extra
                 `
             );
             const taskCount = Number(counts?.task_count ?? tasksFtsTotal ?? 0);
@@ -662,16 +688,16 @@ export class SqliteAdapter {
                         // Use FTS5 delete-all command for contentless tables (content='')
                         await this.client.run("INSERT INTO tasks_fts(tasks_fts) VALUES('delete-all')");
                         await this.client.run(
-                            `INSERT INTO tasks_fts (id, title, description, tags, contexts)
-                             SELECT id, title, coalesce(description, ''), coalesce(tags, ''), coalesce(contexts, '') FROM tasks`
+                            `INSERT INTO tasks_fts (rowid, title, description, tags, contexts, location)
+                             SELECT rowid, title, coalesce(description, ''), coalesce(tags, ''), coalesce(contexts, ''), coalesce(location, '') FROM tasks`
                         );
                     }
                     if (needsProjectRebuild) {
                         // Use FTS5 delete-all command for contentless tables (content='')
                         await this.client.run("INSERT INTO projects_fts(projects_fts) VALUES('delete-all')");
                         await this.client.run(
-                            `INSERT INTO projects_fts (id, title, supportNotes, tagIds, areaTitle)
-                             SELECT id, title, coalesce(supportNotes, ''), coalesce(tagIds, ''), coalesce(areaTitle, '') FROM projects`
+                            `INSERT INTO projects_fts (rowid, title, supportNotes, tagIds, areaTitle)
+                             SELECT rowid, title, coalesce(supportNotes, ''), coalesce(tagIds, ''), coalesce(areaTitle, '') FROM projects`
                         );
                     }
                     await this.client.run('COMMIT');
@@ -887,11 +913,11 @@ export class SqliteAdapter {
         const runSearch = async (): Promise<SearchResults> => {
             const [taskRows, projectRows] = await Promise.all([
                 this.client.all<Record<string, unknown>>(
-                    `SELECT ${SEARCH_TASK_SELECT} FROM tasks_fts f JOIN tasks t ON f.id = t.id WHERE tasks_fts MATCH ? AND t.deletedAt IS NULL ORDER BY bm25(tasks_fts) LIMIT ?`,
+                    `SELECT ${SEARCH_TASK_SELECT} FROM tasks_fts f JOIN tasks t ON f.rowid = t.rowid WHERE tasks_fts MATCH ? AND t.deletedAt IS NULL ORDER BY bm25(tasks_fts) LIMIT ?`,
                     [ftsQuery, SEARCH_RESULT_LIMIT + 1]
                 ),
                 this.client.all<Record<string, unknown>>(
-                    `SELECT ${SEARCH_PROJECT_SELECT} FROM projects_fts f JOIN projects p ON f.id = p.id WHERE projects_fts MATCH ? AND p.deletedAt IS NULL ORDER BY bm25(projects_fts) LIMIT ?`,
+                    `SELECT ${SEARCH_PROJECT_SELECT} FROM projects_fts f JOIN projects p ON f.rowid = p.rowid WHERE projects_fts MATCH ? AND p.deletedAt IS NULL ORDER BY bm25(projects_fts) LIMIT ?`,
                     [ftsQuery, SEARCH_RESULT_LIMIT + 1]
                 ),
             ]);

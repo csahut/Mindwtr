@@ -224,6 +224,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS tasks_fts USING fts5(
   description,
   tags,
   contexts,
+  location,
   content=''
 );
 
@@ -237,37 +238,37 @@ CREATE VIRTUAL TABLE IF NOT EXISTS projects_fts USING fts5(
 );
 
 CREATE TRIGGER IF NOT EXISTS tasks_ai AFTER INSERT ON tasks BEGIN
-  INSERT INTO tasks_fts (id, title, description, tags, contexts)
-  VALUES (new.id, new.title, coalesce(new.description, ''), coalesce(new.tags, ''), coalesce(new.contexts, ''));
+  INSERT INTO tasks_fts (rowid, title, description, tags, contexts, location)
+  VALUES (new.rowid, new.title, coalesce(new.description, ''), coalesce(new.tags, ''), coalesce(new.contexts, ''), coalesce(new.location, ''));
 END;
 
 CREATE TRIGGER IF NOT EXISTS tasks_ad AFTER DELETE ON tasks BEGIN
-  INSERT INTO tasks_fts (tasks_fts, id, title, description, tags, contexts)
-  VALUES ('delete', old.id, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''));
+  INSERT INTO tasks_fts (tasks_fts, rowid, title, description, tags, contexts, location)
+  VALUES ('delete', old.rowid, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''), coalesce(old.location, ''));
 END;
 
 CREATE TRIGGER IF NOT EXISTS tasks_au AFTER UPDATE ON tasks BEGIN
-  INSERT INTO tasks_fts (tasks_fts, id, title, description, tags, contexts)
-  VALUES ('delete', old.id, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''));
-  INSERT INTO tasks_fts (id, title, description, tags, contexts)
-  VALUES (new.id, new.title, coalesce(new.description, ''), coalesce(new.tags, ''), coalesce(new.contexts, ''));
+  INSERT INTO tasks_fts (tasks_fts, rowid, title, description, tags, contexts, location)
+  VALUES ('delete', old.rowid, old.title, coalesce(old.description, ''), coalesce(old.tags, ''), coalesce(old.contexts, ''), coalesce(old.location, ''));
+  INSERT INTO tasks_fts (rowid, title, description, tags, contexts, location)
+  VALUES (new.rowid, new.title, coalesce(new.description, ''), coalesce(new.tags, ''), coalesce(new.contexts, ''), coalesce(new.location, ''));
 END;
 
 CREATE TRIGGER IF NOT EXISTS projects_ai AFTER INSERT ON projects BEGIN
-  INSERT INTO projects_fts (id, title, supportNotes, tagIds, areaTitle)
-  VALUES (new.id, new.title, coalesce(new.supportNotes, ''), coalesce(new.tagIds, ''), coalesce(new.areaTitle, ''));
+  INSERT INTO projects_fts (rowid, title, supportNotes, tagIds, areaTitle)
+  VALUES (new.rowid, new.title, coalesce(new.supportNotes, ''), coalesce(new.tagIds, ''), coalesce(new.areaTitle, ''));
 END;
 
 CREATE TRIGGER IF NOT EXISTS projects_ad AFTER DELETE ON projects BEGIN
-  INSERT INTO projects_fts (projects_fts, id, title, supportNotes, tagIds, areaTitle)
-  VALUES ('delete', old.id, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
+  INSERT INTO projects_fts (projects_fts, rowid, title, supportNotes, tagIds, areaTitle)
+  VALUES ('delete', old.rowid, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
 END;
 
 CREATE TRIGGER IF NOT EXISTS projects_au AFTER UPDATE ON projects BEGIN
-  INSERT INTO projects_fts (projects_fts, id, title, supportNotes, tagIds, areaTitle)
-  VALUES ('delete', old.id, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
-  INSERT INTO projects_fts (id, title, supportNotes, tagIds, areaTitle)
-  VALUES (new.id, new.title, coalesce(new.supportNotes, ''), coalesce(new.tagIds, ''), coalesce(new.areaTitle, ''));
+  INSERT INTO projects_fts (projects_fts, rowid, title, supportNotes, tagIds, areaTitle)
+  VALUES ('delete', old.rowid, old.title, coalesce(old.supportNotes, ''), coalesce(old.tagIds, ''), coalesce(old.areaTitle, ''));
+  INSERT INTO projects_fts (rowid, title, supportNotes, tagIds, areaTitle)
+  VALUES (new.rowid, new.title, coalesce(new.supportNotes, ''), coalesce(new.tagIds, ''), coalesce(new.areaTitle, ''));
 END;
 `;
 

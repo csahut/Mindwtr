@@ -201,32 +201,27 @@ describe('TaskEditFormTab keyboard handling', () => {
     expect(onTitleInputFocusChange).toHaveBeenCalledWith(false);
   });
 
-  it('renders a mobile location editor in the details section', () => {
-    const setEditedTask = vi.fn();
+  it('renders a configured mobile location field in the details section', () => {
+    const renderField = vi.fn((fieldId) => (
+      <TextInput accessibilityLabel={fieldId} value={`field:${fieldId}`} />
+    ));
     let tree!: ReturnType<typeof create>;
 
     act(() => {
       tree = create(
         <TaskEditFormTab
           {...baseProps}
-          editedTask={{ location: 'Office' }}
-          setEditedTask={setEditedTask}
+          detailsFields={['location']}
+          renderField={renderField}
           sectionOpenDefaults={{ ...baseProps.sectionOpenDefaults, details: true }}
         />
       );
     });
 
     const inputs = tree.root.findAllByType(TextInput);
-    const locationInput = inputs.find((input) => input.props.accessibilityLabel === 'taskEdit.locationLabel');
+    const locationInput = inputs.find((input) => input.props.accessibilityLabel === 'location');
 
-    expect(locationInput?.props.value).toBe('Office');
-
-    act(() => {
-      locationInput?.props.onChangeText('Home');
-    });
-
-    const updater = setEditedTask.mock.calls[0]?.[0];
-    expect(typeof updater).toBe('function');
-    expect(updater({ title: 'Task' })).toEqual({ title: 'Task', location: 'Home' });
+    expect(locationInput?.props.value).toBe('field:location');
+    expect(renderField).toHaveBeenCalledWith('location');
   });
 });

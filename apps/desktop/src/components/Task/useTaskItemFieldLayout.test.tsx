@@ -33,6 +33,7 @@ const buildParams = (overrides: Partial<Parameters<typeof useTaskItemFieldLayout
     editReviewAt: '2026-03-21T09:00',
     editStartTime: '2026-03-19T09:00',
     editTags: '#notes',
+    editLocation: 'Office',
     editTimeEstimate: '30min',
     prioritiesEnabled: true,
     timeEstimatesEnabled: true,

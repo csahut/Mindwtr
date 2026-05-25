@@ -56,6 +56,7 @@ export type TaskEditorFieldId =
     | 'assignedTo'
     | 'contexts'
     | 'tags'
+    | 'location'
     | 'timeEstimate'
     | 'recurrence'
     | 'startTime'

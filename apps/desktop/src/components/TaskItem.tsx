@@ -447,6 +447,7 @@ export const TaskItem = memo(function TaskItem({
         editReviewAt,
         editStartTime,
         editTags,
+        editLocation,
         editTimeEstimate,
         prioritiesEnabled,
         timeEstimatesEnabled,
@@ -486,6 +487,7 @@ export const TaskItem = memo(function TaskItem({
         editTimeEstimate,
         editContexts,
         editTags,
+        editLocation,
         language,
         dateFormatSetting: settings?.dateFormat,
         nativeDateInputLocale,
@@ -513,6 +515,7 @@ export const TaskItem = memo(function TaskItem({
         editTimeEstimate,
         editContexts,
         editTags,
+        editLocation,
         language,
         settings?.dateFormat,
         nativeDateInputLocale,
@@ -542,6 +545,7 @@ export const TaskItem = memo(function TaskItem({
         setEditTimeEstimate,
         setEditContexts,
         setEditTags,
+        setEditLocation,
         updateTask,
         resetTaskChecklist,
     }), [
@@ -566,6 +570,7 @@ export const TaskItem = memo(function TaskItem({
         setEditTimeEstimate,
         setEditContexts,
         setEditTags,
+        setEditLocation,
         updateTask,
         resetTaskChecklist,
     ]);
@@ -1010,8 +1015,6 @@ export const TaskItem = memo(function TaskItem({
             sectionCounts={sectionCounts}
             sectionOpenDefaults={sectionOpenDefaults}
             renderField={renderField}
-            editLocation={editLocation}
-            setEditLocation={setEditLocation}
             language={language}
             inputContexts={allContexts}
             isDoneActionActive={editStatus === 'done'}

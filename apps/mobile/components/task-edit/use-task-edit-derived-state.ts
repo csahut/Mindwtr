@@ -214,6 +214,8 @@ export function useTaskEditDerivedState({
                 return Boolean(contextInputDraft.trim());
             case 'description':
                 return Boolean(descriptionDraft.trim());
+            case 'location':
+                return Boolean(String(editedTask.location ?? task?.location ?? '').trim());
             case 'tags':
                 return Boolean(tagInputDraft.trim());
             case 'timeEstimate':
@@ -242,6 +244,7 @@ export function useTaskEditDerivedState({
         editedTask.checklist,
         editedTask.dueDate,
         editedTask.energyLevel,
+        editedTask.location,
         editedTask.priority,
         editedTask.projectId,
         editedTask.recurrence,
@@ -257,6 +260,7 @@ export function useTaskEditDerivedState({
         task?.checklist,
         task?.dueDate,
         task?.energyLevel,
+        task?.location,
         task?.priority,
         task?.projectId,
         task?.recurrence,
