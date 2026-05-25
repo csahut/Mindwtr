@@ -13,6 +13,11 @@ type WebviewZoomShortcutEvent = Pick<
     'altKey' | 'code' | 'ctrlKey' | 'key' | 'metaKey' | 'preventDefault' | 'stopPropagation'
 >;
 
+type WebviewZoomWheelEvent = Pick<
+    WheelEvent,
+    'altKey' | 'ctrlKey' | 'deltaY' | 'metaKey' | 'preventDefault' | 'stopPropagation'
+>;
+
 type WebviewZoomShortcutAction = 'in' | 'out' | 'reset';
 
 type WebviewZoomOptions = {
@@ -25,7 +30,8 @@ export const WEBVIEW_ZOOM_STORAGE_KEY = 'mindwtr:webview-zoom:v1';
 export const DEFAULT_WEBVIEW_ZOOM = 1;
 export const MIN_WEBVIEW_ZOOM = 0.5;
 export const MAX_WEBVIEW_ZOOM = 2;
-const WEBVIEW_ZOOM_STEP = 0.2;
+const WEBVIEW_ZOOM_STEP = 0.1;
+const WEBVIEW_ZOOM_WHEEL_THRESHOLD = 80;
 const DEFAULT_ZOOM_EPSILON = 0.001;
 
 const roundZoom = (value: number): number => Math.round(value * 100) / 100;
@@ -90,6 +96,13 @@ export function getWebviewZoomShortcutAction(event: WebviewZoomShortcutEvent): W
     return null;
 }
 
+export function getWebviewZoomWheelAction(event: WebviewZoomWheelEvent): WebviewZoomShortcutAction | null {
+    if (event.altKey || (!event.ctrlKey && !event.metaKey)) return null;
+    if (event.deltaY < 0) return 'in';
+    if (event.deltaY > 0) return 'out';
+    return null;
+}
+
 const loadCurrentWebviewModule = (): Promise<WebviewZoomModule> => import('@tauri-apps/api/webview');
 
 async function applyWebviewZoom(
@@ -113,6 +126,7 @@ export function installWebviewZoomShortcuts(options: WebviewZoomOptions = {}): (
     const loadWebviewModule = options.loadWebviewModule ?? loadCurrentWebviewModule;
     let currentZoom = loadStoredWebviewZoom(storage);
     let applyQueue = Promise.resolve();
+    let wheelDelta = 0;
 
     const queueApplyZoom = (zoom: number) => {
         applyQueue = applyQueue
@@ -133,8 +147,26 @@ export function installWebviewZoomShortcuts(options: WebviewZoomOptions = {}): (
         queueApplyZoom(currentZoom);
     };
 
+    const handleWheel = (event: WheelEvent) => {
+        const action = getWebviewZoomWheelAction(event);
+        if (!action) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        wheelDelta += event.deltaY;
+        if (Math.abs(wheelDelta) < WEBVIEW_ZOOM_WHEEL_THRESHOLD) return;
+
+        const wheelAction = wheelDelta < 0 ? 'in' : 'out';
+        wheelDelta = 0;
+        currentZoom = saveStoredWebviewZoom(getNextWebviewZoom(currentZoom, wheelAction), storage);
+        queueApplyZoom(currentZoom);
+    };
+
     window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('wheel', handleWheel, { capture: true, passive: false });
     return () => {
         window.removeEventListener('keydown', handleKeyDown, true);
+        window.removeEventListener('wheel', handleWheel, true);
     };
 }
