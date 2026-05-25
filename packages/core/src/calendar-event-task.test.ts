@@ -25,7 +25,8 @@ describe('calendar event task drafts', () => {
                 status: 'next',
                 startTime: '2026-04-06T13:00:00.000Z',
                 timeEstimate: '2hr',
-                description: 'Bring roadmap notes.\n\nLocation: Room 4\n\nCalendar: Work',
+                description: 'Bring roadmap notes.\n\nCalendar: Work',
+                location: 'Room 4',
             },
         });
     });
