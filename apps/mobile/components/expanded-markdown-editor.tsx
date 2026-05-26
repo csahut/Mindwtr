@@ -409,18 +409,6 @@ export function ExpandedMarkdownEditor({
                     >
                         {mode === 'edit' ? (
                             <View style={styles.content}>
-                                <MarkdownFormatToolbar
-                                    selection={editorSelection}
-                                    onSelectionChange={handleToolbarSelectionChange}
-                                    inputRef={inputRef}
-                                    t={t}
-                                    tc={tc}
-                                    visible={isInputFocused}
-                                    canUndo={canUndo}
-                                    onUndo={onUndo}
-                                    onApplyAction={handleApplyAction}
-                                    onInteractionStart={handleToolbarInteractionStart}
-                                />
                                 <MarkdownReferenceAutocomplete
                                     currentTaskId={currentTaskId}
                                     value={editorValue}
@@ -463,6 +451,19 @@ export function ExpandedMarkdownEditor({
                                     multiline
                                     accessibilityLabel={title}
                                     accessibilityHint={placeholder}
+                                />
+                                <MarkdownFormatToolbar
+                                    selection={editorSelection}
+                                    onSelectionChange={handleToolbarSelectionChange}
+                                    inputRef={inputRef}
+                                    t={t}
+                                    tc={tc}
+                                    visible
+                                    canUndo={canUndo}
+                                    onUndo={onUndo}
+                                    onApplyAction={handleApplyAction}
+                                    onInteractionStart={handleToolbarInteractionStart}
+                                    placement="inline"
                                 />
                             </View>
                         ) : (

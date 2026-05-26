@@ -14,6 +14,13 @@ export const markdownFormatToolbarStyles = StyleSheet.create({
         paddingTop: 4,
         paddingBottom: 4,
     },
+    inlineBar: {
+        borderWidth: StyleSheet.hairlineWidth,
+        borderRadius: 10,
+        marginTop: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
     scroll: {
         flex: 1,
     },

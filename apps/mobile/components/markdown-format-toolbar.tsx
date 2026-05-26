@@ -32,6 +32,7 @@ type MarkdownFormatToolbarProps = {
     onUndo: () => MarkdownSelection | undefined;
     onApplyAction: (actionId: MarkdownToolbarActionId, selection: MarkdownSelection) => MarkdownToolbarResult | void;
     onInteractionStart?: () => void;
+    placement?: 'keyboard' | 'inline';
 };
 
 const renderActionLabel = (actionId: MarkdownToolbarActionId, shortLabel: string, color: string) => {
@@ -74,10 +75,12 @@ export function MarkdownFormatToolbar({
     onUndo,
     onApplyAction,
     onInteractionStart,
+    placement = 'keyboard',
 }: MarkdownFormatToolbarProps) {
     const [keyboardInset, setKeyboardInset] = React.useState(0);
 
     React.useEffect(() => {
+        if (placement !== 'keyboard') return;
         if (typeof Keyboard?.addListener !== 'function') return;
 
         const updateKeyboardInset = (event: { endCoordinates?: { screenY?: number; height?: number } }) => {
@@ -102,7 +105,7 @@ export function MarkdownFormatToolbar({
             changeListener.remove();
             hideListener.remove();
         };
-    }, []);
+    }, [placement]);
 
     const restoreSelection = React.useCallback((nextSelection?: MarkdownSelection) => {
         if (!nextSelection) return;
@@ -146,7 +149,84 @@ export function MarkdownFormatToolbar({
         restoreSelection(onApplyAction(actionId, selection)?.selection);
     }, [onApplyAction, restoreSelection, selection]);
 
-    if (!visible || keyboardInset <= 0) {
+    if (!visible) {
+        return null;
+    }
+
+    const toolbarContent = (
+        <View style={styles.row}>
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.scroll}
+                contentContainerStyle={styles.content}
+                keyboardShouldPersistTaps="always"
+            >
+                {MARKDOWN_TOOLBAR_ACTIONS.map((action) => (
+                    <Pressable
+                        key={action.id}
+                        focusable={false}
+                        onPressIn={() => {
+                            onInteractionStart?.();
+                            keepInputFocused();
+                            handleApplyAction(action.id);
+                        }}
+                        style={({ pressed }) => [
+                            styles.button,
+                            { backgroundColor: pressed ? tc.filterBg : 'transparent' },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={translateWithFallback(t, action.labelKey, action.fallbackLabel)}
+                        hitSlop={8}
+                    >
+                        {renderActionLabel(action.id, action.shortLabel, tc.text)}
+                    </Pressable>
+                ))}
+            </ScrollView>
+
+            <View style={styles.trailingActions}>
+                <View style={[styles.divider, { backgroundColor: tc.border }]} />
+
+                <Pressable
+                    focusable={false}
+                    onPressIn={() => {
+                        onInteractionStart?.();
+                        keepInputFocused();
+                        handleUndo();
+                    }}
+                    disabled={!canUndo}
+                    style={({ pressed }) => [
+                        styles.button,
+                        !canUndo ? styles.buttonDisabled : null,
+                        { backgroundColor: pressed ? tc.filterBg : 'transparent' },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={translateWithFallback(t, 'common.undo', 'Undo')}
+                    hitSlop={8}
+                >
+                    <Ionicons name="arrow-undo-outline" size={18} color={tc.text} />
+                </Pressable>
+            </View>
+        </View>
+    );
+
+    if (placement === 'inline') {
+        return (
+            <View
+                style={[
+                    styles.inlineBar,
+                    {
+                        backgroundColor: tc.cardBg,
+                        borderColor: tc.border,
+                    },
+                ]}
+            >
+                {toolbarContent}
+            </View>
+        );
+    }
+
+    if (keyboardInset <= 0) {
         return null;
     }
 
@@ -165,60 +245,7 @@ export function MarkdownFormatToolbar({
                         },
                     ]}
                 >
-                    <View style={styles.row}>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            style={styles.scroll}
-                            contentContainerStyle={styles.content}
-                            keyboardShouldPersistTaps="always"
-                        >
-                            {MARKDOWN_TOOLBAR_ACTIONS.map((action) => (
-                                <Pressable
-                                    key={action.id}
-                                    focusable={false}
-                                    onPressIn={() => {
-                                        onInteractionStart?.();
-                                        keepInputFocused();
-                                        handleApplyAction(action.id);
-                                    }}
-                                    style={({ pressed }) => [
-                                        styles.button,
-                                        { backgroundColor: pressed ? tc.filterBg : 'transparent' },
-                                    ]}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={translateWithFallback(t, action.labelKey, action.fallbackLabel)}
-                                    hitSlop={8}
-                                >
-                                    {renderActionLabel(action.id, action.shortLabel, tc.text)}
-                                </Pressable>
-                            ))}
-                        </ScrollView>
-
-                        <View style={styles.trailingActions}>
-                            <View style={[styles.divider, { backgroundColor: tc.border }]} />
-
-                            <Pressable
-                                focusable={false}
-                                onPressIn={() => {
-                                    onInteractionStart?.();
-                                    keepInputFocused();
-                                    handleUndo();
-                                }}
-                                disabled={!canUndo}
-                                style={({ pressed }) => [
-                                    styles.button,
-                                    !canUndo ? styles.buttonDisabled : null,
-                                    { backgroundColor: pressed ? tc.filterBg : 'transparent' },
-                                ]}
-                                accessibilityRole="button"
-                                accessibilityLabel={translateWithFallback(t, 'common.undo', 'Undo')}
-                                hitSlop={8}
-                            >
-                                <Ionicons name="arrow-undo-outline" size={18} color={tc.text} />
-                            </Pressable>
-                        </View>
-                    </View>
+                    {toolbarContent}
                 </View>
             </View>
         </KeyboardAccessoryPortal>

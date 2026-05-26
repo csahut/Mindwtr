@@ -86,17 +86,6 @@ export function TaskEditContentField({
                         </View>
                     ) : (
                         <>
-                            <MarkdownFormatToolbar
-                                selection={descriptionSelection}
-                                onSelectionChange={setDescriptionSelection}
-                                inputRef={descriptionInputRef}
-                                t={t}
-                                tc={tc}
-                                visible={isDescriptionInputFocused}
-                                canUndo={descriptionUndoDepth > 0}
-                                onUndo={handleDescriptionUndo}
-                                onApplyAction={handleDescriptionApplyAction}
-                            />
                             <MarkdownReferenceAutocomplete
                                 currentTaskId={editedTask.id}
                                 value={descriptionDraft}
@@ -125,6 +114,18 @@ export function TaskEditContentField({
                                 placeholderTextColor={tc.secondaryText}
                                 accessibilityLabel={t('taskEdit.descriptionLabel')}
                                 accessibilityHint={t('taskEdit.descriptionPlaceholder')}
+                            />
+                            <MarkdownFormatToolbar
+                                selection={descriptionSelection}
+                                onSelectionChange={setDescriptionSelection}
+                                inputRef={descriptionInputRef}
+                                t={t}
+                                tc={tc}
+                                visible
+                                canUndo={descriptionUndoDepth > 0}
+                                onUndo={handleDescriptionUndo}
+                                onApplyAction={handleDescriptionApplyAction}
+                                placement="inline"
                             />
                         </>
                     )}
