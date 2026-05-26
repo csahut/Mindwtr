@@ -110,6 +110,19 @@ if ! python3 scripts/ci/repair-package-lock.py --check apps/desktop/package-lock
 fi
 
 echo ""
+echo "Validating mobile FOSS package-lock sync..."
+if ! node scripts/ci/check-mobile-foss-lock-sync.js; then
+    echo ""
+    echo "Mobile FOSS package-lock.json does not match the FOSS dependency manifest."
+    echo "Repair it before tagging with:"
+    echo "  cp apps/mobile/package.json /tmp/mindwtr-mobile-package.json.bak"
+    echo "  bash apps/mobile/scripts/fdroid_prep.sh"
+    echo "  npm install --package-lock-only --prefix apps/mobile --legacy-peer-deps --workspaces=false"
+    echo "  cp /tmp/mindwtr-mobile-package.json.bak apps/mobile/package.json"
+    exit 1
+fi
+
+echo ""
 echo "Done! Now you can:"
 echo "  git add -A"
 echo "  git commit -m 'chore(release): v$NEW_VERSION'"
