@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    applyMarkdownPairKeyPressWithSelectionFallback,
     applyMarkdownPairInsertionWithSelectionFallback,
     applyMarkdownUrlPasteWithSelectionFallback,
 } from './markdown-selection-utils';
@@ -49,5 +50,48 @@ describe('markdown selection replacement fallbacks', () => {
             },
             baseSelection: { start: 5, end: 9 },
         });
+    });
+
+    it('wraps selected text from a mobile key press before Android replaces the range', () => {
+        expect(
+            applyMarkdownPairKeyPressWithSelectionFallback(
+                'read docs',
+                '[',
+                { start: 5, end: 9 },
+            ),
+        ).toEqual({
+            result: {
+                value: 'read [docs]',
+                selection: { start: 6, end: 10 },
+            },
+            baseSelection: { start: 5, end: 9 },
+        });
+    });
+
+    it('uses the last range selection for mobile key press pairing after selection collapses', () => {
+        expect(
+            applyMarkdownPairKeyPressWithSelectionFallback(
+                'read docs',
+                '~',
+                { start: 5, end: 5 },
+                { start: 5, end: 9 },
+            ),
+        ).toEqual({
+            result: {
+                value: 'read ~~docs~~',
+                selection: { start: 7, end: 11 },
+            },
+            baseSelection: { start: 5, end: 9 },
+        });
+    });
+
+    it('ignores mobile key press pairing without a range selection', () => {
+        expect(
+            applyMarkdownPairKeyPressWithSelectionFallback(
+                'read docs',
+                '[',
+                { start: 5, end: 5 },
+            ),
+        ).toBeNull();
     });
 });

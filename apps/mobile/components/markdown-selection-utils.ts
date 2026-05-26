@@ -70,3 +70,25 @@ export const applyMarkdownPairInsertionWithSelectionFallback = (
 ): MarkdownSelectionReplacement | null => (
     applyWithSelectionCandidates(previousValue, nextValue, primarySelection, fallbackSelection, applyMarkdownPairInsertion)
 );
+
+export const applyMarkdownPairKeyPressWithSelectionFallback = (
+    previousValue: string,
+    key: string,
+    primarySelection: MarkdownSelection,
+    fallbackSelection?: MarkdownSelection | null,
+): MarkdownSelectionReplacement | null => {
+    if (!key || key.length > 1) return null;
+
+    for (const selection of getSelectionCandidates(primarySelection, fallbackSelection)) {
+        if (!isRangeSelection(selection)) continue;
+        const nextValue = `${previousValue.slice(0, selection.start)}${key}${previousValue.slice(selection.end)}`;
+        const result = applyMarkdownPairInsertion(previousValue, nextValue, selection);
+        if (result) {
+            return {
+                result,
+                baseSelection: selection,
+            };
+        }
+    }
+    return null;
+};

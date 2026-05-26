@@ -11,6 +11,7 @@ import {
 } from '@mindwtr/core';
 
 import {
+    applyMarkdownPairKeyPressWithSelectionFallback,
     applyMarkdownPairInsertionWithSelectionFallback,
     applyMarkdownUrlPasteWithSelectionFallback,
     isRangeSelection,
@@ -209,6 +210,23 @@ export function useTaskDescriptionEditor({
     }, [applyDescriptionValue, restoreDescriptionSelection]);
 
     const handleDescriptionKeyPress = React.useCallback((event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+        const pairedInsertion = applyMarkdownPairKeyPressWithSelectionFallback(
+            descriptionDraftRef.current,
+            event.nativeEvent.key,
+            descriptionSelectionRef.current,
+            lastDescriptionRangeRef.current,
+        );
+        if (pairedInsertion) {
+            event.preventDefault?.();
+            lastDescriptionRangeRef.current = null;
+            applyDescriptionValue(pairedInsertion.result.value, {
+                baseSelection: pairedInsertion.baseSelection,
+                nextSelection: pairedInsertion.result.selection,
+            });
+            restoreDescriptionSelection(pairedInsertion.result.selection);
+            return;
+        }
+
         const next = applyMarkdownKeyboardShortcut(
             descriptionDraftRef.current,
             descriptionSelectionRef.current,

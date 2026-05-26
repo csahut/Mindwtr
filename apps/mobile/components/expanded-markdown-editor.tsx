@@ -33,6 +33,7 @@ import { KeyboardAccessoryHost } from './keyboard-accessory-host';
 import { MarkdownFormatToolbar } from './markdown-format-toolbar';
 import { MarkdownReferenceAutocomplete } from './markdown-reference-autocomplete';
 import {
+    applyMarkdownPairKeyPressWithSelectionFallback,
     applyMarkdownPairInsertionWithSelectionFallback,
     applyMarkdownUrlPasteWithSelectionFallback,
     isRangeSelection,
@@ -330,6 +331,25 @@ export function ExpandedMarkdownEditor({
         onChange(nextValue);
     }, [onChange, onSelectionChange, restoreEditorFocus]);
     const handleKeyPress = React.useCallback((event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+        const pairedInsertion = applyMarkdownPairKeyPressWithSelectionFallback(
+            valueRef.current,
+            event.nativeEvent.key,
+            selectionRef.current,
+            lastRangeSelectionRef.current,
+        );
+        if (pairedInsertion) {
+            event.preventDefault?.();
+            lastRangeSelectionRef.current = null;
+            valueRef.current = pairedInsertion.result.value;
+            selectionRef.current = pairedInsertion.result.selection;
+            setEditorValue(pairedInsertion.result.value);
+            setEditorSelection(pairedInsertion.result.selection);
+            onChange(pairedInsertion.result.value);
+            onSelectionChange(pairedInsertion.result.selection);
+            restoreEditorFocus(pairedInsertion.result.selection);
+            return;
+        }
+
         const next = applyMarkdownKeyboardShortcut(
             valueRef.current,
             selectionRef.current,
