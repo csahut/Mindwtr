@@ -491,29 +491,43 @@ const findLineEnd = (value: string, index: number) => {
     return nextNewline === -1 ? value.length : nextNewline;
 };
 
-const getMarkdownContinuationPrefix = (line: string): string | null => {
+const getMarkdownContinuation = (line: string): { prefix: string; contentStart: number } | null => {
     const quoteMatch = line.match(/^(\s*(?:>\s?)+)(.*)$/);
-    const quotePrefix = quoteMatch ? quoteMatch[1].replace(/\s*$/, ' ') : '';
+    const quoteRawPrefix = quoteMatch ? quoteMatch[1] : '';
+    const quotePrefix = quoteMatch ? quoteRawPrefix.replace(/\s*$/, ' ') : '';
     const innerLine = quoteMatch ? quoteMatch[2] : line;
+    const innerOffset = quoteRawPrefix.length;
 
     const taskMatch = innerLine.match(/^(\s*)([-+*])\s+\[(?: |x|X)\]\s+(.*)$/);
     if (taskMatch && taskMatch[3].trim().length > 0) {
-        return `${quotePrefix}${taskMatch[1]}${taskMatch[2]} [ ] `;
+        return {
+            prefix: `${quotePrefix}${taskMatch[1]}${taskMatch[2]} [ ] `,
+            contentStart: innerOffset + innerLine.length - taskMatch[3].length,
+        };
     }
 
     const orderedMatch = innerLine.match(/^(\s*)(\d+)([.)])\s+(.*)$/);
     if (orderedMatch && orderedMatch[4].trim().length > 0) {
         const nextNumber = Number.parseInt(orderedMatch[2], 10) + 1;
-        return `${quotePrefix}${orderedMatch[1]}${nextNumber}${orderedMatch[3]} `;
+        return {
+            prefix: `${quotePrefix}${orderedMatch[1]}${nextNumber}${orderedMatch[3]} `,
+            contentStart: innerOffset + innerLine.length - orderedMatch[4].length,
+        };
     }
 
     const bulletMatch = innerLine.match(/^(\s*)([-+*])\s+(.*)$/);
     if (bulletMatch && bulletMatch[3].trim().length > 0) {
-        return `${quotePrefix}${bulletMatch[1]}${bulletMatch[2]} `;
+        return {
+            prefix: `${quotePrefix}${bulletMatch[1]}${bulletMatch[2]} `,
+            contentStart: innerOffset + innerLine.length - bulletMatch[3].length,
+        };
     }
 
     if (quotePrefix && innerLine.trim().length > 0) {
-        return quotePrefix;
+        return {
+            prefix: quotePrefix,
+            contentStart: quoteRawPrefix.length,
+        };
     }
 
     return null;
@@ -857,20 +871,16 @@ export function continueMarkdownOnEnter(
     }
 
     const cursor = normalizedSelection.start;
-    const lineEnd = findLineEnd(value, cursor);
-    if (cursor !== lineEnd) {
-        return null;
-    }
-
     const lineStart = findLineStart(value, cursor);
+    const lineEnd = findLineEnd(value, cursor);
     const line = value.slice(lineStart, lineEnd);
-    const continuationPrefix = getMarkdownContinuationPrefix(line);
-    if (!continuationPrefix) {
+    const continuation = getMarkdownContinuation(line);
+    if (!continuation || cursor - lineStart < continuation.contentStart) {
         return null;
     }
 
-    const nextValue = `${value.slice(0, cursor)}\n${continuationPrefix}${value.slice(cursor)}`;
-    const nextCursor = cursor + 1 + continuationPrefix.length;
+    const nextValue = `${value.slice(0, cursor)}\n${continuation.prefix}${value.slice(cursor)}`;
+    const nextCursor = cursor + 1 + continuation.prefix.length;
     return {
         value: nextValue,
         selection: { start: nextCursor, end: nextCursor },

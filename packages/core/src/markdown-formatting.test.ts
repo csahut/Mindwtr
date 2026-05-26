@@ -265,6 +265,17 @@ describe('continueMarkdownOnEnter', () => {
         });
     });
 
+    it('splits unordered list items with a marker before trailing text', () => {
+        const value = 'List of items\n- Item 1\n- Item 2';
+        const cursor = value.indexOf('Item 1');
+        expect(
+            continueMarkdownOnEnter(value, { start: cursor, end: cursor }),
+        ).toEqual({
+            value: 'List of items\n- \n- Item 1\n- Item 2',
+            selection: { start: cursor + 3, end: cursor + 3 },
+        });
+    });
+
     it('increments ordered list markers', () => {
         expect(
             continueMarkdownOnEnter('1. item', { start: 7, end: 7 }),
@@ -292,9 +303,9 @@ describe('continueMarkdownOnEnter', () => {
         });
     });
 
-    it('does nothing when enter is pressed away from the line end', () => {
+    it('does nothing when enter is pressed before a list marker', () => {
         expect(
-            continueMarkdownOnEnter('- item', { start: 3, end: 3 }),
+            continueMarkdownOnEnter('- item', { start: 0, end: 0 }),
         ).toBeNull();
     });
 });
@@ -306,6 +317,15 @@ describe('continueMarkdownOnTextChange', () => {
         ).toEqual({
             value: '- item\n- ',
             selection: { start: 9, end: 9 },
+        });
+    });
+
+    it('recognizes a raw newline insertion inside a list item on mobile', () => {
+        expect(
+            continueMarkdownOnTextChange('- item', '- \nitem', { start: 2, end: 2 }),
+        ).toEqual({
+            value: '- \n- item',
+            selection: { start: 5, end: 5 },
         });
     });
 
