@@ -422,7 +422,9 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
 
         expect(queryByRole('combobox', { name: 'Task status' })).toBeNull();
         expect(getByRole('group', { name: 'Task status' })).toBeInTheDocument();
-        expect(getByRole('button', { name: 'Inbox' })).toHaveAttribute('aria-pressed', 'true');
+        const selectedStatus = getByRole('button', { name: 'Inbox' });
+        expect(selectedStatus).toHaveAttribute('aria-pressed', 'true');
+        expect(selectedStatus).toHaveClass('bg-primary', 'text-primary-foreground');
         expect(getByRole('button', { name: 'Archived' })).toBeInTheDocument();
 
         fireEvent.click(getByRole('button', { name: 'Waiting' }));

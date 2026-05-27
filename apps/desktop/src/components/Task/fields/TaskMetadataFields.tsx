@@ -14,12 +14,14 @@ function PillOptionField<TValue extends string>({
     options,
     value,
     onChange,
+    activeClassName,
 }: {
     ariaLabel: string;
     label: string;
     options: Array<PillOption<TValue>>;
     value: TValue;
     onChange: (value: TValue) => void;
+    activeClassName?: string;
 }) {
     const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
     const focusOption = (index: number) => {
@@ -67,7 +69,7 @@ function PillOptionField<TValue extends string>({
                             className={cn(
                                 'inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40',
                                 isActive
-                                    ? 'border-primary bg-primary/10 text-primary'
+                                    ? activeClassName ?? 'border-primary bg-primary/10 text-primary'
                                     : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground'
                             )}
                         >
@@ -162,6 +164,7 @@ export function StatusField({
             options={options}
             value={value}
             onChange={onChange}
+            activeClassName="border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
         />
     );
 }
