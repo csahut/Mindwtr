@@ -1,0 +1,60 @@
+import type { Task, TaskEnergyLevel, TaskPriority, TimeEstimate } from '@mindwtr/core';
+import { matchesHierarchicalToken } from '@mindwtr/core';
+
+export type MobileTaskListFilters = {
+  energyLevels: TaskEnergyLevel[];
+  locationQuery: string;
+  priorities: TaskPriority[];
+  searchQuery: string;
+  timeEstimates: TimeEstimate[];
+  tokens: string[];
+};
+
+const normalize = (value: string | undefined): string => value?.trim().toLowerCase() ?? '';
+
+export const countActiveMobileTaskFilters = (filters: MobileTaskListFilters): number => (
+  (normalize(filters.searchQuery) ? 1 : 0)
+  + (normalize(filters.locationQuery) ? 1 : 0)
+  + filters.tokens.length
+  + filters.priorities.length
+  + filters.energyLevels.length
+  + filters.timeEstimates.length
+);
+
+export const taskMatchesMobileTaskFilters = (
+  task: Pick<Task, 'contexts' | 'description' | 'energyLevel' | 'location' | 'priority' | 'tags' | 'timeEstimate' | 'title'>,
+  filters: MobileTaskListFilters,
+): boolean => {
+  const searchQuery = normalize(filters.searchQuery);
+  if (searchQuery) {
+    const searchable = `${task.title} ${task.description ?? ''}`.toLowerCase();
+    if (!searchable.includes(searchQuery)) return false;
+  }
+
+  if (filters.tokens.length > 0) {
+    const taskTokens = [...(task.contexts ?? []), ...(task.tags ?? [])];
+    const matchesAll = filters.tokens.every((token) =>
+      taskTokens.some((taskToken) => matchesHierarchicalToken(token, taskToken))
+    );
+    if (!matchesAll) return false;
+  }
+
+  if (filters.priorities.length > 0 && (!task.priority || !filters.priorities.includes(task.priority))) {
+    return false;
+  }
+
+  if (filters.energyLevels.length > 0 && (!task.energyLevel || !filters.energyLevels.includes(task.energyLevel))) {
+    return false;
+  }
+
+  if (filters.timeEstimates.length > 0 && (!task.timeEstimate || !filters.timeEstimates.includes(task.timeEstimate))) {
+    return false;
+  }
+
+  const locationQuery = normalize(filters.locationQuery);
+  if (locationQuery && !normalize(task.location).includes(locationQuery)) {
+    return false;
+  }
+
+  return true;
+};

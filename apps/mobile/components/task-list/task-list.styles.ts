@@ -48,6 +48,11 @@ export const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'flex-start',
   },
+  headerAccessoryControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   headerAccessoryRight: {
     alignItems: 'flex-end',
   },
@@ -58,6 +63,21 @@ export const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  filterBadge: {
+    position: 'absolute',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    right: -3,
+    top: -4,
+  },
+  filterBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   selectButton: {
     borderWidth: 1,
@@ -281,10 +301,98 @@ export const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   filterChipText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  taskFilterSheetRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  taskFilterSheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  taskFilterSheet: {
+    maxHeight: '82%',
+    borderTopWidth: 1,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 18,
+  },
+  taskFilterSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 12,
+  },
+  taskFilterSheetTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  taskFilterSheetHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  taskFilterTextButton: {
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  taskFilterTextButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  taskFilterIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  taskFilterSheetScroll: {
+    maxHeight: '100%',
+  },
+  taskFilterSheetContent: {
+    gap: 12,
+    paddingBottom: 20,
+  },
+  taskFilterSectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  taskFilterInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 15,
+  },
+  taskFilterChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  taskFilterChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  taskFilterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   list: {
     flex: 1,

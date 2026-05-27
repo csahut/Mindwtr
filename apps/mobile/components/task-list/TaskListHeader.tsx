@@ -1,9 +1,7 @@
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import type { TimeEstimate } from '@mindwtr/core';
-import { ArrowUpDown } from 'lucide-react-native';
+import { ArrowUpDown, SlidersHorizontal, X } from 'lucide-react-native';
 
-import { MOBILE_TIME_ESTIMATE_OPTIONS, formatTimeEstimateChipLabel } from '../time-estimate-filter-utils';
 import { styles } from './task-list.styles';
 
 type ThemeColors = {
@@ -16,45 +14,53 @@ type ThemeColors = {
   tint: string;
 };
 
+export type TaskListActiveFilterChip = {
+  id: string;
+  label: string;
+  onPress: () => void;
+};
+
 type TaskListHeaderProps = {
+  activeFilterChips: TaskListActiveFilterChip[];
   count: number;
   enableBulkActions: boolean;
-  hasActiveTimeEstimateFilters: boolean;
   headerAccessory?: React.ReactNode;
+  filterActiveCount: number;
+  hasActiveFilters: boolean;
+  onClearFilters: () => void;
+  onOpenFilters: () => void;
   onOpenSort: () => void;
   onToggleSelectionMode: () => void;
-  selectedTimeEstimates: TimeEstimate[];
   selectionMode: boolean;
-  setTimeEstimates: () => void;
   showHeader: boolean;
   showSort: boolean;
-  showTimeEstimateFilters: boolean;
   sortByLabel: string;
   t: (key: string) => string;
   themeColors: ThemeColors;
   title: string;
-  toggleTimeEstimate: (estimate: TimeEstimate) => void;
 };
 
 export function TaskListHeader({
+  activeFilterChips,
   count,
   enableBulkActions,
-  hasActiveTimeEstimateFilters,
   headerAccessory,
+  filterActiveCount,
+  hasActiveFilters,
+  onClearFilters,
+  onOpenFilters,
   onOpenSort,
   onToggleSelectionMode,
-  selectedTimeEstimates,
   selectionMode,
-  setTimeEstimates,
   showHeader,
   showSort,
-  showTimeEstimateFilters,
   sortByLabel,
   t,
   themeColors,
   title,
-  toggleTimeEstimate,
 }: TaskListHeaderProps) {
+  const filtersLabel = t('filters.label') === 'filters.label' ? 'Filters' : t('filters.label');
+  const clearLabel = t('filters.clear') === 'filters.clear' ? t('common.clear') : t('filters.clear');
   const sortControl = showSort ? (
     <TouchableOpacity
       onPress={onOpenSort}
@@ -69,6 +75,30 @@ export function TaskListHeader({
       <ArrowUpDown size={16} color={themeColors.secondaryText} strokeWidth={2} />
     </TouchableOpacity>
   ) : null;
+  const filterControl = (
+    <TouchableOpacity
+      onPress={onOpenFilters}
+      style={[
+        styles.sortButton,
+        {
+          borderColor: hasActiveFilters ? themeColors.tint : themeColors.border,
+          backgroundColor: themeColors.filterBg,
+        },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={filterActiveCount > 0 ? `${filtersLabel}: ${filterActiveCount}` : filtersLabel}
+      hitSlop={8}
+    >
+      <SlidersHorizontal size={16} color={hasActiveFilters ? themeColors.tint : themeColors.secondaryText} strokeWidth={2} />
+      {filterActiveCount > 0 ? (
+        <View style={[styles.filterBadge, { backgroundColor: themeColors.tint }]}>
+          <Text style={[styles.filterBadgeText, { color: themeColors.onTint }]}>
+            {filterActiveCount}
+          </Text>
+        </View>
+      ) : null}
+    </TouchableOpacity>
+  );
 
   return (
     <>
@@ -84,6 +114,7 @@ export function TaskListHeader({
           </View>
           <View style={styles.headerActions}>
             {sortControl}
+            {filterControl}
             {headerAccessory}
             {enableBulkActions && (
               <TouchableOpacity
@@ -102,60 +133,50 @@ export function TaskListHeader({
             )}
           </View>
         </View>
-      ) : sortControl || headerAccessory ? (
+      ) : sortControl || filterControl || headerAccessory ? (
         <View style={styles.headerAccessoryRow}>
-          <View style={styles.headerAccessoryLeft}>{sortControl}</View>
+          <View style={styles.headerAccessoryLeft}>
+            <View style={styles.headerAccessoryControls}>
+              {sortControl}
+              {filterControl}
+            </View>
+          </View>
           <View style={styles.headerAccessoryRight}>{headerAccessory}</View>
         </View>
       ) : null}
 
-      {showTimeEstimateFilters && (
+      {activeFilterChips.length > 0 ? (
         <View style={[styles.filterSection, { borderBottomColor: themeColors.border, backgroundColor: themeColors.cardBg }]}>
-          <Text style={[styles.filterLabel, { color: themeColors.secondaryText }]}>
-            {t('filters.timeEstimate')}
-          </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChips}>
+            {activeFilterChips.map((chip) => (
+              <TouchableOpacity
+                key={chip.id}
+                accessibilityRole="button"
+                onPress={chip.onPress}
+                style={[
+                  styles.filterChip,
+                  {
+                    borderColor: themeColors.tint,
+                    backgroundColor: themeColors.filterBg,
+                  },
+                ]}
+              >
+                <Text style={[styles.filterChipText, { color: themeColors.tint }]}>{chip.label}</Text>
+                <X size={14} color={themeColors.tint} />
+              </TouchableOpacity>
+            ))}
             <TouchableOpacity
-              onPress={setTimeEstimates}
-              style={[
-                styles.filterChip,
-                {
-                  borderColor: themeColors.border,
-                  backgroundColor: !hasActiveTimeEstimateFilters ? themeColors.tint : themeColors.filterBg,
-                },
-              ]}
               accessibilityRole="button"
-              accessibilityState={{ selected: !hasActiveTimeEstimateFilters }}
+              onPress={onClearFilters}
+              style={[styles.filterChip, { borderColor: themeColors.border, backgroundColor: themeColors.filterBg }]}
             >
-              <Text style={[styles.filterChipText, { color: !hasActiveTimeEstimateFilters ? themeColors.onTint : themeColors.text }]}>
-                {t('common.all')}
+              <Text style={[styles.filterChipText, { color: themeColors.secondaryText }]}>
+                {clearLabel}
               </Text>
             </TouchableOpacity>
-            {MOBILE_TIME_ESTIMATE_OPTIONS.map((estimate) => {
-              const isActive = selectedTimeEstimates.includes(estimate);
-              return (
-                <TouchableOpacity
-                  key={estimate}
-                  onPress={() => toggleTimeEstimate(estimate)}
-                  style={[
-                    styles.filterChip,
-                    {
-                      borderColor: themeColors.border,
-                      backgroundColor: isActive ? themeColors.tint : themeColors.filterBg,
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isActive }}
-                >
-                  <Text style={[styles.filterChipText, { color: isActive ? themeColors.onTint : themeColors.text }]}>
-                    {formatTimeEstimateChipLabel(estimate)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
           </ScrollView>
         </View>
-      )}
+      ) : null}
     </>
   );
 }
