@@ -122,6 +122,9 @@ def ensure_finish_arg(value: str, after=None) -> None:
 
 ensure_finish_arg('--socket=pulseaudio', after='--socket=wayland')
 ensure_finish_arg('--talk-name=org.freedesktop.Notifications', after='--share=network')
+ensure_finish_arg('--talk-name=org.kde.StatusNotifierWatcher', after='--talk-name=org.freedesktop.Notifications')
+# org.freedesktop.portal.* talk-names are intentionally not added:
+# portals are allowed by Flatpak by default and Flathub lints manual entries.
 
 env_line_index = next((index for index, line in enumerate(lines) if line.strip() == 'env:'), None)
 if env_line_index is None:

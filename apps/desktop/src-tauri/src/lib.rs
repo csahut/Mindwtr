@@ -708,6 +708,7 @@ pub fn run() {
 
             let diagnostics_enabled = diagnostics_enabled();
             let is_windows_store = is_windows_store_install();
+            let is_flatpak_install = cfg!(target_os = "linux") && is_flatpak();
             if let Some(window) = app.get_webview_window("main") {
                 #[cfg(target_os = "linux")]
                 if let Ok(icon) = Image::from_bytes(include_bytes!("../icons/icon.png")) {
@@ -723,7 +724,7 @@ pub fn run() {
                         let _ = window.open_devtools();
                     }
                 }
-                if cfg!(target_os = "linux") && is_flatpak() {
+                if is_flatpak_install {
                     let _ = window.eval("window.__MINDWTR_FLATPAK__ = true;");
                 }
             }
@@ -732,7 +733,7 @@ pub fn run() {
             if let Err(error) = create_quick_add_window(&handle) {
                 log::warn!("{error}");
             }
-            if !(cfg!(target_os = "linux") && is_flatpak()) && !is_windows_store {
+            if !is_windows_store {
                 let tray_init_result: tauri::Result<()> = (|| {
                     let quick_add_item =
                         MenuItem::with_id(handle, "quick_add", "Quick Add", true, None::<&str>)?;
@@ -790,12 +791,10 @@ pub fn run() {
                 }
             } else if is_windows_store {
                 log::info!("Tray disabled for Microsoft Store install.");
-            } else {
-                log::info!("Tray disabled inside Flatpak sandbox.");
             }
 
             let shortcut_state = app.state::<GlobalQuickAddShortcutState>();
-            let default_shortcut = if cfg!(target_os = "linux") && is_flatpak() {
+            let default_shortcut = if is_flatpak_install {
                 GLOBAL_QUICK_ADD_SHORTCUT_DISABLED
             } else {
                 default_global_quick_add_shortcut()

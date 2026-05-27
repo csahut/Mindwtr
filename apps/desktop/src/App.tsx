@@ -44,6 +44,7 @@ import {
 } from './lib/text-size';
 import { saveStoredFullscreen } from './lib/window-state';
 import { installWebviewZoomShortcuts } from './lib/webview-zoom';
+import { resolveCloseBehavior } from './lib/window-behavior';
 import { subscribeNavigateEvent } from './lib/navigation-events';
 import { QUICK_ADD_SAVED_EVENT } from './lib/quick-add-saved-event';
 import { useUiStore } from './store/ui-store';
@@ -64,8 +65,11 @@ function App() {
     const fetchData = useTaskStore((state) => state.fetchData);
     const isLoading = useTaskStore((state) => state.isLoading);
     const setError = useTaskStore((state) => state.setError);
+    const isFlatpak = isFlatpakRuntime();
     const windowDecorations = useTaskStore((state) => state.settings?.window?.decorations);
-    const closeBehavior = useTaskStore((state) => state.settings?.window?.closeBehavior ?? 'ask');
+    const closeBehavior = useTaskStore((state) => (
+        resolveCloseBehavior(state.settings?.window?.closeBehavior, isFlatpak)
+    ));
     const showTray = useTaskStore((state) => state.settings?.window?.showTray);
     const settingsTheme = useTaskStore((state) => state.settings?.theme);
     const settingsTextSize = useTaskStore((state) => state.settings?.appearance?.textSize);
@@ -74,7 +78,6 @@ function App() {
     const settingsTimeFormat = useTaskStore((state) => state.settings?.timeFormat);
     const updateSettings = useTaskStore((state) => state.updateSettings);
     const showToast = useUiStore((state) => state.showToast);
-    const isFlatpak = isFlatpakRuntime();
     const { t, language, setLanguage } = useLanguage();
     const isActiveRef = useRef(true);
     const lastSyncErrorRef = useRef<string | null>(null);
@@ -410,10 +413,6 @@ function App() {
                 await invoke('acknowledge_close_request').catch((error) => {
                     void logError(error, { scope: 'app', step: 'acknowledgeCloseRequest' });
                 });
-                if (isFlatpak) {
-                    await quitApp().catch((error) => reportCloseError('Quit failed', error));
-                    return;
-                }
                 if (closeBehavior === 'quit') {
                     await quitApp().catch((error) => reportCloseError('Quit failed', error));
                     return;
@@ -439,7 +438,7 @@ function App() {
         return () => {
             if (unlisten) unlisten();
         };
-    }, [closeBehavior, closePromptOpen, hideToTray, isFlatpak, quitApp, setClosePromptRememberValue, setError, showTray]);
+    }, [closeBehavior, closePromptOpen, hideToTray, quitApp, setClosePromptRememberValue, setError, showTray]);
 
     useEffect(() => {
         if (!isTauriRuntime()) return;

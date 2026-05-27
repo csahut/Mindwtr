@@ -27,6 +27,7 @@ import {
     type DesktopThemeMode,
 } from '../../../lib/theme';
 import { coerceDesktopTextSize } from '../../../lib/text-size';
+import { resolveCloseBehavior } from '../../../lib/window-behavior';
 import type { SettingsMainPageProps } from './SettingsMainPage';
 
 type MainPageProps = Omit<SettingsMainPageProps, 'languages' | 't'>;
@@ -81,7 +82,7 @@ export function useSettingsMainPage({
     const undoNotificationsEnabled = notificationSettings.undoNotificationsEnabled !== false;
     const weekStart = normalizeWeekStartSetting(settings?.weekStart);
     const windowDecorationsEnabled = windowSettings?.decorations !== false;
-    const closeBehavior = windowSettings?.closeBehavior ?? 'ask';
+    const closeBehavior = resolveCloseBehavior(windowSettings?.closeBehavior, isFlatpak);
     const trayVisible = windowSettings?.showTray !== false;
 
     useEffect(() => {
@@ -130,6 +131,11 @@ export function useSettingsMainPage({
             cancelled = true;
         };
     }, [isFlatpak, isTauri, settings?.window, updateSettings]);
+
+    useEffect(() => {
+        if (!isTauri || !isFlatpak) return;
+        setLaunchAtStartupEnabledState(settings?.window?.launchAtStartup === true);
+    }, [isFlatpak, isTauri, settings?.window?.launchAtStartup]);
 
     const onThemeChange = useCallback((mode: DesktopThemeMode) => {
         localStorage.setItem(THEME_STORAGE_KEY, mode);
@@ -315,10 +321,10 @@ export function useSettingsMainPage({
         onUndoNotificationsChange,
         onWeekStartChange,
         onWindowDecorationsChange,
-        showCloseBehavior: isTauri && !isFlatpak,
-        showLaunchAtStartup: isTauri && !isFlatpak,
+        showCloseBehavior: isTauri,
+        showLaunchAtStartup: isTauri,
         showTaskAge,
-        showTrayToggle: isTauri && !isFlatpak,
+        showTrayToggle: isTauri,
         showWindowDecorations: isLinux,
         textSizeMode,
         themeMode,
