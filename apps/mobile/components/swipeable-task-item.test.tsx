@@ -33,6 +33,32 @@ const { addTask, updateTask, restoreTask, showToast, getChecklistProgress, getTa
 const hapticsMocks = vi.hoisted(() => ({
   notificationAsync: vi.fn().mockResolvedValue(undefined),
 }));
+const translate = vi.hoisted(() => {
+  const labels: Record<string, string> = {
+    'common.cancel': 'Cancel',
+    'common.delete': 'Delete',
+    'common.done': 'Done',
+    'common.edit': 'Edit',
+    'common.notice': 'Notice',
+    'common.skip': 'Skip',
+    'common.undo': 'Undo',
+    'list.taskDeleted': 'Task deleted',
+    'list.done': 'Completed',
+    'status.inbox': 'Inbox',
+    'status.done': 'Done',
+    'status.next': 'Next',
+    'status.someday': 'Someday',
+    'projects.nextActionPromptTitle': "What's the next action?",
+    'projects.nextActionPromptDesc': 'Choose or add the next action for {{project}}.',
+    'projects.nextActionPromptChooseExisting': 'Choose an existing task',
+    'projects.nextActionPromptAddNew': 'Add a new next action',
+    'projects.nextActionPromptPlaceholder': 'New next action...',
+    'projects.nextActionPromptAddButton': 'Add next action',
+    'task.aria.delete': 'Delete task',
+    'task.deleteConfirmBody': 'Move this task to Trash?',
+  };
+  return (key: string) => labels[key] ?? key;
+});
 
 vi.mock('@mindwtr/core', () => {
   storeState.addTask = addTask;
@@ -80,7 +106,19 @@ vi.mock('@mindwtr/core', () => {
     getStatusColor: () => ({ bg: '#111111', border: '#222222', text: '#333333' }),
     hasTimeComponent: () => false,
     normalizeFocusTaskLimit: (value?: number) => value ?? 3,
-    parseInlineMarkdown: (text: string) => [{ type: 'text', text }],
+    parseInlineMarkdown: (text: string) => {
+      const tokens: Array<{ type: string; text: string }> = [];
+      const regex = /\*\*(.*?)\*\*/g;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) tokens.push({ type: 'text', text: text.slice(lastIndex, match.index) });
+        tokens.push({ type: 'bold', text: match[1] });
+        lastIndex = regex.lastIndex;
+      }
+      if (lastIndex < text.length) tokens.push({ type: 'text', text: text.slice(lastIndex) });
+      return tokens;
+    },
     parseMarkdownReferenceHref: () => null,
     safeFormatDate,
     safeParseDueDate: () => null,
@@ -95,30 +133,14 @@ vi.mock('@mindwtr/core', () => {
 vi.mock('../contexts/language-context', () => ({
   useLanguage: () => ({
     language: 'en',
-    t: (key: string) =>
-      ({
-        'common.cancel': 'Cancel',
-        'common.delete': 'Delete',
-        'common.done': 'Done',
-        'common.edit': 'Edit',
-        'common.notice': 'Notice',
-        'common.skip': 'Skip',
-        'common.undo': 'Undo',
-        'list.taskDeleted': 'Task deleted',
-        'list.done': 'Completed',
-        'status.inbox': 'Inbox',
-        'status.done': 'Done',
-        'status.next': 'Next',
-        'status.someday': 'Someday',
-        'projects.nextActionPromptTitle': "What's the next action?",
-        'projects.nextActionPromptDesc': 'Choose or add the next action for {{project}}.',
-        'projects.nextActionPromptChooseExisting': 'Choose an existing task',
-        'projects.nextActionPromptAddNew': 'Add a new next action',
-        'projects.nextActionPromptPlaceholder': 'New next action...',
-        'projects.nextActionPromptAddButton': 'Add next action',
-        'task.aria.delete': 'Delete task',
-        'task.deleteConfirmBody': 'Move this task to Trash?',
-      }[key] ?? key),
+    t: translate,
+  }),
+}));
+
+vi.mock('@/contexts/language-context', () => ({
+  useLanguage: () => ({
+    language: 'en',
+    t: translate,
   }),
 }));
 
@@ -172,6 +194,10 @@ describe('SwipeableTaskItem', () => {
   const flattenText = (value: unknown): string => {
     if (typeof value === 'string' || typeof value === 'number') return String(value);
     if (Array.isArray(value)) return value.map((item) => flattenText(item)).join('');
+    if (value && typeof value === 'object') {
+      const item = value as { children?: unknown; props?: { children?: unknown } };
+      return flattenText(item.props?.children ?? item.children);
+    }
     return '';
   };
 
@@ -385,6 +411,42 @@ describe('SwipeableTaskItem', () => {
     });
 
     expect(hasText(tree, '2 days old')).toBe(true);
+  });
+
+  it('renders compact description markdown without raw emphasis markers', () => {
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <SwipeableTaskItem
+          task={{
+            id: 'task-1',
+            title: 'Prepare notes',
+            description: 'Review **draft** notes',
+            status: 'inbox',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          } as any}
+          isDark={false}
+          tc={{
+            taskItemBg: '#111111',
+            border: '#222222',
+            text: '#ffffff',
+            secondaryText: '#999999',
+            tint: '#3b82f6',
+            cardBg: '#111111',
+            filterBg: '#222222',
+            warning: '#f59e0b',
+          } as any}
+          onPress={vi.fn()}
+          onStatusChange={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      );
+    });
+
+    const renderedText = flattenText(tree.toJSON());
+    expect(renderedText).toContain('Review draft notes');
+    expect(renderedText).not.toContain('**draft**');
   });
 
   it('shows the completion date and time for completed tasks', () => {

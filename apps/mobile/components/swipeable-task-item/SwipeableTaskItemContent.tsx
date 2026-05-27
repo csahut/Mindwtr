@@ -349,12 +349,13 @@ export function SwipeableTaskItemContent({
                     )}
                 </View>
                 {task.description && (
-                    <Text
-                        style={[styles.taskDescription, { color: tc.secondaryText, writingDirection: textDirection, textAlign }]}
+                    <MarkdownInlineText
+                        markdown={task.description}
+                        tc={tc}
+                        direction={textDirection}
+                        style={[styles.taskDescription, { color: tc.secondaryText }]}
                         numberOfLines={1}
-                    >
-                        {task.description}
-                    </Text>
+                    />
                 )}
                 {metaParts.length > 0 && (
                     <View style={styles.inlineMeta}>
