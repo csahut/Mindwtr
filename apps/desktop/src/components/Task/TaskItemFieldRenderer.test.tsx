@@ -31,12 +31,18 @@ const t = (key: string) => {
         'taskEdit.statusLabel': 'Status',
         'taskEdit.priorityLabel': 'Priority',
         'taskEdit.energyLevel': 'Energy Level',
+        'taskEdit.contextsLabel': 'Contexts',
+        'taskEdit.contextsPlaceholder': 'Add contexts',
+        'taskEdit.tagsLabel': 'Tags',
+        'taskEdit.tagsPlaceholder': 'Add tags',
         'task.aria.startDate': 'Start date',
         'task.aria.startTime': 'Start time',
         'task.aria.dueDate': 'Due date',
         'task.aria.dueTime': 'Due time',
         'task.aria.reviewDate': 'Review date',
         'task.aria.reviewTime': 'Review time',
+        'task.aria.contexts': 'Contexts',
+        'task.aria.tags': 'Tags',
         'task.aria.description': 'Description',
         'task.aria.location': 'Location',
         'task.aria.recurrence': 'Recurrence',
@@ -464,7 +470,9 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
 
         expect(queryByRole('combobox', { name: 'Priority' })).toBeNull();
         expect(getByRole('group', { name: 'Priority' })).toBeInTheDocument();
-        expect(getByRole('button', { name: 'Low' })).toHaveAttribute('aria-pressed', 'true');
+        const selectedPriority = getByRole('button', { name: 'Low' });
+        expect(selectedPriority).toHaveAttribute('aria-pressed', 'true');
+        expect(selectedPriority).toHaveClass('bg-primary', 'text-primary-foreground');
 
         fireEvent.click(getByRole('button', { name: 'None' }));
 
@@ -484,11 +492,55 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
 
         expect(queryByRole('combobox', { name: 'Energy Level' })).toBeNull();
         expect(getByRole('group', { name: 'Energy Level' })).toBeInTheDocument();
-        expect(getByRole('button', { name: 'Medium energy' })).toHaveAttribute('aria-pressed', 'true');
+        const selectedEnergyLevel = getByRole('button', { name: 'Medium energy' });
+        expect(selectedEnergyLevel).toHaveAttribute('aria-pressed', 'true');
+        expect(selectedEnergyLevel).toHaveClass('bg-primary', 'text-primary-foreground');
 
         fireEvent.click(getByRole('button', { name: 'High energy' }));
 
         expect(handlers.setEditEnergyLevel).toHaveBeenCalledWith('high');
+    });
+
+    it('emphasizes selected context tokens', () => {
+        const handlers = createHandlers();
+
+        const { getByRole } = render(
+            <TaskItemFieldRenderer
+                fieldId="contexts"
+                data={createData({
+                    editContexts: 'Home',
+                    popularContextOptions: ['Home', 'Office'],
+                })}
+                handlers={handlers}
+            />
+        );
+
+        expect(getByRole('button', { name: 'Home' })).toHaveClass('bg-primary', 'text-primary-foreground');
+
+        fireEvent.click(getByRole('button', { name: 'Office' }));
+
+        expect(handlers.setEditContexts).toHaveBeenCalledWith('Home, Office');
+    });
+
+    it('emphasizes selected tag tokens', () => {
+        const handlers = createHandlers();
+
+        const { getByRole } = render(
+            <TaskItemFieldRenderer
+                fieldId="tags"
+                data={createData({
+                    editTags: 'Launch',
+                    popularTagOptions: ['Launch', 'Follow-up'],
+                })}
+                handlers={handlers}
+            />
+        );
+
+        expect(getByRole('button', { name: 'Launch' })).toHaveClass('bg-primary', 'text-primary-foreground');
+
+        fireEvent.click(getByRole('button', { name: 'Follow-up' }));
+
+        expect(handlers.setEditTags).toHaveBeenCalledWith('Launch, Follow-up');
     });
 
     it('updates weekly recurrence intervals without dropping selected weekdays', () => {

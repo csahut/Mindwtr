@@ -8,6 +8,8 @@ type PillOption<TValue extends string> = {
     label: string;
 };
 
+const selectedPillClassName = 'border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90';
+
 function PillOptionField<TValue extends string>({
     ariaLabel,
     label,
@@ -69,7 +71,7 @@ function PillOptionField<TValue extends string>({
                             className={cn(
                                 'inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40',
                                 isActive
-                                    ? activeClassName ?? 'border-primary bg-primary/10 text-primary'
+                                    ? activeClassName ?? selectedPillClassName
                                     : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground'
                             )}
                         >
@@ -125,7 +127,7 @@ function ToggleTokenField({
                             className={cn(
                                 'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
                                 isActive
-                                    ? 'bg-primary/10 border-primary text-primary'
+                                    ? selectedPillClassName
                                     : 'bg-transparent border-border text-muted-foreground hover:border-primary/50'
                             )}
                         >
@@ -164,7 +166,6 @@ export function StatusField({
             options={options}
             value={value}
             onChange={onChange}
-            activeClassName="border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
         />
     );
 }
