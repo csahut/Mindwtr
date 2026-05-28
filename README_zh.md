@@ -399,11 +399,17 @@ Mindwtr 的发展离不开用户与贡献者的支持，感谢大家一起把它
   <a href="https://github.com/ronmolenda" title="@ronmolenda">
     <img src="docs/assets/sponsors/ronmolenda.png" width="60" height="60" alt="@ronmolenda" />
   </a>
+  <a href="https://github.com/bepolymathe" title="@bepolymathe">
+    <img src="https://github.com/bepolymathe.png?size=120" width="60" height="60" alt="@bepolymathe" />
+  </a>
+  <a href="https://github.com/davidblume" title="@davidblume">
+    <img src="https://github.com/davidblume.png?size=120" width="60" height="60" alt="@davidblume" />
+  </a>
   <a href="https://github.com/karl1990" title="@karl1990">
     <img src="docs/assets/sponsors/karl1990.png" width="60" height="60" alt="@karl1990" />
   </a>
 </p>
 
 <p align="center">
-  <sub><a href="https://github.com/jarrydstan">@jarrydstan</a> · <a href="https://github.com/ronmolenda">@ronmolenda</a> · <a href="https://github.com/karl1990">@karl1990</a></sub>
+  <sub><a href="https://github.com/jarrydstan">@jarrydstan</a> · <a href="https://github.com/ronmolenda">@ronmolenda</a> · <a href="https://github.com/bepolymathe">@bepolymathe</a> · <a href="https://github.com/davidblume">@davidblume</a> · <a href="https://github.com/karl1990">@karl1990</a></sub>
 </p>
