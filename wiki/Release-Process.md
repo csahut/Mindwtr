@@ -83,6 +83,7 @@ At minimum, verify:
 - FOSS config still strips blocked permissions and keeps only intentional ones
 - CloudKit-backed schema did not change, or the production schema was updated first
 - store/release metadata changes are intentional and scoped per platform
+- mobile store categories in the consoles are still correct: Google Play `Productivity > Task Management` and App Store primary category `Productivity`
 - Google Play locale bodies fit the 500-character API limit
 
 For larger releases, also verify:
