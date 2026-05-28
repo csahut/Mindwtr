@@ -100,6 +100,7 @@ export const CLOUD_TASK_CREATION_ALLOWED_PROP_KEYS = new Set<keyof Task>([
     'startTime',
     'dueDate',
     'recurrence',
+    'showFutureRecurrence',
     'pushCount',
     'tags',
     'contexts',

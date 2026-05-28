@@ -46,7 +46,10 @@ const isLocalAttachmentUri = (uri: string): boolean => {
     return !/^https?:\/\//i.test(trimmed);
 };
 
-const isLocalCalendarSourceUrl = (url: string): boolean => url.trim().toLowerCase().startsWith('file://');
+const isLocalCalendarSourceUrl = (url: string): boolean => {
+    const normalized = url.trim().toLowerCase();
+    return normalized.startsWith('file://') || normalized.startsWith('content://');
+};
 
 const collectPendingUploads = (
     ownerType: PendingAttachmentUpload['ownerType'],

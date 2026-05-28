@@ -193,6 +193,7 @@ describe('sync-helpers sanitizeAppDataForRemote', () => {
                 externalCalendars: [
                     { id: 'cal-1', name: 'Work', url: 'https://example.com/work.ics', enabled: true },
                     { id: 'cal-local', name: 'Local', url: 'file:///home/user/agenda.ics', enabled: true },
+                    { id: 'cal-android-local', name: 'Android Local', url: 'content://com.android.providers.media.documents/document/calendar.ics', enabled: true },
                 ],
                 savedFilters: [{
                     id: 'filter-1',

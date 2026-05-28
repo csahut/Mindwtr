@@ -365,6 +365,7 @@ describe('cloud server utils', () => {
         expect(__cloudTestUtils.validateTaskCreationProps({
             status: 'next',
             projectId: 'p1',
+            showFutureRecurrence: true,
         }).ok).toBe(true);
 
         const invalid = __cloudTestUtils.validateTaskCreationProps({
