@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { getProjectNextActionPromptData, shallow, useTaskStore } from '@mindwtr/core';
+import { getProjectNextActionPromptData, shallow, tFallback, useTaskStore } from '@mindwtr/core';
 import type { Task } from '@mindwtr/core';
 
 import { useLanguage } from '../contexts/language-context';
+import { useToast } from '../contexts/toast-context';
 import { useThemeColors } from '../hooks/use-theme-colors';
 import { ProjectNextActionPromptModal } from './swipeable-task-item/ProjectNextActionPromptModal';
 
@@ -16,6 +17,21 @@ type ProjectNextActionPromptState = {
 type ProjectNextActionPromptPresenter = (completedTask: Task) => boolean;
 
 let activePresenter: ProjectNextActionPromptPresenter | null = null;
+
+const getActionFailureMessage = (result: unknown): string | null => {
+    if (!result || typeof result !== 'object') return null;
+    const actionResult = result as { error?: unknown; success?: unknown };
+    if (actionResult.success !== false) return null;
+    return typeof actionResult.error === 'string' && actionResult.error.trim().length > 0
+        ? actionResult.error.trim()
+        : 'Task update failed';
+};
+
+const getUnknownErrorMessage = (error: unknown): string | undefined => {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string' && error.trim().length > 0) return error.trim();
+    return undefined;
+};
 
 const getAllTasksForPrompt = (completedTask: Task, allTasks: Task[]): Task[] => {
     if (allTasks.some((task) => task.id === completedTask.id)) {
@@ -65,12 +81,15 @@ export function ProjectNextActionPromptProvider({ children }: { children: React.
     }), shallow);
     const tc = useThemeColors();
     const { t } = useLanguage();
+    const { showToast } = useToast();
     const [prompt, setPrompt] = useState<ProjectNextActionPromptState | null>(null);
     const [newTitle, setNewTitle] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const closePrompt = useCallback(() => {
         setPrompt(null);
         setNewTitle('');
+        setIsSubmitting(false);
     }, []);
 
     const presentPrompt = useCallback((completedTask: Task) => {
@@ -90,34 +109,50 @@ export function ProjectNextActionPromptProvider({ children }: { children: React.
         };
     }, [presentPrompt]);
 
+    const showActionFailure = useCallback((message?: string) => {
+        showToast({
+            title: tFallback(t, 'common.error', 'Error'),
+            message: message || tFallback(t, 'projects.nextActionPromptFailed', 'Could not update the next action.'),
+            tone: 'error',
+            durationMs: 4200,
+        });
+    }, [showToast, t]);
+
     const handleChooseTask = useCallback((taskId: string) => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
         void Promise.resolve(updateTask(taskId, { status: 'next' }))
             .then((result) => {
-                if (result && !result.success) {
-                    throw new Error(result.error || 'Failed to choose next action');
-                }
+                const failure = getActionFailureMessage(result);
+                if (failure) throw new Error(failure);
                 closePrompt();
             })
-            .catch(() => undefined);
-    }, [closePrompt, updateTask]);
+            .catch((error) => {
+                showActionFailure(getUnknownErrorMessage(error));
+            })
+            .finally(() => setIsSubmitting(false));
+    }, [closePrompt, isSubmitting, showActionFailure, updateTask]);
 
     const handleAddTask = useCallback(() => {
-        if (!prompt) return;
+        if (!prompt || isSubmitting) return;
         const title = newTitle.trim();
         if (!title) return;
+        setIsSubmitting(true);
         void Promise.resolve(addTask(title, {
             status: 'next',
             projectId: prompt.projectId,
             sectionId: prompt.sectionId,
         }))
             .then((result) => {
-                if (result && !result.success) {
-                    throw new Error(result.error || 'Failed to add next action');
-                }
+                const failure = getActionFailureMessage(result);
+                if (failure) throw new Error(failure);
                 closePrompt();
             })
-            .catch(() => undefined);
-    }, [addTask, closePrompt, newTitle, prompt]);
+            .catch((error) => {
+                showActionFailure(getUnknownErrorMessage(error));
+            })
+            .finally(() => setIsSubmitting(false));
+    }, [addTask, closePrompt, isSubmitting, newTitle, prompt, showActionFailure]);
 
     return (
         <>
@@ -128,6 +163,7 @@ export function ProjectNextActionPromptProvider({ children }: { children: React.
                     candidates={prompt.candidates}
                     projectTitle={prompt.projectTitle}
                     newTitle={newTitle}
+                    submitting={isSubmitting}
                     tc={tc}
                     t={t}
                     onAddTask={handleAddTask}

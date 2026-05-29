@@ -172,7 +172,7 @@ export function useReviewModalController({
     }, []);
 
     const handleStatusChange = useCallback((taskId: string, status: string) => {
-        updateTask(taskId, { status: status as TaskStatus });
+        return updateTask(taskId, { status: status as TaskStatus });
     }, [updateTask]);
 
     const handleDelete = useCallback((taskId: string) => {

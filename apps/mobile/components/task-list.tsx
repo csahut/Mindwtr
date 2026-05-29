@@ -965,7 +965,7 @@ function TaskListComponent({
         selectionMode={enableBulkActions ? selectionMode : false}
         isMultiSelected={enableBulkActions && multiSelectedIds.has(item.id)}
         onToggleSelect={enableBulkActions ? () => toggleMultiSelect(item.id) : undefined}
-        onStatusChange={(status) => { void updateTask(item.id, { status: status as TaskStatus }); }}
+        onStatusChange={(status) => updateTask(item.id, { status: status as TaskStatus })}
         onDelete={() => { void deleteTask(item.id); }}
         isHighlighted={item.id === highlightTaskId}
         hideStatusBadge={hideStatusBadgeForList}
@@ -1003,7 +1003,7 @@ function TaskListComponent({
               onPress={() => undefined}
               selectionMode={false}
               isMultiSelected={false}
-              onStatusChange={(status) => { void updateTask(item.id, { status: status as TaskStatus }); }}
+              onStatusChange={(status) => updateTask(item.id, { status: status as TaskStatus })}
               onDelete={() => { void deleteTask(item.id); }}
               isHighlighted={item.id === highlightTaskId}
               hideStatusBadge

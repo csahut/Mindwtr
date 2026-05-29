@@ -255,7 +255,7 @@ export default function ReviewScreen() {
       isMultiSelected={multiSelectedIds.has(task.id)}
       onToggleSelect={() => toggleMultiSelect(task.id)}
       onLongPressAction={() => toggleMultiSelect(task.id)}
-      onStatusChange={(status) => { void updateTask(task.id, { status: status as TaskStatus }); }}
+      onStatusChange={(status) => updateTask(task.id, { status: status as TaskStatus })}
       onDelete={() => { void deleteTask(task.id); }}
       onProjectPress={openProjectScreen}
       onContextPress={openContextsScreen}

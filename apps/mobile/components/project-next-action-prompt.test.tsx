@@ -9,9 +9,10 @@ import {
     ProjectNextActionPromptProvider,
 } from './project-next-action-prompt';
 
-const { addTask, updateTask, storeState } = vi.hoisted(() => ({
+const { addTask, updateTask, showToast, storeState } = vi.hoisted(() => ({
     addTask: vi.fn(),
     updateTask: vi.fn(),
+    showToast: vi.fn(),
     storeState: {
         addTask: vi.fn(),
         updateTask: vi.fn(),
@@ -96,6 +97,12 @@ vi.mock('../hooks/use-theme-colors', () => ({
         filterBg: '#e5e7eb',
         tint: '#2563eb',
         onTint: '#ffffff',
+    }),
+}));
+
+vi.mock('../contexts/toast-context', () => ({
+    useToast: () => ({
+        showToast,
     }),
 }));
 
@@ -213,5 +220,48 @@ describe('ProjectNextActionPromptProvider', () => {
         });
 
         expect(updateTask).toHaveBeenCalledWith('candidate', { status: 'next' });
+    });
+
+    it('keeps the prompt open and reports failed next-action updates', async () => {
+        updateTask.mockResolvedValueOnce({ success: false, error: 'Project is locked' });
+
+        function Trigger() {
+            return (
+                <Text
+                    accessibilityLabel="Open next action prompt"
+                    onPress={() => presentProjectNextActionPrompt({ ...currentTask, status: 'done' } as any)}
+                >
+                    Open
+                </Text>
+            );
+        }
+
+        let tree!: renderer.ReactTestRenderer;
+        await renderer.act(async () => {
+            tree = renderer.create(
+                <ProjectNextActionPromptProvider>
+                    <Trigger />
+                </ProjectNextActionPromptProvider>,
+            );
+            await Promise.resolve();
+        });
+
+        const trigger = tree.root.find((node) => node.props.accessibilityLabel === 'Open next action prompt');
+        await renderer.act(async () => {
+            trigger.props.onPress();
+            await Promise.resolve();
+        });
+
+        const candidate = tree.root.find((node) => node.props.accessibilityLabel === 'Draft follow-up');
+        await renderer.act(async () => {
+            candidate.props.onPress();
+            await Promise.resolve();
+        });
+
+        expect(hasText(tree, "What's the next action?")).toBe(true);
+        expect(showToast).toHaveBeenCalledWith(expect.objectContaining({
+            message: 'Project is locked',
+            tone: 'error',
+        }));
     });
 });

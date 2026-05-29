@@ -144,7 +144,7 @@ export function ContextsView() {
   );
 
   const handleStatusChange = (taskId: string, newStatus: TaskStatus) => {
-    updateTask(taskId, { status: newStatus });
+    return updateTask(taskId, { status: newStatus });
   };
 
   const handleDelete = (taskId: string) => {

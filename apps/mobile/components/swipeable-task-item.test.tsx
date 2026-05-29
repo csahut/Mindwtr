@@ -595,6 +595,140 @@ describe('SwipeableTaskItem', () => {
     expect(updateTask).toHaveBeenCalledWith('task-2', { status: 'next' });
   });
 
+  it('does not open the next-action prompt when the completion update fails', async () => {
+    const project = { id: 'project-1', title: 'Launch plan', status: 'active' };
+    const task = {
+      id: 'task-1',
+      title: 'Finish current step',
+      status: 'next',
+      projectId: 'project-1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as any;
+    const candidate = {
+      id: 'task-2',
+      title: 'Draft follow-up',
+      status: 'someday',
+      projectId: 'project-1',
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    } as any;
+    storeState.projects = [project];
+    storeState._allProjects = [project];
+    storeState._allTasks = [task, candidate];
+    storeState._tasksById = new Map([[task.id, task], [candidate.id, candidate]]);
+    const onStatusChange = vi.fn(async () => ({ success: false, error: 'Maximum focus limit reached' }));
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <SwipeableTaskItem
+          task={task}
+          isDark={false}
+          tc={{
+            taskItemBg: '#111111',
+            border: '#222222',
+            text: '#ffffff',
+            secondaryText: '#999999',
+            tint: '#3b82f6',
+            onTint: '#ffffff',
+            inputBg: '#222222',
+            filterBg: '#333333',
+            warning: '#f59e0b',
+          } as any}
+          onPress={vi.fn()}
+          onStatusChange={onStatusChange}
+          onDelete={vi.fn()}
+        />
+      );
+    });
+
+    const doneAction = tree.root.find((node) => node.props.accessibilityLabel === 'Done action' && typeof node.props.onPress === 'function');
+    await renderer.act(async () => {
+      doneAction.props.onPress();
+      await Promise.resolve();
+    });
+
+    expect(hasText(tree, "What's the next action?")).toBe(false);
+    expect(showToast).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Maximum focus limit reached',
+      tone: 'error',
+    }));
+  });
+
+  it('keeps the next-action prompt open when promoting a candidate fails', async () => {
+    const project = { id: 'project-1', title: 'Launch plan', status: 'active' };
+    const task = {
+      id: 'task-1',
+      title: 'Finish current step',
+      status: 'next',
+      projectId: 'project-1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as any;
+    const candidate = {
+      id: 'task-2',
+      title: 'Draft follow-up',
+      status: 'someday',
+      projectId: 'project-1',
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    } as any;
+    storeState.projects = [project];
+    storeState._allProjects = [project];
+    storeState._allTasks = [task, candidate];
+    storeState._tasksById = new Map([[task.id, task], [candidate.id, candidate]]);
+    updateTask.mockResolvedValueOnce({ success: false, error: 'Project is locked' });
+    const onStatusChange = vi.fn((status: string) => {
+      const updatedTask = { ...task, status };
+      storeState._allTasks = [updatedTask, candidate];
+      storeState._tasksById = new Map([[updatedTask.id, updatedTask], [candidate.id, candidate]]);
+      return Promise.resolve({ success: true });
+    });
+
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <SwipeableTaskItem
+          task={task}
+          isDark={false}
+          tc={{
+            taskItemBg: '#111111',
+            border: '#222222',
+            text: '#ffffff',
+            secondaryText: '#999999',
+            tint: '#3b82f6',
+            onTint: '#ffffff',
+            inputBg: '#222222',
+            filterBg: '#333333',
+            warning: '#f59e0b',
+          } as any}
+          onPress={vi.fn()}
+          onStatusChange={onStatusChange}
+          onDelete={vi.fn()}
+        />
+      );
+    });
+
+    const doneAction = tree.root.find((node) => node.props.accessibilityLabel === 'Done action' && typeof node.props.onPress === 'function');
+    await renderer.act(async () => {
+      doneAction.props.onPress();
+      await Promise.resolve();
+    });
+
+    const candidateAction = tree.root.find((node) => node.props.accessibilityLabel === 'Draft follow-up' && typeof node.props.onPress === 'function');
+    await renderer.act(async () => {
+      candidateAction.props.onPress();
+      await Promise.resolve();
+    });
+
+    expect(hasText(tree, "What's the next action?")).toBe(true);
+    expect(showToast).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Project is locked',
+      tone: 'error',
+    }));
+  });
+
   it('can add a new project next action from the completion prompt', async () => {
     const project = { id: 'project-1', title: 'Launch plan', status: 'active' };
     const task = {

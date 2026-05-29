@@ -59,6 +59,21 @@ type ProjectNextActionPromptState = {
     sectionId?: string;
 };
 
+const getActionFailureMessage = (result: unknown): string | null => {
+    if (!result || typeof result !== 'object') return null;
+    const actionResult = result as { error?: unknown; success?: unknown };
+    if (actionResult.success !== false) return null;
+    return typeof actionResult.error === 'string' && actionResult.error.trim().length > 0
+        ? actionResult.error.trim()
+        : 'Task update failed';
+};
+
+const getUnknownErrorMessage = (error: unknown): string | undefined => {
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'string' && error.trim().length > 0) return error.trim();
+    return undefined;
+};
+
 /**
  * A swipeable task item with context-aware left swipe actions:
  * - Inbox: swipe to Next
@@ -133,10 +148,12 @@ export function SwipeableTaskItem({
     const [showStatusMenu, setShowStatusMenu] = useState(false);
     const [projectNextActionPrompt, setProjectNextActionPrompt] = useState<ProjectNextActionPromptState | null>(null);
     const [projectNextActionTitle, setProjectNextActionTitle] = useState('');
+    const [isProjectNextActionSubmitting, setIsProjectNextActionSubmitting] = useState(false);
 
     const closeProjectNextActionPrompt = useCallback(() => {
         setProjectNextActionPrompt(null);
         setProjectNextActionTitle('');
+        setIsProjectNextActionSubmitting(false);
     }, []);
 
     const openProjectNextActionPromptIfNeeded = useCallback((completedTaskId: string) => {
@@ -164,47 +181,81 @@ export function SwipeableTaskItem({
         });
     }, [task]);
 
+    const showActionFailure = useCallback((message?: string) => {
+        showToast({
+            title: tFallback(t, 'common.error', 'Error'),
+            message: message || tFallback(t, 'task.updateFailed', 'Could not update task.'),
+            tone: 'error',
+            durationMs: 4200,
+        });
+    }, [showToast, t]);
+
     const handleStatusChange = useCallback((status: TaskStatus) => {
         let result: void | Promise<unknown>;
         try {
             result = onStatusChange(status);
-        } catch {
+        } catch (error) {
+            showActionFailure(getUnknownErrorMessage(error));
             return;
         }
-        if (status !== 'done' || task.status === 'done') return;
         void Promise.resolve(result)
-            .then(() => openProjectNextActionPromptIfNeeded(task.id))
-            .catch(() => undefined);
-    }, [onStatusChange, openProjectNextActionPromptIfNeeded, task.id, task.status]);
+            .then((actionResult) => {
+                const failure = getActionFailureMessage(actionResult);
+                if (failure) {
+                    showActionFailure(failure);
+                    return;
+                }
+                if (status === 'done' && task.status !== 'done') {
+                    openProjectNextActionPromptIfNeeded(task.id);
+                }
+            })
+            .catch((error) => {
+                showActionFailure(getUnknownErrorMessage(error));
+            });
+    }, [onStatusChange, openProjectNextActionPromptIfNeeded, showActionFailure, task.id, task.status]);
 
     const handlePromoteProjectNextAction = useCallback((nextTaskId: string) => {
+        if (isProjectNextActionSubmitting) return;
+        setIsProjectNextActionSubmitting(true);
         void Promise.resolve(updateTask(nextTaskId, { status: 'next' }))
             .then((result) => {
-                if (result && !result.success) {
-                    throw new Error(result.error || 'Failed to choose next action');
-                }
+                const failure = getActionFailureMessage(result);
+                if (failure) throw new Error(failure);
                 closeProjectNextActionPrompt();
             })
-            .catch(() => undefined);
-    }, [closeProjectNextActionPrompt, updateTask]);
+            .catch((error) => {
+                showActionFailure(getUnknownErrorMessage(error));
+            })
+            .finally(() => setIsProjectNextActionSubmitting(false));
+    }, [closeProjectNextActionPrompt, isProjectNextActionSubmitting, showActionFailure, updateTask]);
 
     const handleAddProjectNextAction = useCallback(() => {
-        if (!projectNextActionPrompt) return;
+        if (!projectNextActionPrompt || isProjectNextActionSubmitting) return;
         const title = projectNextActionTitle.trim();
         if (!title) return;
+        setIsProjectNextActionSubmitting(true);
         void Promise.resolve(addTask(title, {
             status: 'next',
             projectId: projectNextActionPrompt.projectId,
             sectionId: projectNextActionPrompt.sectionId,
         }))
             .then((result) => {
-                if (result && !result.success) {
-                    throw new Error(result.error || 'Failed to add next action');
-                }
+                const failure = getActionFailureMessage(result);
+                if (failure) throw new Error(failure);
                 closeProjectNextActionPrompt();
             })
-            .catch(() => undefined);
-    }, [addTask, closeProjectNextActionPrompt, projectNextActionPrompt, projectNextActionTitle]);
+            .catch((error) => {
+                showActionFailure(getUnknownErrorMessage(error));
+            })
+            .finally(() => setIsProjectNextActionSubmitting(false));
+    }, [
+        addTask,
+        closeProjectNextActionPrompt,
+        isProjectNextActionSubmitting,
+        projectNextActionPrompt,
+        projectNextActionTitle,
+        showActionFailure,
+    ]);
 
     const toggleFocus = () => {
         if (selectionMode) return;
@@ -453,6 +504,7 @@ export function SwipeableTaskItem({
                     candidates={projectNextActionPrompt.candidates}
                     projectTitle={projectNextActionPrompt.projectTitle}
                     newTitle={projectNextActionTitle}
+                    submitting={isProjectNextActionSubmitting}
                     tc={tc}
                     t={t}
                     onAddTask={handleAddProjectNextAction}

@@ -61,7 +61,7 @@ export function SomedayView() {
   }, [projects, resolvedAreaFilter, areaById]);
 
   const handleStatusChange = (id: string, status: TaskStatus) => {
-    updateTask(id, { status });
+    return updateTask(id, { status });
   };
   const handleActivateProject = (projectId: string) => {
     updateProject(projectId, { status: 'active' });
