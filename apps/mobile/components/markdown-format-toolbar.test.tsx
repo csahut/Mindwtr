@@ -120,14 +120,50 @@ describe('MarkdownFormatToolbar', () => {
         expect(italicIcons[0].props.size).toBe(13);
     });
 
-    it('renders keyboard placement immediately when the input is focused', () => {
+    it('waits for keyboard visibility before rendering keyboard placement', () => {
+        const listeners = new Map<string, (event?: unknown) => void>();
+        vi.spyOn(Keyboard, 'addListener').mockImplementation(((eventName: string, listener: (event?: unknown) => void) => {
+            listeners.set(eventName, listener);
+            return { remove: () => listeners.delete(eventName) };
+        }) as any);
+
         let tree: ReactTestRenderer | undefined;
         act(() => {
             tree = create(renderKeyboardToolbar());
         });
 
+        expect(tree!.root.findAllByType(Pressable)).toHaveLength(0);
+
+        act(() => {
+            listeners.get('keyboardDidShow')?.({ endCoordinates: { height: 320, screenY: 524 } });
+        });
+
         expect(tree!.root.findAllByType(Pressable)).toHaveLength(MARKDOWN_TOOLBAR_ACTIONS.length + 1);
-        expect(extractFloatingBarBottom(tree!)).toBe(0);
+    });
+
+    it('hides keyboard placement again when the keyboard is dismissed', () => {
+        const listeners = new Map<string, (event?: unknown) => void>();
+        vi.spyOn(Keyboard, 'addListener').mockImplementation(((eventName: string, listener: (event?: unknown) => void) => {
+            listeners.set(eventName, listener);
+            return { remove: () => listeners.delete(eventName) };
+        }) as any);
+
+        let tree: ReactTestRenderer | undefined;
+        act(() => {
+            tree = create(renderKeyboardToolbar());
+        });
+
+        act(() => {
+            listeners.get('keyboardDidShow')?.({ endCoordinates: { height: 320, screenY: 524 } });
+        });
+
+        expect(tree!.root.findAllByType(Pressable)).toHaveLength(MARKDOWN_TOOLBAR_ACTIONS.length + 1);
+
+        act(() => {
+            listeners.get('keyboardDidHide')?.();
+        });
+
+        expect(tree!.root.findAllByType(Pressable)).toHaveLength(0);
     });
 
     it('uses the keyboard height on Android when the release window is not resized', () => {

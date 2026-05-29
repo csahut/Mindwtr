@@ -36,6 +36,13 @@ const getWindowWidth = () => {
     return Number.isFinite(width) && width > 0 ? width : 390;
 };
 
+const getKeyboardMetricsInset = () => {
+    const metrics = typeof Keyboard.metrics === 'function' ? Keyboard.metrics() : undefined;
+    return typeof metrics?.height === 'number' && Number.isFinite(metrics.height)
+        ? Math.max(0, metrics.height)
+        : 0;
+};
+
 type MarkdownFormatToolbarProps = {
     selection: MarkdownSelection;
     onSelectionChange: (selection: MarkdownSelection) => void;
@@ -111,6 +118,9 @@ export function MarkdownFormatToolbar({
 }: MarkdownFormatToolbarProps) {
     const [windowWidth, setWindowWidth] = React.useState(getWindowWidth);
     const [toolbarBottomOffset, setToolbarBottomOffset] = React.useState(0);
+    const [isKeyboardVisible, setIsKeyboardVisible] = React.useState(() => (
+        placement === 'inline' || getKeyboardMetricsInset() > 0
+    ));
     const baselineWindowHeightRef = React.useRef(Dimensions.get('window').height);
     const overlayHeightRef = React.useRef<number | null>(null);
     const lastKeyboardSnapshotRef = React.useRef<KeyboardInsetSnapshot | null>(null);
@@ -181,7 +191,11 @@ export function MarkdownFormatToolbar({
     }, []);
 
     React.useEffect(() => {
-        if (placement !== 'keyboard') return;
+        if (placement !== 'keyboard') {
+            setIsKeyboardVisible(true);
+            return;
+        }
+        setIsKeyboardVisible(getKeyboardMetricsInset() > 0);
         if (typeof Keyboard?.addListener !== 'function') return;
 
         const updateKeyboardInset = (event: { endCoordinates?: { screenY?: number; height?: number } }) => {
@@ -205,6 +219,7 @@ export function MarkdownFormatToolbar({
                 ? Math.max(0, screenHeight - keyboardTop)
                 : 0;
             const keyboardInset = measuredInset || explicitInset || screenInset;
+            setIsKeyboardVisible(keyboardInset > 0);
 
             baselineWindowHeightRef.current = Math.max(baselineWindowHeightRef.current, windowHeight);
             const resizedWindowDelta = Math.max(0, baselineWindowHeightRef.current - windowHeight);
@@ -234,6 +249,7 @@ export function MarkdownFormatToolbar({
             baselineWindowHeightRef.current = Dimensions.get('window').height;
             lastKeyboardSnapshotRef.current = null;
             setToolbarBottomOffset(0);
+            setIsKeyboardVisible(false);
         };
 
         const showListener = Keyboard.addListener('keyboardDidShow', updateKeyboardInset);
@@ -295,7 +311,7 @@ export function MarkdownFormatToolbar({
         suppressPressUntilRef.current > Date.now()
     ), []);
 
-    if (!visible) {
+    if (!visible || (placement === 'keyboard' && !isKeyboardVisible)) {
         return null;
     }
 
