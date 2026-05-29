@@ -1,8 +1,8 @@
 import { DEFAULT_AREA_COLOR } from '@mindwtr/core';
-import type { Area, Project, Task, TaskPriority } from '@mindwtr/core';
+import type { Area, Project, Task, TaskEnergyLevel, TaskPriority } from '@mindwtr/core';
 import { getContextColor } from '../../../lib/context-color';
 
-export type NextGroupBy = 'none' | 'context' | 'area' | 'project' | 'priority';
+export type NextGroupBy = 'none' | 'context' | 'area' | 'project' | 'energy' | 'priority';
 
 export interface TaskGroup {
     id: string;
@@ -36,7 +36,14 @@ interface GroupByPriorityParams {
     noPriorityLabel: string;
 }
 
+interface GroupByEnergyParams {
+    tasks: Task[];
+    getEnergyLabel: (energy: TaskEnergyLevel) => string;
+    noEnergyLabel: string;
+}
+
 const PRIORITY_GROUP_ORDER: TaskPriority[] = ['urgent', 'high', 'medium', 'low'];
+const ENERGY_GROUP_ORDER: TaskEnergyLevel[] = ['high', 'medium', 'low'];
 
 export function groupTasksByArea({
     areas,
@@ -165,6 +172,47 @@ export function groupTasksByPriority({
             id: 'priority:none',
             title: noPriorityLabel,
             tasks: noPriorityTasks,
+            muted: true,
+        });
+    }
+
+    return groups;
+}
+
+export function groupTasksByEnergy({
+    tasks,
+    getEnergyLabel,
+    noEnergyLabel,
+}: GroupByEnergyParams): TaskGroup[] {
+    const grouped = new Map<TaskEnergyLevel, Task[]>();
+    const noEnergyTasks: Task[] = [];
+
+    tasks.forEach((task) => {
+        if (!task.energyLevel) {
+            noEnergyTasks.push(task);
+            return;
+        }
+        const energyTasks = grouped.get(task.energyLevel) ?? [];
+        energyTasks.push(task);
+        grouped.set(task.energyLevel, energyTasks);
+    });
+
+    const groups: TaskGroup[] = [];
+    ENERGY_GROUP_ORDER.forEach((energy) => {
+        const energyTasks = grouped.get(energy) ?? [];
+        if (energyTasks.length === 0) return;
+        groups.push({
+            id: `energy:${energy}`,
+            title: getEnergyLabel(energy),
+            tasks: energyTasks,
+        });
+    });
+
+    if (noEnergyTasks.length > 0) {
+        groups.push({
+            id: 'energy:none',
+            title: noEnergyLabel,
+            tasks: noEnergyTasks,
             muted: true,
         });
     }

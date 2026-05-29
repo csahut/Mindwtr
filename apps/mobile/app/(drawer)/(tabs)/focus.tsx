@@ -26,6 +26,7 @@ import {
   markSavedFilterDeleted,
   normalizeFocusTaskLimit,
   SAVED_FILTER_NO_PROJECT_ID,
+  sortTasksBySavedPreference,
   translateWithFallback,
   useTaskStore,
   isTaskInActiveProject,
@@ -41,6 +42,7 @@ import {
   type FocusGroupBy,
   type FilterCriteria,
   type SavedFilter,
+  type SortField,
 } from '@mindwtr/core';
 import { SwipeableTaskItem } from '@/components/swipeable-task-item';
 import { useThemeColors } from '@/hooks/use-theme-colors';
@@ -63,7 +65,9 @@ const ENERGY_LEVEL_OPTIONS: TaskEnergyLevel[] = ['low', 'medium', 'high'];
 const ALL_TIME_ESTIMATE_OPTIONS: TimeEstimate[] = ['5min', '10min', '15min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
 const DEFAULT_TIME_ESTIMATE_PRESETS: TimeEstimate[] = ['10min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
 const FOCUS_GROUP_BY_OPTIONS: FocusGroupBy[] = ['none', 'context', 'project', 'area', 'energy', 'priority'];
+const FOCUS_SORT_OPTIONS: SortField[] = ['default', 'due', 'start', 'priority', 'created', 'created-desc'];
 const NO_PROJECT_FILTER_ID = SAVED_FILTER_NO_PROJECT_ID;
+const DEFAULT_FOCUS_SORT_BY: SortField = 'default';
 const FOCUS_LIST_INITIAL_RENDER_COUNT = 12;
 const FOCUS_LIST_BATCH_RENDER_COUNT = 12;
 const FOCUS_LIST_WINDOW_SIZE = 5;
@@ -193,6 +197,7 @@ export default function FocusScreen() {
   const [selectedTimeEstimates, setSelectedTimeEstimates] = useState<TimeEstimate[]>([]);
   const [locationFilter, setLocationFilter] = useState('');
   const [activeSavedFilterId, setActiveSavedFilterId] = useState<string | null>(null);
+  const [focusSortBy, setFocusSortBy] = useState<SortField>(DEFAULT_FOCUS_SORT_BY);
   const [saveFilterDialogVisible, setSaveFilterDialogVisible] = useState(false);
   const [saveFilterName, setSaveFilterName] = useState('');
   const showFutureStarts = settings?.appearance?.showFutureStarts === true;
@@ -265,6 +270,8 @@ export default function FocusScreen() {
     () => savedFocusFilters.find((filter) => filter.id === activeSavedFilterId) ?? null,
     [activeSavedFilterId, savedFocusFilters],
   );
+  const effectiveFocusSortBy = activeSavedFilter?.sortBy ?? focusSortBy;
+  const effectiveFocusGroupBy = normalizeFocusGroupBy(activeSavedFilter?.groupBy ?? focusGroupBy);
   const currentFilterCriteria = useMemo(() => buildFocusFilterCriteria({
     tokens: selectedTokens,
     projects: selectedProjects,
@@ -290,6 +297,12 @@ export default function FocusScreen() {
   }), [prioritiesEnabled, rawEffectiveFilterCriteria, timeEstimatesEnabled]);
   const hasCurrentFilterCriteria = hasActiveFilterCriteria(currentFilterCriteria);
   const hasFilters = hasActiveFilterCriteria(effectiveFilterCriteria);
+  const canSaveFocusPerspective = activeSavedFilterId === null
+    && (
+      hasCurrentFilterCriteria
+      || focusSortBy !== DEFAULT_FOCUS_SORT_BY
+      || effectiveFocusGroupBy !== 'none'
+    );
   const filteredActiveTasks = useMemo(() => (
     applyFilter(activeTasks, effectiveFilterCriteria, { projects, tokenMatchMode: 'all' })
   ), [
@@ -317,15 +330,25 @@ export default function FocusScreen() {
         return resolveText('focus.group.none', 'None');
     }
   }, [resolveText]);
+  const getFocusSortByLabel = useCallback((sortBy: SortField) => {
+    if (sortBy === 'priority') return resolveText('filters.priority', 'Priority');
+    return resolveText(`sort.${sortBy}`, sortBy);
+  }, [resolveText]);
+  const updateFocusSortBy = useCallback((nextSortBy: SortField) => {
+    if (nextSortBy === effectiveFocusSortBy && !activeSavedFilter) return;
+    setActiveSavedFilterId(null);
+    setFocusSortBy(nextSortBy);
+  }, [activeSavedFilter, effectiveFocusSortBy]);
   const updateFocusGroupBy = useCallback((nextGroupBy: FocusGroupBy) => {
-    if (nextGroupBy === focusGroupBy) return;
+    if (nextGroupBy === effectiveFocusGroupBy && !activeSavedFilter) return;
+    setActiveSavedFilterId(null);
     void updateSettings({
       gtd: {
         ...(settings?.gtd ?? {}),
         focusGroupBy: nextGroupBy === 'none' ? undefined : nextGroupBy,
       },
     }).catch(() => undefined);
-  }, [focusGroupBy, settings?.gtd, updateSettings]);
+  }, [activeSavedFilter, effectiveFocusGroupBy, settings?.gtd, updateSettings]);
   const toggleFutureStarts = useCallback(() => {
     void updateSettings({
       appearance: {
@@ -385,6 +408,7 @@ export default function FocusScreen() {
   }, []);
   const clearFilters = useCallback(() => {
     setActiveSavedFilterId(null);
+    setFocusSortBy(DEFAULT_FOCUS_SORT_BY);
     setSelectedTokens([]);
     setSelectedProjects([]);
     setLocationFilter('');
@@ -405,18 +429,21 @@ export default function FocusScreen() {
     )));
     setSelectedEnergyLevels((criteria.energy ?? []).filter((energy): energy is TaskEnergyLevel => energySet.has(energy)));
     setSelectedTimeEstimates((criteria.timeEstimates ?? []).filter((estimate): estimate is TimeEstimate => estimateSet.has(estimate)));
+    setFocusSortBy(filter.sortBy ?? DEFAULT_FOCUS_SORT_BY);
     setActiveSavedFilterId(filter.id);
     setFiltersVisible(false);
   }, []);
   const saveCurrentFilter = useCallback(() => {
     const trimmedName = saveFilterName.trim();
-    if (!trimmedName || !hasCurrentFilterCriteria) return;
+    if (!trimmedName || !canSaveFocusPerspective) return;
     const nowIso = new Date().toISOString();
     const nextFilter: SavedFilter = {
       id: generateUUID(),
       name: trimmedName,
       view: 'focus',
       criteria: currentFilterCriteria,
+      ...(focusSortBy !== DEFAULT_FOCUS_SORT_BY ? { sortBy: focusSortBy } : {}),
+      ...(effectiveFocusGroupBy !== 'none' ? { groupBy: effectiveFocusGroupBy } : {}),
       createdAt: nowIso,
       updatedAt: nowIso,
     };
@@ -427,7 +454,7 @@ export default function FocusScreen() {
       setSaveFilterDialogVisible(false);
       setFiltersVisible(false);
     }).catch(() => undefined);
-  }, [currentFilterCriteria, hasCurrentFilterCriteria, saveFilterName, settings?.savedFilters, updateSettings]);
+  }, [canSaveFocusPerspective, currentFilterCriteria, effectiveFocusGroupBy, focusSortBy, saveFilterName, settings?.savedFilters, updateSettings]);
   const deleteSavedFilter = useCallback((filter: SavedFilter) => {
     const nextFilters = markSavedFilterDeleted(settings?.savedFilters, filter.id);
     updateSettings({ savedFilters: nextFilters }).then(() => {
@@ -540,6 +567,14 @@ export default function FocusScreen() {
         .map((project) => project.id)
     );
   }, [visibleProjects]);
+  const sortBySavedPerspective = useCallback((items: Task[]) => {
+    if (effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY) return items;
+    return sortTasksBySavedPreference(items, effectiveFocusSortBy, {
+      projects,
+      prioritizeByPriority: prioritiesEnabled,
+      sortOrder: activeSavedFilter?.sortOrder,
+    });
+  }, [activeSavedFilter?.sortOrder, effectiveFocusSortBy, prioritiesEnabled, projects]);
 
   const { focusedTasks, schedule, nextActions, reviewDue } = useMemo(() => {
     const now = new Date();
@@ -588,15 +623,25 @@ export default function FocusScreen() {
       });
 
     return {
-      focusedTasks: allFocusedTasks,
-      schedule: scheduleItems,
-      nextActions: sortFocusNextActions(nextItems, {
-        now,
-        prioritizeByPriority: prioritiesEnabled,
-      }),
-      reviewDue: reviewDueItems,
+      focusedTasks: sortBySavedPerspective(allFocusedTasks),
+      schedule: effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY ? scheduleItems : sortBySavedPerspective(scheduleItems),
+      nextActions: effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY
+        ? sortFocusNextActions(nextItems, {
+          now,
+          prioritizeByPriority: prioritiesEnabled,
+        })
+        : sortBySavedPerspective(nextItems),
+      reviewDue: effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY ? reviewDueItems : sortBySavedPerspective(reviewDueItems),
     };
-  }, [baseActiveTasks, filteredActiveTasks, prioritiesEnabled, sequentialProjectIds, sequentialWithinSectionProjectIds]);
+  }, [
+    baseActiveTasks,
+    effectiveFocusSortBy,
+    filteredActiveTasks,
+    prioritiesEnabled,
+    sequentialProjectIds,
+    sequentialWithinSectionProjectIds,
+    sortBySavedPerspective,
+  ]);
 
   const sections = useMemo<FocusSection[]>(() => {
     const buildTaskItems = (items: Task[], grouped = false): FocusListItem[] => (
@@ -616,7 +661,7 @@ export default function FocusScreen() {
       return 4;
     };
     const buildNextActionGroups = (): FocusTaskGroup[] => {
-      switch (focusGroupBy) {
+      switch (effectiveFocusGroupBy) {
         case 'context':
           return groupFocusTasksByContext(nextActions, resolveText('contexts.none', 'No context'));
         case 'project':
@@ -668,7 +713,7 @@ export default function FocusScreen() {
     };
     const buildGroupedNextItems = (): FocusListItem[] => {
       if (!expandedSections.next) return [];
-      if (focusGroupBy === 'none') {
+      if (effectiveFocusGroupBy === 'none') {
         return buildTaskItems(nextActions);
       }
       const groups = buildNextActionGroups();
@@ -726,11 +771,11 @@ export default function FocusScreen() {
     return nextSections;
   }, [
     areaById,
+    effectiveFocusGroupBy,
     expandedSections.focus,
     expandedSections.next,
     expandedSections.reviewDue,
     expandedSections.schedule,
-    focusGroupBy,
     focusedTasks,
     nextActions,
     projectById,
@@ -1029,17 +1074,17 @@ export default function FocusScreen() {
               >
                 <TouchableOpacity
                   accessibilityRole="button"
-                  accessibilityState={{ selected: !hasFilters }}
+                  accessibilityState={{ selected: !hasFilters && !activeSavedFilterId && focusSortBy === DEFAULT_FOCUS_SORT_BY }}
                   onPress={clearFilters}
                   style={[
                     styles.savedFilterChip,
                     {
-                      borderColor: !hasFilters ? tc.tint : tc.border,
-                      backgroundColor: !hasFilters ? tc.tint : tc.filterBg,
+                      borderColor: !hasFilters && !activeSavedFilterId && focusSortBy === DEFAULT_FOCUS_SORT_BY ? tc.tint : tc.border,
+                      backgroundColor: !hasFilters && !activeSavedFilterId && focusSortBy === DEFAULT_FOCUS_SORT_BY ? tc.tint : tc.filterBg,
                     },
                   ]}
                 >
-                  <Text style={[styles.savedFilterChipText, { color: !hasFilters ? tc.onTint : tc.text }]}>
+                  <Text style={[styles.savedFilterChipText, { color: !hasFilters && !activeSavedFilterId && focusSortBy === DEFAULT_FOCUS_SORT_BY ? tc.onTint : tc.text }]}>
                     {resolveText('common.all', 'All')}
                   </Text>
                 </TouchableOpacity>
@@ -1165,7 +1210,7 @@ export default function FocusScreen() {
                 {resolveText('filters.label', 'Filters')}
               </Text>
               <View style={styles.sheetHeaderActions}>
-                {hasCurrentFilterCriteria && activeSavedFilterId === null ? (
+                {canSaveFocusPerspective ? (
                   <TouchableOpacity
                     accessibilityRole="button"
                     onPress={openSaveFilterDialog}
@@ -1200,12 +1245,24 @@ export default function FocusScreen() {
               showsVerticalScrollIndicator={false}
             >
               <Text style={[styles.sheetSectionLabel, { color: tc.secondaryText }]}>
+                {resolveText('sort.label', 'Sort')}
+              </Text>
+              <View style={styles.sheetChipRow}>
+                {FOCUS_SORT_OPTIONS.map((sortBy) => renderFilterChip(
+                  getFocusSortByLabel(sortBy),
+                  effectiveFocusSortBy === sortBy,
+                  () => updateFocusSortBy(sortBy),
+                  `sort:${sortBy}`,
+                ))}
+              </View>
+
+              <Text style={[styles.sheetSectionLabel, { color: tc.secondaryText }]}>
                 {resolveText('focus.groupBy', 'Group by')}
               </Text>
               <View style={styles.sheetChipRow}>
                 {FOCUS_GROUP_BY_OPTIONS.map((groupBy) => renderFilterChip(
                   getFocusGroupByLabel(groupBy),
-                  focusGroupBy === groupBy,
+                  effectiveFocusGroupBy === groupBy,
                   () => updateFocusGroupBy(groupBy),
                   `group:${groupBy}`,
                 ))}

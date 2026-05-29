@@ -905,6 +905,60 @@ describe('AgendaView', () => {
         expect(getByText('Phone task')).toBeInTheDocument();
     });
 
+    it('applies saved Focus sort preferences from the chip row', () => {
+        const highLaterTask: Task = {
+            id: 'high-later-task',
+            title: 'High later task',
+            status: 'next',
+            priority: 'urgent',
+            startTime: '2026-02-03T09:00:00.000Z',
+            contexts: [],
+            tags: [],
+            createdAt: '2026-02-01T08:00:00.000Z',
+            updatedAt: '2026-02-01T08:00:00.000Z',
+        };
+        const lowEarlierTask: Task = {
+            id: 'low-earlier-task',
+            title: 'Low earlier task',
+            status: 'next',
+            priority: 'low',
+            startTime: '2026-02-02T09:00:00.000Z',
+            contexts: [],
+            tags: [],
+            createdAt: '2026-02-01T07:00:00.000Z',
+            updatedAt: '2026-02-01T07:00:00.000Z',
+        };
+
+        useTaskStore.setState({
+            tasks: [highLaterTask, lowEarlierTask],
+            _allTasks: [highLaterTask, lowEarlierTask],
+            projects: [],
+            _allProjects: [],
+            areas: [],
+            _allAreas: [],
+            settings: {
+                savedFilters: [{
+                    id: 'filter-start',
+                    name: 'Start first',
+                    view: 'focus',
+                    criteria: {},
+                    sortBy: 'start',
+                    createdAt: nowIso,
+                    updatedAt: nowIso,
+                }],
+            },
+            highlightTaskId: null,
+        });
+
+        const { container, getByRole } = renderAgenda();
+
+        fireEvent.click(getByRole('button', { name: 'Start first' }));
+
+        const taskIds = Array.from(container.querySelectorAll<HTMLElement>('[data-task-id]'))
+            .map((element) => element.dataset.taskId);
+        expect(taskIds).toEqual(['low-earlier-task', 'high-later-task']);
+    });
+
     it('deletes the active saved Focus filter from the chip row', async () => {
         const deskTask: Task = {
             id: 'desk-task',
@@ -1055,6 +1109,39 @@ describe('AgendaView', () => {
             });
         });
         expect(getByText('High energy preset')).toBeInTheDocument();
+    });
+
+    it('saves Focus sort and group preferences without requiring criteria', async () => {
+        useTaskStore.setState({
+            tasks: [],
+            _allTasks: [],
+            projects: [],
+            _allProjects: [],
+            areas: [],
+            _allAreas: [],
+            settings: {},
+            highlightTaskId: null,
+        });
+
+        const { getAllByRole, getByDisplayValue, getByRole } = renderAgenda();
+
+        fireEvent.click(getByRole('button', { name: /^Show$/i }));
+        fireEvent.click(getByRole('button', { name: 'Start date' }));
+        fireEvent.change(getByRole('combobox', { name: 'Group' }), { target: { value: 'project' } });
+        fireEvent.click(getByRole('button', { name: /^Save$/i }));
+        fireEvent.change(getByDisplayValue('Focus filter'), { target: { value: 'Start by project' } });
+        const saveButtons = getAllByRole('button', { name: /^Save$/i });
+        fireEvent.click(saveButtons[saveButtons.length - 1]);
+
+        await waitFor(() => {
+            expect(useTaskStore.getState().settings.savedFilters?.[0]).toMatchObject({
+                name: 'Start by project',
+                view: 'focus',
+                criteria: {},
+                sortBy: 'start',
+                groupBy: 'project',
+            });
+        });
     });
 
     it('collapses next actions when the section header is toggled', () => {

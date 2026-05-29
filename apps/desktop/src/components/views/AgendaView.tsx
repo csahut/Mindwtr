@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { shallow, useTaskStore, TaskPriority, TimeEstimate, applyFilter, buildAdvancedFilterCriteriaChips, removeAdvancedFilterCriteriaChip, formatFocusTaskLimitText, generateUUID, getUsedTaskTokens, getFocusSequentialFirstTaskIds, hasActiveFilterCriteria, markSavedFilterDeleted, normalizeFocusTaskLimit, safeParseDate, safeParseDueDate, isDueForReview, isTaskInActiveProject, SAVED_FILTER_NO_PROJECT_ID, shouldShowTaskForStart, sortFocusNextActions, translateWithFallback } from '@mindwtr/core';
-import type { FilterCriteria, SavedFilter, Task, TaskEnergyLevel } from '@mindwtr/core';
+import { shallow, useTaskStore, TaskPriority, TimeEstimate, applyFilter, buildAdvancedFilterCriteriaChips, removeAdvancedFilterCriteriaChip, formatFocusTaskLimitText, generateUUID, getUsedTaskTokens, getFocusSequentialFirstTaskIds, hasActiveFilterCriteria, markSavedFilterDeleted, normalizeFocusTaskLimit, safeParseDate, safeParseDueDate, isDueForReview, isTaskInActiveProject, SAVED_FILTER_NO_PROJECT_ID, shouldShowTaskForStart, sortFocusNextActions, sortTasksBySavedPreference, translateWithFallback } from '@mindwtr/core';
+import type { FilterCriteria, FocusGroupBy, SavedFilter, SortField, Task, TaskEnergyLevel } from '@mindwtr/core';
 import { useLanguage } from '../../contexts/language-context';
 import { cn } from '../../lib/utils';
 import { useUiStore } from '../../store/ui-store';
@@ -15,13 +15,19 @@ import { AgendaFiltersPanel, type AgendaActiveFilterChip, type AgendaProjectFilt
 import { AgendaHeader } from './agenda/AgendaHeader';
 import { AgendaCollapsibleSection, AgendaProjectSection } from './agenda/AgendaSections';
 import { StoreTaskItem } from './list/StoreTaskItem';
-import { groupTasksByArea, groupTasksByContext, groupTasksByPriority, groupTasksByProject, type TaskGroup } from './list/next-grouping';
+import { groupTasksByArea, groupTasksByContext, groupTasksByEnergy, groupTasksByPriority, groupTasksByProject, type NextGroupBy, type TaskGroup } from './list/next-grouping';
 import { PromptModal } from '../PromptModal';
 import { ConfirmModal } from '../ConfirmModal';
 
 const AGENDA_VIRTUALIZATION_THRESHOLD = 25;
 const NO_PROJECT_FILTER_ID = SAVED_FILTER_NO_PROJECT_ID;
 const AGENDA_ACTIVE_STATUSES: Task['status'][] = ['inbox', 'next', 'waiting', 'someday'];
+const DEFAULT_FOCUS_SORT_BY: SortField = 'default';
+const FOCUS_GROUP_BY_VALUES = new Set<FocusGroupBy>(['none', 'context', 'project', 'area', 'energy', 'priority']);
+
+function normalizeAgendaGroupBy(value: unknown): NextGroupBy {
+    return FOCUS_GROUP_BY_VALUES.has(value as FocusGroupBy) ? value as NextGroupBy : 'none';
+}
 
 function getAgendaScrollElement(containerElement: HTMLDivElement | null): HTMLElement | null {
     if (containerElement) {
@@ -218,6 +224,7 @@ export function AgendaView() {
     const [searchQuery, setSearchQuery] = useState('');
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [activeSavedFilterId, setActiveSavedFilterId] = useState<string | null>(null);
+    const [focusSortBy, setFocusSortBy] = useState<SortField>(DEFAULT_FOCUS_SORT_BY);
     const [saveFilterPromptOpen, setSaveFilterPromptOpen] = useState(false);
     const [filterPendingDelete, setFilterPendingDelete] = useState<SavedFilter | null>(null);
     const showFutureStarts = settings?.appearance?.showFutureStarts === true;
@@ -296,6 +303,8 @@ export function AgendaView() {
     };
     const savedFocusFilters = (settings?.savedFilters ?? []).filter((filter) => filter.view === 'focus' && !filter.deletedAt);
     const activeSavedFilter = savedFocusFilters.find((filter) => filter.id === activeSavedFilterId) ?? null;
+    const effectiveFocusSortBy = activeSavedFilter?.sortBy ?? focusSortBy;
+    const effectiveNextGroupBy = normalizeAgendaGroupBy(activeSavedFilter?.groupBy ?? nextGroupBy);
     const currentFilterCriteria = buildFocusFilterCriteria({
         tokens: selectedTokens,
         projects: selectedProjects,
@@ -312,6 +321,12 @@ export function AgendaView() {
     };
     const hasCurrentFilterCriteria = hasActiveFilterCriteria(currentFilterCriteria);
     const hasFilters = hasActiveFilterCriteria(effectiveFilterCriteria);
+    const canSaveFocusPerspective = activeSavedFilterId === null
+        && (
+            hasCurrentFilterCriteria
+            || focusSortBy !== DEFAULT_FOCUS_SORT_BY
+            || effectiveNextGroupBy !== 'none'
+        );
     const normalizedSearchQuery = searchQuery.trim().toLowerCase();
     const matchesSearchQuery = useCallback((title: string) => {
         if (!normalizedSearchQuery) return true;
@@ -505,8 +520,17 @@ export function AgendaView() {
         setActiveSavedFilterId(null);
         setLocationFilter(value);
     };
+    const updateFocusSortBy = useCallback((value: SortField) => {
+        setActiveSavedFilterId(null);
+        setFocusSortBy(value);
+    }, []);
+    const updateFocusGroupBy = useCallback((value: NextGroupBy) => {
+        setActiveSavedFilterId(null);
+        setListOptions({ nextGroupBy: value });
+    }, [setListOptions]);
     const clearFilters = () => {
         setActiveSavedFilterId(null);
+        setFocusSortBy(DEFAULT_FOCUS_SORT_BY);
         setSelectedTokens([]);
         setSelectedProjects([]);
         setLocationFilter('');
@@ -531,18 +555,21 @@ export function AgendaView() {
         )));
         setSelectedEnergyLevels((criteria.energy ?? []).filter((energy): energy is TaskEnergyLevel => energySet.has(energy)));
         setSelectedTimeEstimates((criteria.timeEstimates ?? []).filter((estimate): estimate is TimeEstimate => estimateSet.has(estimate)));
+        setFocusSortBy(filter.sortBy ?? DEFAULT_FOCUS_SORT_BY);
         setActiveSavedFilterId(filter.id);
         setFiltersOpen(false);
     }, [energyLevelOptions, priorityOptions, timeEstimateOptions]);
     const handleSaveFilterConfirm = useCallback((name: string) => {
         const trimmedName = name.trim();
-        if (!trimmedName || !hasCurrentFilterCriteria) return;
+        if (!trimmedName || !canSaveFocusPerspective) return;
         const nowIso = new Date().toISOString();
         const nextFilter: SavedFilter = {
             id: generateUUID(),
             name: trimmedName,
             view: 'focus',
             criteria: currentFilterCriteria,
+            ...(focusSortBy !== DEFAULT_FOCUS_SORT_BY ? { sortBy: focusSortBy } : {}),
+            ...(effectiveNextGroupBy !== 'none' ? { groupBy: effectiveNextGroupBy } : {}),
             createdAt: nowIso,
             updatedAt: nowIso,
         };
@@ -552,7 +579,7 @@ export function AgendaView() {
             setSaveFilterPromptOpen(false);
             setActiveSavedFilterId(nextFilter.id);
         }).catch(() => undefined);
-    }, [currentFilterCriteria, hasCurrentFilterCriteria, settings?.savedFilters, updateSettings]);
+    }, [canSaveFocusPerspective, currentFilterCriteria, effectiveNextGroupBy, focusSortBy, settings?.savedFilters, updateSettings]);
     const handleDeleteSavedFilterConfirm = useCallback(() => {
         if (!filterPendingDelete) return;
         const deleteId = filterPendingDelete.id;
@@ -583,7 +610,18 @@ export function AgendaView() {
         return () => window.clearTimeout(timer);
     }, [highlightTaskId, setHighlightTask]);
     // Today's Focus: tasks marked as isFocusedToday.
-    const focusedTasks = filteredActiveTasks.filter(t => t.isFocusedToday);
+    const sortBySavedPerspective = useCallback((items: Task[]) => {
+        if (effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY) return items;
+        return sortTasksBySavedPreference(items, effectiveFocusSortBy, {
+            projects,
+            prioritizeByPriority: prioritiesEnabled,
+            sortOrder: activeSavedFilter?.sortOrder,
+        });
+    }, [activeSavedFilter?.sortOrder, effectiveFocusSortBy, prioritiesEnabled, projects]);
+
+    const focusedTasks = useMemo(() => (
+        sortBySavedPerspective(filteredActiveTasks.filter(t => t.isFocusedToday))
+    ), [filteredActiveTasks, sortBySavedPerspective]);
 
     // Categorize tasks
     const sections = useMemo(() => {
@@ -648,18 +686,43 @@ export function AgendaView() {
             return Number.POSITIVE_INFINITY;
         };
 
+        const sortSchedule = (items: Task[]) => (
+            effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY
+                ? sortWith(items, scheduleSortTime)
+                : sortBySavedPerspective(items)
+        );
+        const sortNextActions = (items: Task[]) => (
+            effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY
+                ? sortFocusNextActions(items, {
+                    now,
+                    prioritizeByPriority: prioritiesEnabled,
+                })
+                : sortBySavedPerspective(items)
+        );
+        const sortReviewDue = (items: Task[]) => (
+            effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY
+                ? sortWith(items, (task) => safeParseDate(task.reviewAt)?.getTime() ?? Number.POSITIVE_INFINITY)
+                : sortBySavedPerspective(items)
+        );
+
         return {
-            schedule: sortWith(schedule, scheduleSortTime),
-            nextActions: sortFocusNextActions(nextActions, {
-                now,
-                prioritizeByPriority: prioritiesEnabled,
-            }),
-            reviewDue: sortWith(reviewDue, (task) => safeParseDate(task.reviewAt)?.getTime() ?? Number.POSITIVE_INFINITY),
+            schedule: sortSchedule(schedule),
+            nextActions: sortNextActions(nextActions),
+            reviewDue: sortReviewDue(reviewDue),
         };
-    }, [baseActiveTasks, filteredActiveTasks, reviewDueCandidates, prioritiesEnabled, sequentialProjectIds, sequentialWithinSectionProjectIds]);
+    }, [
+        baseActiveTasks,
+        effectiveFocusSortBy,
+        filteredActiveTasks,
+        prioritiesEnabled,
+        reviewDueCandidates,
+        sequentialProjectIds,
+        sequentialWithinSectionProjectIds,
+        sortBySavedPerspective,
+    ]);
     const nextActionGroups = useMemo(() => {
-        if (nextGroupBy === 'none') return [] as TaskGroup[];
-        if (nextGroupBy === 'area') {
+        if (effectiveNextGroupBy === 'none') return [] as TaskGroup[];
+        if (effectiveNextGroupBy === 'area') {
             return groupTasksByArea({
                 areas,
                 tasks: sections.nextActions,
@@ -667,25 +730,32 @@ export function AgendaView() {
                 generalLabel: resolveText('settings.general', 'General'),
             });
         }
-        if (nextGroupBy === 'project') {
+        if (effectiveNextGroupBy === 'project') {
             return groupTasksByProject({
                 tasks: sections.nextActions,
                 projectMap,
                 noProjectLabel: resolveText('taskEdit.noProjectOption', 'No project'),
             });
         }
-        if (nextGroupBy === 'priority') {
+        if (effectiveNextGroupBy === 'priority') {
             return groupTasksByPriority({
                 tasks: sections.nextActions,
                 getPriorityLabel: (priority) => t(`priority.${priority}`),
                 noPriorityLabel: resolveText('focus.group.noPriority', 'No priority'),
             });
         }
+        if (effectiveNextGroupBy === 'energy') {
+            return groupTasksByEnergy({
+                tasks: sections.nextActions,
+                getEnergyLabel: (energy) => t(`energyLevel.${energy}`),
+                noEnergyLabel: resolveText('focus.group.noEnergy', 'No energy'),
+            });
+        }
         return groupTasksByContext({
             tasks: sections.nextActions,
             noContextLabel: resolveText('contexts.none', 'No context'),
         });
-    }, [areas, nextGroupBy, projectMap, resolveText, sections.nextActions, t]);
+    }, [areas, effectiveNextGroupBy, projectMap, resolveText, sections.nextActions, t]);
     const focusedCount = focusedTasks.length;
     const { top3Tasks, remainingCount } = useMemo(() => {
         const byId = new Map<string, Task>();
@@ -704,23 +774,25 @@ export function AgendaView() {
             const parsed = safeParseDueDate(value);
             return parsed ? parsed.getTime() : Number.POSITIVE_INFINITY;
         };
-        const sorted = [...candidates].sort((a, b) => {
-            if (prioritiesEnabled) {
-                const priorityDiff = (priorityRank[b.priority as TaskPriority] || 0) - (priorityRank[a.priority as TaskPriority] || 0);
-                if (priorityDiff !== 0) return priorityDiff;
-            }
-            const dueDiff = parseDue(a.dueDate) - parseDue(b.dueDate);
-            if (dueDiff !== 0) return dueDiff;
-            const aCreated = safeParseDate(a.createdAt)?.getTime() ?? 0;
-            const bCreated = safeParseDate(b.createdAt)?.getTime() ?? 0;
-            return aCreated - bCreated;
-        });
+        const sorted = effectiveFocusSortBy === DEFAULT_FOCUS_SORT_BY
+            ? [...candidates].sort((a, b) => {
+                if (prioritiesEnabled) {
+                    const priorityDiff = (priorityRank[b.priority as TaskPriority] || 0) - (priorityRank[a.priority as TaskPriority] || 0);
+                    if (priorityDiff !== 0) return priorityDiff;
+                }
+                const dueDiff = parseDue(a.dueDate) - parseDue(b.dueDate);
+                if (dueDiff !== 0) return dueDiff;
+                const aCreated = safeParseDate(a.createdAt)?.getTime() ?? 0;
+                const bCreated = safeParseDate(b.createdAt)?.getTime() ?? 0;
+                return aCreated - bCreated;
+            })
+            : sortBySavedPerspective(candidates);
         const top3 = sorted.slice(0, 3);
         return {
             top3Tasks: top3,
             remainingCount: Math.max(candidates.length - top3.length, 0),
         };
-    }, [sections, prioritiesEnabled]);
+    }, [effectiveFocusSortBy, sections, prioritiesEnabled, sortBySavedPerspective]);
 
     const handleToggleFocus = useCallback((taskId: string) => {
         const task = tasksById.get(taskId);
@@ -795,8 +867,8 @@ export function AgendaView() {
             <div className="space-y-6 w-full">
             <AgendaHeader
                 nextActionsCount={nextActionsCount}
-                nextGroupBy={nextGroupBy}
-                onChangeGroupBy={(value) => setListOptions({ nextGroupBy: value })}
+                nextGroupBy={effectiveNextGroupBy}
+                onChangeGroupBy={updateFocusGroupBy}
                 onToggleDetails={handleToggleDetails}
                 onToggleTop3={() => setListOptions({ focusTop3Only: !top3Only })}
                 resolveText={resolveText}
@@ -810,10 +882,10 @@ export function AgendaView() {
                     <button
                         type="button"
                         onClick={clearAllFilters}
-                        aria-pressed={!hasTaskFilters}
+                        aria-pressed={!hasTaskFilters && !activeSavedFilterId && focusSortBy === DEFAULT_FOCUS_SORT_BY}
                         className={cn(
                             'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                            !hasTaskFilters
+                            !hasTaskFilters && !activeSavedFilterId && focusSortBy === DEFAULT_FOCUS_SORT_BY
                                 ? 'border-primary bg-primary text-primary-foreground'
                                 : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
                         )}
@@ -861,8 +933,9 @@ export function AgendaView() {
             <AgendaFiltersPanel
                 allTokens={allTokens}
                 activeFilterChips={activeFilterChips}
-                canSaveFilter={hasCurrentFilterCriteria && activeSavedFilterId === null}
+                canSaveFilter={canSaveFocusPerspective}
                 energyLevelOptions={energyLevelOptions}
+                focusSortBy={effectiveFocusSortBy}
                 formatEstimate={formatEstimate}
                 hasFilters={hasFilters}
                 locationFilter={locationFilter}
@@ -870,6 +943,7 @@ export function AgendaView() {
                 onLocationChange={updateLocationFilter}
                 onSaveFilter={() => setSaveFilterPromptOpen(true)}
                 onSearchChange={setSearchQuery}
+                onSortChange={updateFocusSortBy}
                 onToggleEnergy={toggleEnergyFilter}
                 onToggleFiltersOpen={() => setFiltersOpen((prev) => !prev)}
                 onToggleProject={toggleProjectFilter}
@@ -1002,7 +1076,7 @@ export function AgendaView() {
                             </AgendaCollapsibleSection>
                         )}
 
-                        {nextGroupBy === 'none' ? (
+                        {effectiveNextGroupBy === 'none' ? (
                             sections.nextActions.length > 0 && (
                                 <AgendaCollapsibleSection
                                     title={t('agenda.nextActions')}

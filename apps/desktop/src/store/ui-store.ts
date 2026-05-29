@@ -2,7 +2,7 @@ import { createWithEqualityFn } from 'zustand/traditional';
 import type { TaskPriority, TimeEstimate } from '@mindwtr/core';
 
 const toastTimeouts = new Map<string, number>();
-type ListNextGroupBy = 'none' | 'context' | 'area' | 'project' | 'priority';
+type ListNextGroupBy = 'none' | 'context' | 'area' | 'project' | 'energy' | 'priority';
 type ListOptions = {
     showDetails: boolean;
     nextGroupBy: ListNextGroupBy;
@@ -18,7 +18,12 @@ const DEFAULT_LIST_OPTIONS: ListOptions = {
 };
 
 function isListNextGroupBy(value: unknown): value is ListNextGroupBy {
-    return value === 'none' || value === 'context' || value === 'area' || value === 'project' || value === 'priority';
+    return value === 'none'
+        || value === 'context'
+        || value === 'area'
+        || value === 'project'
+        || value === 'energy'
+        || value === 'priority';
 }
 
 function getListOptionsStorage(): Storage | null {

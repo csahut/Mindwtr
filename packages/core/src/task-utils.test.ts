@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     sortTasks,
     sortFocusNextActions,
+    sortTasksBySavedPreference,
     getStatusColor,
     getTaskAgeLabel,
     rescheduleTask,
@@ -115,6 +116,48 @@ describe('task-utils', () => {
             });
 
             expect(sorted.map((task) => task.id)).toEqual(['overdue', 'near', 'later']);
+        });
+    });
+
+    describe('sortTasksBySavedPreference', () => {
+        it('sorts start-date perspectives before priority and creation fallbacks', () => {
+            const sorted = sortTasksBySavedPreference([
+                {
+                    id: 'high-later',
+                    title: 'High later',
+                    status: 'next',
+                    priority: 'urgent',
+                    startTime: '2026-02-03T09:00:00.000Z',
+                    tags: [],
+                    contexts: [],
+                    createdAt: '2026-02-01T08:00:00.000Z',
+                    updatedAt: '2026-02-01T08:00:00.000Z',
+                },
+                {
+                    id: 'low-earlier',
+                    title: 'Low earlier',
+                    status: 'next',
+                    priority: 'low',
+                    startTime: '2026-02-02T09:00:00.000Z',
+                    tags: [],
+                    contexts: [],
+                    createdAt: '2026-02-01T07:00:00.000Z',
+                    updatedAt: '2026-02-01T07:00:00.000Z',
+                },
+                {
+                    id: 'high-same-start',
+                    title: 'High same start',
+                    status: 'next',
+                    priority: 'high',
+                    startTime: '2026-02-02T09:00:00.000Z',
+                    tags: [],
+                    contexts: [],
+                    createdAt: '2026-02-01T09:00:00.000Z',
+                    updatedAt: '2026-02-01T09:00:00.000Z',
+                },
+            ] as Task[], 'start', { prioritizeByPriority: true });
+
+            expect(sorted.map((task) => task.id)).toEqual(['high-same-start', 'low-earlier', 'high-later']);
         });
     });
 

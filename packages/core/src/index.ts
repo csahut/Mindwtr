@@ -207,6 +207,7 @@ export {
     sortFocusNextActions,
     sortTasks,
     sortTasksBy,
+    sortTasksBySavedPreference,
     STATUS_COLORS,
 } from './task-utils';
 export type {

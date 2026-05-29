@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS saved_filters (
   criteria TEXT NOT NULL,
   sortBy TEXT,
   sortOrder TEXT,
+  groupBy TEXT,
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL,
   deletedAt TEXT

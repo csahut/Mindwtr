@@ -251,6 +251,7 @@ export interface SavedFilter {
     criteria: FilterCriteria;
     sortBy?: SortField;
     sortOrder?: 'asc' | 'desc';
+    groupBy?: FocusGroupBy;
     createdAt: string;
     updatedAt: string;
     deletedAt?: string;

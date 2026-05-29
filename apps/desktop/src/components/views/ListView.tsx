@@ -21,7 +21,7 @@ import { reportError } from '../../lib/report-error';
 import { AREA_FILTER_ALL, AREA_FILTER_NONE, projectMatchesAreaFilter, resolveAreaFilter, taskMatchesAreaFilter } from '../../lib/area-filter';
 import { cn } from '../../lib/utils';
 import { sortDoneTasksForListView } from './list/done-sort';
-import { groupTasksByArea, groupTasksByContext, groupTasksByPriority, groupTasksByProject, type NextGroupBy, type TaskGroup } from './list/next-grouping';
+import { groupTasksByArea, groupTasksByContext, groupTasksByEnergy, groupTasksByPriority, groupTasksByProject, type NextGroupBy, type TaskGroup } from './list/next-grouping';
 import { useListSelection } from './list/useListSelection';
 import { StoreTaskItem } from './list/StoreTaskItem';
 import { LIST_VIRTUALIZATION_THRESHOLD, LIST_VIRTUAL_ROW_ESTIMATE, LIST_VIRTUAL_OVERSCAN } from './list/useVirtualList';
@@ -436,6 +436,13 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                 tasks: filteredTasks,
                 getPriorityLabel: (priority) => t(`priority.${priority}`),
                 noPriorityLabel: resolveText('focus.group.noPriority', 'No priority'),
+            });
+        }
+        if (activeNextGroupBy === 'energy') {
+            return groupTasksByEnergy({
+                tasks: filteredTasks,
+                getEnergyLabel: (energy) => t(`energyLevel.${energy}`),
+                noEnergyLabel: resolveText('focus.group.noEnergy', 'No energy'),
             });
         }
         return groupTasksByContext({

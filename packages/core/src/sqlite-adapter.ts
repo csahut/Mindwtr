@@ -587,13 +587,18 @@ export class SqliteAdapter {
               criteria TEXT NOT NULL,
               sortBy TEXT,
               sortOrder TEXT,
+              groupBy TEXT,
               createdAt TEXT NOT NULL,
               updatedAt TEXT NOT NULL,
               deletedAt TEXT
             )
         `);
         const columns = await this.client.all<{ name?: string }>('PRAGMA table_info(saved_filters)');
-        if (!new Set(columns.map((column) => column.name)).has('deletedAt')) {
+        const columnNames = new Set(columns.map((column) => column.name));
+        if (!columnNames.has('groupBy')) {
+            await this.client.run('ALTER TABLE saved_filters ADD COLUMN groupBy TEXT');
+        }
+        if (!columnNames.has('deletedAt')) {
             await this.client.run('ALTER TABLE saved_filters ADD COLUMN deletedAt TEXT');
         }
         await this.client.run('CREATE INDEX IF NOT EXISTS idx_saved_filters_view ON saved_filters(view)');
@@ -805,6 +810,7 @@ export class SqliteAdapter {
             criteria: fromJson<unknown>(row.criteria, {}),
             sortBy: row.sortBy,
             sortOrder: row.sortOrder,
+            groupBy: row.groupBy,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             deletedAt: row.deletedAt,
@@ -1300,6 +1306,7 @@ export class SqliteAdapter {
                     'criteria',
                     'sortBy',
                     'sortOrder',
+                    'groupBy',
                     'createdAt',
                     'updatedAt',
                     'deletedAt',
@@ -1312,6 +1319,7 @@ export class SqliteAdapter {
                     toJson(filter.criteria),
                     filter.sortBy ?? null,
                     filter.sortOrder ?? null,
+                    filter.groupBy ?? null,
                     filter.createdAt,
                     filter.updatedAt,
                     filter.deletedAt ?? null,
@@ -1322,6 +1330,7 @@ export class SqliteAdapter {
                  criteria=excluded.criteria,
                  sortBy=excluded.sortBy,
                  sortOrder=excluded.sortOrder,
+                 groupBy=excluded.groupBy,
                  createdAt=excluded.createdAt,
                  updatedAt=excluded.updatedAt,
                  deletedAt=excluded.deletedAt`,

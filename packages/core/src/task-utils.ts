@@ -2,7 +2,7 @@
  * Utility functions for task operations
  */
 
-import { Task, TaskStatus, TaskSortBy, TaskPriority, Project, AppData } from './types';
+import { Task, TaskStatus, TaskSortBy, TaskPriority, Project, AppData, SortField } from './types';
 import { isDueForReview, safeParseDate, safeParseDueDate } from './date';
 import { TASK_STATUS_ORDER } from './task-status';
 import type { Language } from './i18n/i18n-types';
@@ -29,6 +29,24 @@ const TASK_PRIORITY_SORT_RANK: Record<TaskPriority, number> = {
     medium: 2,
     high: 3,
     urgent: 4,
+};
+
+const TASK_ENERGY_SORT_RANK: Record<NonNullable<Task['energyLevel']>, number> = {
+    low: 1,
+    medium: 2,
+    high: 3,
+};
+
+const TIME_ESTIMATE_SORT_RANK: Record<NonNullable<Task['timeEstimate']>, number> = {
+    '5min': 5,
+    '10min': 10,
+    '15min': 15,
+    '30min': 30,
+    '1hr': 60,
+    '2hr': 120,
+    '3hr': 180,
+    '4hr': 240,
+    '4hr+': 241,
 };
 
 export const FOCUS_NEXT_DUE_SOON_WINDOW_DAYS = 30;
@@ -78,6 +96,12 @@ type SortFocusNextActionsOptions = {
     now?: Date;
     dueSoonWindowDays?: number;
     prioritizeByPriority?: boolean;
+};
+
+type SortTasksBySavedPreferenceOptions = {
+    projects?: readonly Project[];
+    prioritizeByPriority?: boolean;
+    sortOrder?: 'asc' | 'desc';
 };
 
 function getFocusNextActionBucket(
@@ -377,6 +401,98 @@ export function sortTasksBy(tasks: Task[], sortBy: TaskSortBy = 'default'): Task
         default:
             return sortTasks(tasks);
     }
+}
+
+export function sortTasksBySavedPreference<T extends Task>(
+    tasks: T[],
+    sortBy: SortField | undefined,
+    options: SortTasksBySavedPreferenceOptions = {},
+): T[] {
+    if (!sortBy || sortBy === 'default') {
+        return [...tasks];
+    }
+
+    const projectOrder = new Map<string, number>();
+    const projectTitle = new Map<string, string>();
+    [...(options.projects ?? [])]
+        .filter((project) => !project.deletedAt)
+        .sort((a, b) => {
+            const aOrder = Number.isFinite(a.order) ? (a.order as number) : Number.POSITIVE_INFINITY;
+            const bOrder = Number.isFinite(b.order) ? (b.order as number) : Number.POSITIVE_INFINITY;
+            if (aOrder !== bOrder) return aOrder - bOrder;
+            return a.title.localeCompare(b.title);
+        })
+        .forEach((project, index) => {
+            projectOrder.set(project.id, index);
+            projectTitle.set(project.id, project.title);
+        });
+
+    const direction = options.sortOrder === 'desc' ? -1 : 1;
+    const compare = (a: T, b: T): number => {
+        const byCreatedAsc = () => safeTime(a.createdAt, 0) - safeTime(b.createdAt, 0);
+        const byCreatedDesc = () => safeTime(b.createdAt, 0) - safeTime(a.createdAt, 0);
+        const byTitle = () => a.title.localeCompare(b.title);
+        const byId = () => a.id.localeCompare(b.id);
+        const byDue = () => safeDueTime(a.dueDate, Number.POSITIVE_INFINITY) - safeDueTime(b.dueDate, Number.POSITIVE_INFINITY);
+        const byStart = () => safeTime(a.startTime, Number.POSITIVE_INFINITY) - safeTime(b.startTime, Number.POSITIVE_INFINITY);
+        const byReview = () => safeTime(a.reviewAt, Number.POSITIVE_INFINITY) - safeTime(b.reviewAt, Number.POSITIVE_INFINITY);
+        const byUpdated = () => safeTime(b.updatedAt, 0) - safeTime(a.updatedAt, 0);
+        const byPriority = () => (TASK_PRIORITY_SORT_RANK[b.priority as TaskPriority] || 0)
+            - (TASK_PRIORITY_SORT_RANK[a.priority as TaskPriority] || 0);
+        const byEnergy = () => (TASK_ENERGY_SORT_RANK[b.energyLevel as NonNullable<Task['energyLevel']>] || 0)
+            - (TASK_ENERGY_SORT_RANK[a.energyLevel as NonNullable<Task['energyLevel']>] || 0);
+        const byTimeEstimate = () => (
+            TIME_ESTIMATE_SORT_RANK[a.timeEstimate as NonNullable<Task['timeEstimate']>] ?? Number.POSITIVE_INFINITY
+        ) - (
+            TIME_ESTIMATE_SORT_RANK[b.timeEstimate as NonNullable<Task['timeEstimate']>] ?? Number.POSITIVE_INFINITY
+        );
+        const byProject = () => {
+            const orderA = a.projectId ? (projectOrder.get(a.projectId) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+            const orderB = b.projectId ? (projectOrder.get(b.projectId) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+            if (orderA !== orderB) return orderA - orderB;
+            const titleA = a.projectId ? (projectTitle.get(a.projectId) ?? '') : '';
+            const titleB = b.projectId ? (projectTitle.get(b.projectId) ?? '') : '';
+            return titleA.localeCompare(titleB);
+        };
+        const withFallbacks = (...comparers: Array<() => number>) => {
+            for (const comparer of comparers) {
+                const result = comparer();
+                if (result !== 0) return result;
+            }
+            return byId();
+        };
+
+        switch (sortBy) {
+            case 'due':
+                return withFallbacks(byDue, byCreatedAsc);
+            case 'start':
+                return options.prioritizeByPriority
+                    ? withFallbacks(byStart, byPriority, byCreatedAsc)
+                    : withFallbacks(byStart, byCreatedAsc);
+            case 'review':
+                return withFallbacks(byReview, byCreatedAsc);
+            case 'title':
+                return withFallbacks(byTitle, byCreatedAsc);
+            case 'created':
+                return withFallbacks(byCreatedAsc);
+            case 'created-desc':
+                return withFallbacks(byCreatedDesc);
+            case 'priority':
+                return withFallbacks(byPriority, byDue, byStart, byCreatedAsc);
+            case 'energy':
+                return withFallbacks(byEnergy, byDue, byStart, byCreatedAsc);
+            case 'timeEstimate':
+                return withFallbacks(byTimeEstimate, byDue, byStart, byCreatedAsc);
+            case 'project':
+                return withFallbacks(byProject, byCreatedAsc);
+            case 'updated':
+                return withFallbacks(byUpdated, byCreatedAsc);
+            default:
+                return withFallbacks(byCreatedAsc);
+        }
+    };
+
+    return [...tasks].sort((a, b) => direction * compare(a, b));
 }
 
 export function sortFocusNextActions(tasks: Task[], options: SortFocusNextActionsOptions = {}): Task[] {

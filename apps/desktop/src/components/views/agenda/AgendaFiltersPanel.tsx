@@ -1,4 +1,4 @@
-import type { TaskEnergyLevel, TaskPriority, TimeEstimate } from '@mindwtr/core';
+import type { SortField, TaskEnergyLevel, TaskPriority, TimeEstimate } from '@mindwtr/core';
 import { Filter, Save, X } from 'lucide-react';
 
 import { cn } from '../../../lib/utils';
@@ -17,11 +17,14 @@ export type AgendaActiveFilterChip = {
     onRemove?: () => void;
 };
 
+const FOCUS_SORT_OPTIONS: SortField[] = ['default', 'due', 'start', 'priority', 'created', 'created-desc'];
+
 type AgendaFiltersPanelProps = {
     allTokens: string[];
     activeFilterChips: AgendaActiveFilterChip[];
     energyLevelOptions: TaskEnergyLevel[];
     formatEstimate: (estimate: TimeEstimate) => string;
+    focusSortBy: SortField;
     canSaveFilter: boolean;
     hasFilters: boolean;
     locationFilter: string;
@@ -29,6 +32,7 @@ type AgendaFiltersPanelProps = {
     onClearFilters: () => void;
     onLocationChange: (value: string) => void;
     onSearchChange: (value: string) => void;
+    onSortChange: (value: SortField) => void;
     onToggleEnergy: (energyLevel: TaskEnergyLevel) => void;
     onToggleFiltersOpen: () => void;
     onToggleProject: (projectId: string) => void;
@@ -57,12 +61,14 @@ export function AgendaFiltersPanel({
     activeFilterChips,
     energyLevelOptions,
     formatEstimate,
+    focusSortBy,
     canSaveFilter,
     hasFilters,
     locationFilter,
     onClearFilters,
     onLocationChange,
     onSearchChange,
+    onSortChange,
     onSaveFilter,
     onToggleEnergy,
     onToggleFiltersOpen,
@@ -167,6 +173,31 @@ export function AgendaFiltersPanel({
             )}
             {showFiltersPanel && (
                 <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">{t('sort.label')}</div>
+                        <div className="flex flex-wrap gap-2">
+                            {FOCUS_SORT_OPTIONS.map((sortBy) => {
+                                const isActive = focusSortBy === sortBy;
+                                const label = sortBy === 'priority' ? t('filters.priority') : t(`sort.${sortBy}`);
+                                return (
+                                    <button
+                                        key={sortBy}
+                                        type="button"
+                                        onClick={() => onSortChange(sortBy)}
+                                        aria-pressed={isActive}
+                                        className={cn(
+                                            'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                                            isActive
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                                        )}
+                                    >
+                                        {label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                     <div className="space-y-2">
                         <div className="text-xs uppercase tracking-wide text-muted-foreground">{t('filters.contexts')}</div>
                         <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto">

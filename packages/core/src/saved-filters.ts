@@ -17,6 +17,7 @@ import type {
     DateRange,
     FilterCriteria,
     FilterPriority,
+    FocusGroupBy,
     Project,
     SavedFilter,
     SavedFilterView,
@@ -42,6 +43,7 @@ const FILTER_PRIORITY_VALUES = new Set<FilterPriority>(['none', 'low', 'medium',
 const TASK_ENERGY_VALUES = new Set<TaskEnergyLevel>(['low', 'medium', 'high']);
 const TIME_ESTIMATE_VALUES = new Set<TimeEstimate>(['5min', '10min', '15min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+']);
 const SAVED_FILTER_VIEW_VALUES = new Set<SavedFilterView>(['focus', 'next', 'waiting', 'someday', 'contexts', 'all']);
+const FOCUS_GROUP_BY_VALUES = new Set<FocusGroupBy>(['none', 'context', 'project', 'area', 'energy', 'priority']);
 const SORT_FIELD_VALUES = new Set<SortField>([
     'default',
     'due',
@@ -358,6 +360,9 @@ export function normalizeSavedFilter(value: unknown): SavedFilter | null {
         ? value.sortBy as SortField
         : undefined;
     const sortOrder = value.sortOrder === 'asc' || value.sortOrder === 'desc' ? value.sortOrder : undefined;
+    const groupBy = typeof value.groupBy === 'string' && FOCUS_GROUP_BY_VALUES.has(value.groupBy as FocusGroupBy)
+        ? value.groupBy as FocusGroupBy
+        : undefined;
     const icon = typeof value.icon === 'string' && value.icon.trim() ? value.icon.trim() : undefined;
     const deletedAt = typeof value.deletedAt === 'string' && value.deletedAt.trim() ? value.deletedAt.trim() : undefined;
 
@@ -369,6 +374,7 @@ export function normalizeSavedFilter(value: unknown): SavedFilter | null {
         criteria: normalizeFilterCriteria(value.criteria),
         ...(sortBy ? { sortBy } : {}),
         ...(sortOrder ? { sortOrder } : {}),
+        ...(groupBy ? { groupBy } : {}),
         createdAt,
         updatedAt,
         ...(deletedAt ? { deletedAt } : {}),
