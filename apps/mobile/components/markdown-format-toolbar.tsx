@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+    Dimensions,
     Keyboard,
     Pressable,
     Platform,
@@ -21,6 +22,17 @@ import type { ThemeColors } from '@/hooks/use-theme-colors';
 import { KeyboardAccessoryPortal } from './keyboard-accessory-host';
 import { markdownFormatToolbarStyles as styles } from './markdown-format-toolbar.styles';
 
+const TOOLBAR_MIN_BUTTON_SIZE = 32;
+const TOOLBAR_MAX_BUTTON_SIZE = 40;
+const TOOLBAR_OUTER_PADDING = 16;
+const TOOLBAR_FIXED_CHROME = 18;
+const TOOLBAR_ACTION_GAP = 2;
+
+const getWindowWidth = () => {
+    const width = Dimensions.get('window').width;
+    return Number.isFinite(width) && width > 0 ? width : 390;
+};
+
 type MarkdownFormatToolbarProps = {
     selection: MarkdownSelection;
     onSelectionChange: (selection: MarkdownSelection) => void;
@@ -35,27 +47,33 @@ type MarkdownFormatToolbarProps = {
     placement?: 'keyboard' | 'inline';
 };
 
-const renderActionLabel = (actionId: MarkdownToolbarActionId, shortLabel: string, color: string) => {
+const renderActionLabel = (
+    actionId: MarkdownToolbarActionId,
+    shortLabel: string,
+    color: string,
+    iconSize: number,
+    fontSize: number,
+) => {
     switch (actionId) {
         case 'bulletList':
-            return <Ionicons name="list-outline" size={16} color={color} />;
+            return <Ionicons name="list-outline" size={iconSize} color={color} />;
         case 'orderedList':
-            return <Ionicons name="list-circle-outline" size={16} color={color} />;
+            return <Ionicons name="list-circle-outline" size={iconSize} color={color} />;
         case 'taskList':
-            return <Ionicons name="checkbox-outline" size={16} color={color} />;
+            return <Ionicons name="checkbox-outline" size={iconSize} color={color} />;
         case 'quote':
-            return <Ionicons name="chatbox-ellipses-outline" size={16} color={color} />;
+            return <Ionicons name="chatbox-ellipses-outline" size={iconSize} color={color} />;
         case 'link':
-            return <Ionicons name="link-outline" size={16} color={color} />;
+            return <Ionicons name="link-outline" size={iconSize} color={color} />;
         case 'code':
-            return <Ionicons name="code-slash-outline" size={16} color={color} />;
+            return <Ionicons name="code-slash-outline" size={iconSize} color={color} />;
         default:
             return (
                 <Text
                     style={[
                         styles.buttonText,
                         actionId === 'italic' ? styles.buttonTextItalic : null,
-                        { color },
+                        { color, fontSize },
                     ]}
                 >
                     {shortLabel}
@@ -77,8 +95,46 @@ export function MarkdownFormatToolbar({
     onInteractionStart,
     placement = 'keyboard',
 }: MarkdownFormatToolbarProps) {
+    const [windowWidth, setWindowWidth] = React.useState(getWindowWidth);
     const [keyboardInset, setKeyboardInset] = React.useState(0);
     const suppressPressUntilRef = React.useRef(0);
+
+    React.useEffect(() => {
+        const dimensions = Dimensions as typeof Dimensions & {
+            addEventListener?: (
+                type: 'change',
+                handler: (event: { window?: { width?: number } }) => void,
+            ) => { remove?: () => void } | undefined;
+        };
+        if (typeof dimensions.addEventListener !== 'function') return;
+        const subscription = dimensions.addEventListener('change', (event) => {
+            const nextWidth = event.window?.width;
+            if (Number.isFinite(nextWidth) && nextWidth > 0) {
+                setWindowWidth(nextWidth);
+            }
+        });
+        return () => {
+            subscription?.remove?.();
+        };
+    }, []);
+    const buttonSize = React.useMemo(() => {
+        const buttonCount = MARKDOWN_TOOLBAR_ACTIONS.length + 1;
+        const gapsWidth = TOOLBAR_ACTION_GAP * Math.max(0, MARKDOWN_TOOLBAR_ACTIONS.length - 1);
+        const availableWidth = Math.max(
+            0,
+            windowWidth - TOOLBAR_OUTER_PADDING - TOOLBAR_FIXED_CHROME - gapsWidth,
+        );
+        const fittedSize = Math.floor(availableWidth / buttonCount);
+        return Math.max(TOOLBAR_MIN_BUTTON_SIZE, Math.min(TOOLBAR_MAX_BUTTON_SIZE, fittedSize));
+    }, [windowWidth]);
+    const iconSize = Math.max(18, Math.min(22, Math.round(buttonSize * 0.58)));
+    const fontSize = Math.max(12, Math.min(14, Math.round(buttonSize * 0.36)));
+    const adaptiveButtonStyle = React.useMemo(() => ({
+        minHeight: buttonSize,
+        minWidth: buttonSize,
+        paddingHorizontal: 0,
+        width: buttonSize,
+    }), [buttonSize]);
 
     React.useEffect(() => {
         if (placement !== 'keyboard') return;
@@ -187,13 +243,14 @@ export function MarkdownFormatToolbar({
                         }}
                         style={({ pressed }) => [
                             styles.button,
+                            adaptiveButtonStyle,
                             { backgroundColor: pressed ? tc.filterBg : 'transparent' },
                         ]}
                         accessibilityRole="button"
                         accessibilityLabel={translateWithFallback(t, action.labelKey, action.fallbackLabel)}
                         hitSlop={8}
                     >
-                        {renderActionLabel(action.id, action.shortLabel, tc.text)}
+                        {renderActionLabel(action.id, action.shortLabel, tc.text, iconSize, fontSize)}
                     </Pressable>
                 ))}
             </ScrollView>
@@ -214,6 +271,7 @@ export function MarkdownFormatToolbar({
                     disabled={!canUndo}
                     style={({ pressed }) => [
                         styles.button,
+                        adaptiveButtonStyle,
                         !canUndo ? styles.buttonDisabled : null,
                         { backgroundColor: pressed ? tc.filterBg : 'transparent' },
                     ]}
@@ -221,7 +279,7 @@ export function MarkdownFormatToolbar({
                     accessibilityLabel={translateWithFallback(t, 'common.undo', 'Undo')}
                     hitSlop={8}
                 >
-                    <Ionicons name="arrow-undo-outline" size={18} color={tc.text} />
+                    <Ionicons name="arrow-undo-outline" size={iconSize} color={tc.text} />
                 </Pressable>
             </View>
         </View>

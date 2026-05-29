@@ -51,6 +51,23 @@ describe('MarkdownFormatToolbar', () => {
         expect(tree!.root.findAllByType(Pressable)).toHaveLength(MARKDOWN_TOOLBAR_ACTIONS.length + 1);
     });
 
+    it('sizes toolbar buttons adaptively above the compact minimum on phone-width screens', () => {
+        let tree: ReactTestRenderer | undefined;
+        act(() => {
+            tree = create(<MarkdownFormatToolbar {...baseProps} placement="inline" />);
+        });
+
+        const firstAction = tree!.root.findAllByType(Pressable)[0];
+        const styles = firstAction.props.style({ pressed: false });
+        const adaptiveStyle = styles.find((entry: Record<string, unknown> | null) => entry && entry.width);
+
+        expect(adaptiveStyle).toEqual(expect.objectContaining({
+            width: 34,
+            minHeight: 34,
+            minWidth: 34,
+        }));
+    });
+
     it('keeps keyboard placement hidden until the keyboard inset is known', () => {
         let tree: ReactTestRenderer | undefined;
         act(() => {
