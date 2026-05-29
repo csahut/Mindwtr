@@ -55,6 +55,13 @@ vi.mock('expo-router', () => ({
   },
 }));
 
+const flattenStyle = (style: any): Record<string, any> => {
+  if (Array.isArray(style)) {
+    return Object.assign({}, ...style.filter(Boolean).map(flattenStyle));
+  }
+  return style ?? {};
+};
+
 describe('ExpandedMarkdownEditor', () => {
   it('enables native spell checking in edit mode', () => {
     let tree: renderer.ReactTestRenderer;
@@ -128,6 +135,44 @@ describe('ExpandedMarkdownEditor', () => {
 
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(tree!.root.findByType(TextInput).props.value).toBe('read [docs]');
+
+    act(() => {
+      tree!.unmount();
+    });
+  });
+
+  it('keeps the fullscreen edit field tall when the keyboard toolbar is visible', () => {
+    let tree: renderer.ReactTestRenderer;
+
+    act(() => {
+      tree = renderer.create(
+        <ExpandedMarkdownEditor
+          isOpen
+          onClose={vi.fn()}
+          value={'1. List\n2. Hhh\n3.\n\n- list\njshs'}
+          onChange={vi.fn()}
+          title="Description"
+          headerTitle="Reserve PT SOS"
+          placeholder="Description"
+          t={(key) => key}
+          initialMode="edit"
+          selection={{ start: 0, end: 0 }}
+          onSelectionChange={vi.fn()}
+          canUndo={false}
+          onUndo={() => undefined}
+        />
+      );
+    });
+
+    const input = tree!.root.findByType(TextInput);
+
+    act(() => {
+      input.props.onFocus();
+    });
+
+    const editSurfaceStyle = flattenStyle(input.parent?.props.style);
+
+    expect(editSurfaceStyle.paddingBottom).toBe(64);
 
     act(() => {
       tree!.unmount();
