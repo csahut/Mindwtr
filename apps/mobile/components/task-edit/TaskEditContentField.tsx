@@ -173,31 +173,34 @@ export function TaskEditContentField({
         case 'attachments':
             return (
                 <View style={styles.formGroup}>
-                    <View style={styles.inlineHeader}>
+                    <View style={styles.attachmentHeader}>
                         <Text style={[styles.label, { color: tc.secondaryText }]}>{t('attachments.title')}</Text>
-                        <View style={styles.inlineActions}>
-                            <TouchableOpacity
-                                onPress={addFileAttachment}
-                                style={[styles.smallButton, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
-                            >
-                                <Text style={[styles.smallButtonText, { color: tc.tint }]}>{t('attachments.addFile')}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={addImageAttachment}
-                                style={[styles.smallButton, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
-                            >
-                                <Text style={[styles.smallButtonText, { color: tc.tint }]}>{t('attachments.addPhoto')}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setLinkInputTouched(false);
-                                    setLinkModalVisible(true);
-                                }}
-                                style={[styles.smallButton, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
-                            >
-                                <Text style={[styles.smallButtonText, { color: tc.tint }]}>{t('attachments.addLink')}</Text>
-                            </TouchableOpacity>
-                        </View>
+                    </View>
+                    <View style={styles.attachmentActions}>
+                        <TouchableOpacity
+                            onPress={addFileAttachment}
+                            style={[styles.attachmentButton, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
+                        >
+                            <Ionicons name="document-attach-outline" size={16} color={tc.tint} />
+                            <Text style={[styles.attachmentButtonText, { color: tc.tint }]} numberOfLines={1}>{t('attachments.addFile')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={addImageAttachment}
+                            style={[styles.attachmentButton, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
+                        >
+                            <Ionicons name="image-outline" size={16} color={tc.tint} />
+                            <Text style={[styles.attachmentButtonText, { color: tc.tint }]} numberOfLines={1}>{t('attachments.addPhoto')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => {
+                                setLinkInputTouched(false);
+                                setLinkModalVisible(true);
+                            }}
+                            style={[styles.attachmentButton, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
+                        >
+                            <Ionicons name="link-outline" size={16} color={tc.tint} />
+                            <Text style={[styles.attachmentButtonText, { color: tc.tint }]} numberOfLines={1}>{t('attachments.addLink')}</Text>
+                        </TouchableOpacity>
                     </View>
                     {visibleAttachments.length === 0 ? (
                         <Text style={[styles.helperText, { color: tc.secondaryText }]}>{t('common.none')}</Text>

@@ -331,6 +331,32 @@ export const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
     },
+    attachmentHeader: {
+        marginBottom: 8,
+    },
+    attachmentActions: {
+        flexDirection: 'row',
+        gap: 8,
+        marginBottom: 10,
+    },
+    attachmentButton: {
+        flex: 1,
+        minWidth: 0,
+        minHeight: 44,
+        paddingHorizontal: 8,
+        paddingVertical: 9,
+        borderRadius: 8,
+        borderWidth: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 5,
+    },
+    attachmentButtonText: {
+        flexShrink: 1,
+        fontSize: 12,
+        fontWeight: '700',
+    },
     markdownPreview: {
         marginTop: 8,
         padding: 12,
