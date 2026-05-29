@@ -1,8 +1,8 @@
 import React from 'react';
-import { Pressable, ScrollView } from 'react-native';
+import { Dimensions, Keyboard, Platform, Pressable, ScrollView } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { MARKDOWN_TOOLBAR_ACTIONS } from '@mindwtr/core';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MarkdownFormatToolbar } from './markdown-format-toolbar';
 
@@ -42,7 +42,37 @@ const baseProps = {
     onApplyAction: vi.fn(() => ({ value: '', selection: { start: 0, end: 0 } })),
 };
 
+const originalPlatformOs = Platform.OS;
+
+const setPlatform = (os: typeof Platform.OS) => {
+    Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: os,
+    });
+};
+
+const extractFloatingBarBottom = (tree: ReactTestRenderer) => {
+    const toolbarBars = tree.root.findAll((node) => (
+        Array.isArray(node.props.style)
+        && node.props.style.some((entry: Record<string, unknown> | null) => (
+            entry && typeof entry === 'object' && 'bottom' in entry
+        ))
+    ));
+    const styleWithBottom = toolbarBars[0]?.props.style.find((entry: Record<string, unknown> | null) => (
+        entry && typeof entry === 'object' && 'bottom' in entry
+    ));
+    return styleWithBottom?.bottom;
+};
+
 describe('MarkdownFormatToolbar', () => {
+    afterEach(() => {
+        Object.defineProperty(Platform, 'OS', {
+            configurable: true,
+            value: originalPlatformOs,
+        });
+        vi.restoreAllMocks();
+    });
+
     it('renders inline without waiting for keyboard metrics', () => {
         let tree: ReactTestRenderer | undefined;
         act(() => {
@@ -83,13 +113,68 @@ describe('MarkdownFormatToolbar', () => {
         expect(italicIcons[0].props.size).toBe(13);
     });
 
-    it('keeps keyboard placement hidden until the keyboard inset is known', () => {
+    it('renders keyboard placement immediately when the input is focused', () => {
         let tree: ReactTestRenderer | undefined;
         act(() => {
             tree = create(<MarkdownFormatToolbar {...baseProps} />);
         });
 
-        expect(tree!.root.findAllByType(Pressable)).toHaveLength(0);
+        expect(tree!.root.findAllByType(Pressable)).toHaveLength(MARKDOWN_TOOLBAR_ACTIONS.length + 1);
+        expect(extractFloatingBarBottom(tree!)).toBe(0);
+    });
+
+    it('uses the keyboard height on Android when the release window is not resized', () => {
+        setPlatform('android');
+        vi.spyOn(Dimensions, 'get').mockReturnValue({
+            width: 390,
+            height: 844,
+            scale: 3,
+            fontScale: 1,
+        });
+        const listeners = new Map<string, (event?: unknown) => void>();
+        vi.spyOn(Keyboard, 'addListener').mockImplementation(((eventName: string, listener: (event?: unknown) => void) => {
+            listeners.set(eventName, listener);
+            return { remove: () => listeners.delete(eventName) };
+        }) as any);
+
+        let tree: ReactTestRenderer | undefined;
+        act(() => {
+            tree = create(<MarkdownFormatToolbar {...baseProps} />);
+        });
+
+        act(() => {
+            listeners.get('keyboardDidShow')?.({ endCoordinates: { height: 320, screenY: 524 } });
+        });
+
+        expect(extractFloatingBarBottom(tree!)).toBe(320);
+    });
+
+    it('keeps Android toolbar at the resized window edge when the root is already above the keyboard', () => {
+        setPlatform('android');
+        let windowHeight = 844;
+        vi.spyOn(Dimensions, 'get').mockImplementation(((dimension: string) => ({
+            width: 390,
+            height: dimension === 'window' ? windowHeight : 844,
+            scale: 3,
+            fontScale: 1,
+        })) as any);
+        const listeners = new Map<string, (event?: unknown) => void>();
+        vi.spyOn(Keyboard, 'addListener').mockImplementation(((eventName: string, listener: (event?: unknown) => void) => {
+            listeners.set(eventName, listener);
+            return { remove: () => listeners.delete(eventName) };
+        }) as any);
+
+        let tree: ReactTestRenderer | undefined;
+        act(() => {
+            tree = create(<MarkdownFormatToolbar {...baseProps} />);
+        });
+
+        windowHeight = 524;
+        act(() => {
+            listeners.get('keyboardDidShow')?.({ endCoordinates: { height: 320, screenY: 524 } });
+        });
+
+        expect(extractFloatingBarBottom(tree!)).toBe(0);
     });
 
     it('applies toolbar actions on tap release so horizontal drags do not format text', () => {

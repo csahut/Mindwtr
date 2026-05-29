@@ -27,6 +27,7 @@ const TOOLBAR_MAX_BUTTON_SIZE = 40;
 const TOOLBAR_OUTER_PADDING = 16;
 const TOOLBAR_FIXED_CHROME = 18;
 const TOOLBAR_ACTION_GAP = 2;
+const MIN_RESIZED_WINDOW_DELTA = 48;
 
 const getWindowWidth = () => {
     const width = Dimensions.get('window').width;
@@ -97,7 +98,8 @@ export function MarkdownFormatToolbar({
     placement = 'keyboard',
 }: MarkdownFormatToolbarProps) {
     const [windowWidth, setWindowWidth] = React.useState(getWindowWidth);
-    const [keyboardInset, setKeyboardInset] = React.useState(0);
+    const [toolbarBottomOffset, setToolbarBottomOffset] = React.useState(0);
+    const baselineWindowHeightRef = React.useRef(Dimensions.get('window').height);
     const suppressPressUntilRef = React.useRef(0);
 
     React.useEffect(() => {
@@ -143,16 +145,38 @@ export function MarkdownFormatToolbar({
 
         const updateKeyboardInset = (event: { endCoordinates?: { screenY?: number; height?: number } }) => {
             const metrics = typeof Keyboard.metrics === 'function' ? Keyboard.metrics() : undefined;
+            const windowHeight = Dimensions.get('window').height;
+            const screenHeight = Dimensions.get('screen').height;
             const explicitInset = typeof event.endCoordinates?.height === 'number'
                 ? Math.max(0, event.endCoordinates.height)
                 : 0;
             const measuredInset = typeof metrics?.height === 'number'
                 ? Math.max(0, metrics.height)
                 : 0;
-            setKeyboardInset(measuredInset || explicitInset);
+            const eventScreenY = typeof event.endCoordinates?.screenY === 'number'
+                ? event.endCoordinates.screenY
+                : undefined;
+            const metricsScreenY = typeof metrics?.screenY === 'number'
+                ? metrics.screenY
+                : undefined;
+            const keyboardTop = eventScreenY ?? metricsScreenY;
+            const screenInset = typeof keyboardTop === 'number'
+                ? Math.max(0, screenHeight - keyboardTop)
+                : 0;
+            const keyboardInset = measuredInset || explicitInset || screenInset;
+
+            baselineWindowHeightRef.current = Math.max(baselineWindowHeightRef.current, windowHeight);
+            const resizedWindowDelta = Math.max(0, baselineWindowHeightRef.current - windowHeight);
+            const isWindowAlreadyAboveKeyboard = Platform.OS === 'android'
+                && resizedWindowDelta >= Math.max(MIN_RESIZED_WINDOW_DELTA, keyboardInset * 0.5);
+
+            setToolbarBottomOffset(isWindowAlreadyAboveKeyboard ? 0 : keyboardInset);
         };
 
-        const resetKeyboardInset = () => setKeyboardInset(0);
+        const resetKeyboardInset = () => {
+            baselineWindowHeightRef.current = Dimensions.get('window').height;
+            setToolbarBottomOffset(0);
+        };
 
         const showListener = Keyboard.addListener('keyboardDidShow', updateKeyboardInset);
         const changeListener = Keyboard.addListener('keyboardDidChangeFrame', updateKeyboardInset);
@@ -302,12 +326,6 @@ export function MarkdownFormatToolbar({
         );
     }
 
-    if (keyboardInset <= 0) {
-        return null;
-    }
-
-    const toolbarBottom = Platform.OS === 'android' ? 0 : keyboardInset;
-
     return (
         <KeyboardAccessoryPortal>
             <View pointerEvents="box-none" style={styles.overlay}>
@@ -315,7 +333,7 @@ export function MarkdownFormatToolbar({
                     style={[
                         styles.floatingBar,
                         {
-                            bottom: toolbarBottom,
+                            bottom: toolbarBottomOffset,
                             backgroundColor: tc.bg,
                             borderTopColor: tc.border,
                         },
