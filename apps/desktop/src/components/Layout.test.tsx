@@ -124,8 +124,11 @@ describe('Layout Obsidian nav visibility', () => {
         const quickAddListener = vi.fn();
         window.addEventListener('mindwtr:quick-add', quickAddListener);
         const { getByRole } = renderLayout();
+        const addTaskButton = getByRole('button', { name: 'Add Task (Inbox)' });
 
-        fireEvent.click(getByRole('button', { name: 'Add Task' }));
+        expect(addTaskButton).toHaveAttribute('title', 'Add Task (Inbox)');
+
+        fireEvent.click(addTaskButton);
 
         expect(quickAddListener).toHaveBeenCalledTimes(1);
         expect(quickAddListener.mock.calls[0][0]).toMatchObject({
