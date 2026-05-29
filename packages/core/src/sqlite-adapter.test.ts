@@ -689,6 +689,7 @@ describeSqlite('SqliteAdapter', () => {
             'criteria',
             'sortBy',
             'sortOrder',
+            'groupBy',
             'createdAt',
             'updatedAt',
             'deletedAt',
