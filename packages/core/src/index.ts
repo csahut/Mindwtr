@@ -470,6 +470,7 @@ export {
     continueMarkdownOnTextChange,
     extractChecklistFromMarkdown,
     getActiveMarkdownReferenceQuery,
+    getInlineMarkdownPreview,
     insertMarkdownReferenceAtQuery,
     MARKDOWN_TOOLBAR_ACTIONS,
     normalizeMarkdownInternalLinks,

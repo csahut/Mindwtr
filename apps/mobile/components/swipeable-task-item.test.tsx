@@ -106,14 +106,28 @@ vi.mock('@mindwtr/core', () => {
     getStatusColor: () => ({ bg: '#111111', border: '#222222', text: '#333333' }),
     hasTimeComponent: () => false,
     normalizeFocusTaskLimit: (value?: number) => value ?? 3,
+    getInlineMarkdownPreview: (text: string) => {
+      const line = text.replace(/\r\n/g, '\n').split('\n').find((candidate) => candidate.trim()) ?? '';
+      return line.replace(/^\s{0,3}(?:(?:[-*+]\s+)?\[(?: |x|X)\]\s+|>\s?|#{1,6}\s+|[-*+]\s+|\d+[.)]\s+)/, '').trim();
+    },
     parseInlineMarkdown: (text: string) => {
-      const tokens: Array<{ type: string; text: string }> = [];
-      const regex = /\*\*(.*?)\*\*/g;
+      const tokens: Array<{ type: string; text: string; href?: string }> = [];
+      const regex = /(\*\*([^*]+)\*\*|__([^_]+)__|~~([^~\n]+)~~|\*([^*\n]+)\*|_([^_\n]+)_|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/g;
       let lastIndex = 0;
       let match: RegExpExecArray | null;
       while ((match = regex.exec(text)) !== null) {
         if (match.index > lastIndex) tokens.push({ type: 'text', text: text.slice(lastIndex, match.index) });
-        tokens.push({ type: 'bold', text: match[1] });
+        if (match[7]) {
+          tokens.push({ type: 'code', text: match[7] });
+        } else if (match[2] || match[3]) {
+          tokens.push({ type: 'bold', text: match[2] || match[3] });
+        } else if (match[4]) {
+          tokens.push({ type: 'strike', text: match[4] });
+        } else if (match[5] || match[6]) {
+          tokens.push({ type: 'italic', text: match[5] || match[6] });
+        } else if (match[8] && match[9]) {
+          tokens.push({ type: 'link', text: match[8], href: match[9] });
+        }
         lastIndex = regex.lastIndex;
       }
       if (lastIndex < text.length) tokens.push({ type: 'text', text: text.slice(lastIndex) });
@@ -413,7 +427,7 @@ describe('SwipeableTaskItem', () => {
     expect(hasText(tree, '2 days old')).toBe(true);
   });
 
-  it('renders compact description markdown without raw emphasis markers', () => {
+  it('renders compact description markdown without raw block or inline markers', () => {
     let tree!: renderer.ReactTestRenderer;
     renderer.act(() => {
       tree = renderer.create(
@@ -421,7 +435,7 @@ describe('SwipeableTaskItem', () => {
           task={{
             id: 'task-1',
             title: 'Prepare notes',
-            description: 'Review **draft** notes',
+            description: '# Review **draft** [spec](https://example.com)',
             status: 'inbox',
             createdAt: '2026-01-01T00:00:00.000Z',
             updatedAt: '2026-01-01T00:00:00.000Z',
@@ -445,8 +459,10 @@ describe('SwipeableTaskItem', () => {
     });
 
     const renderedText = flattenText(tree.toJSON());
-    expect(renderedText).toContain('Review draft notes');
+    expect(renderedText).toContain('Review draft spec');
+    expect(renderedText).not.toContain('# Review');
     expect(renderedText).not.toContain('**draft**');
+    expect(renderedText).not.toContain('](');
   });
 
   it('shows the completion date and time for completed tasks', () => {

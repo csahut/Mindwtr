@@ -7,6 +7,7 @@ import {
     applyMarkdownUrlPaste,
     continueMarkdownOnEnter,
     continueMarkdownOnTextChange,
+    getInlineMarkdownPreview,
     parseInlineMarkdown,
 } from './markdown';
 
@@ -161,6 +162,18 @@ describe('parseInlineMarkdown', () => {
             { type: 'strike', text: 'drop' },
             { type: 'text', text: ' done' },
         ]);
+    });
+});
+
+describe('getInlineMarkdownPreview', () => {
+    it('removes block prefixes while preserving inline markdown tokens', () => {
+        expect(getInlineMarkdownPreview('# Heading **draft** [spec](https://example.com)')).toBe('Heading **draft** [spec](https://example.com)');
+        expect(getInlineMarkdownPreview('- [x] ~~Done~~ item')).toBe('~~Done~~ item');
+        expect(getInlineMarkdownPreview('> `Quoted` note')).toBe('`Quoted` note');
+    });
+
+    it('uses the first useful content line', () => {
+        expect(getInlineMarkdownPreview('\n---\n```ts\nconst value = 1;\n```')).toBe('const value = 1;');
     });
 });
 

@@ -16,6 +16,8 @@ const INTERNAL_LINK_TOKEN_RE = /^\[\[(task|project):([^\]|]+)\|([^\]]+)\]\]$/;
 const TASK_LIST_RE = /^\s{0,3}(?:[-*+]\s+)?\[( |x|X)\]\s+(.+)$/;
 const TASK_LIST_LINE_RE = /^(\s{0,3}(?:[-*+]\s+)?)\[( |x|X)\](\s+)(.+)$/;
 const MARKDOWN_LIST_ITEM_RE = /^(\s*)(?:(?:[-+*])\s+(?:\[(?: |x|X)\]\s*)?|\d+[.)]\s+)(?:\S|$)/;
+const MARKDOWN_PREVIEW_PREFIX_RE = /^\s{0,3}(?:(?:[-*+]\s+)?\[(?: |x|X)\]\s+|>\s?|#{1,6}\s+|[-*+]\s+|\d+[.)]\s+)/;
+const MARKDOWN_PREVIEW_SKIP_LINE_RE = /^\s*(?:```.*|[-*_]{3,})\s*$/;
 
 export type InlineToken =
     | { type: 'text'; text: string }
@@ -381,6 +383,19 @@ export function parseInlineMarkdown(text: string): InlineToken[] {
     }
 
     return tokens;
+}
+
+export function getInlineMarkdownPreview(markdown: string): string {
+    if (!markdown) return '';
+
+    const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+    for (const line of lines) {
+        if (!line.trim() || MARKDOWN_PREVIEW_SKIP_LINE_RE.test(line)) continue;
+        const preview = line.replace(MARKDOWN_PREVIEW_PREFIX_RE, '').trim();
+        if (preview) return preview;
+    }
+
+    return '';
 }
 
 export function stripMarkdown(markdown: string): string {

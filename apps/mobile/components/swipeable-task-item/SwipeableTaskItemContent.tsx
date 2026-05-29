@@ -1,6 +1,7 @@
 import React, { type ReactNode, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
+    getInlineMarkdownPreview,
     getTaskAgeLabel,
     getStatusColor,
     hasTimeComponent,
@@ -126,6 +127,10 @@ export function SwipeableTaskItemContent({
         && task.status !== 'reference'
         && !!ageLabel;
     const statusColors = getStatusColor(task.status);
+    const descriptionPreview = useMemo(
+        () => getInlineMarkdownPreview(task.description ?? ''),
+        [task.description],
+    );
     const metaParts: ReactNode[] = [];
     const canNavigateMeta = !selectionMode;
 
@@ -348,15 +353,15 @@ export function SwipeableTaskItemContent({
                         </Pressable>
                     )}
                 </View>
-                {task.description && (
+                {descriptionPreview ? (
                     <MarkdownInlineText
-                        markdown={task.description}
+                        markdown={descriptionPreview}
                         tc={tc}
                         direction={textDirection}
                         style={[styles.taskDescription, { color: tc.secondaryText }]}
                         numberOfLines={1}
                     />
-                )}
+                ) : null}
                 {metaParts.length > 0 && (
                     <View style={styles.inlineMeta}>
                         {metaParts}
