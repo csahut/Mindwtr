@@ -645,6 +645,22 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
         });
     });
 
+    it('wraps selected description text when a tilde key press is intercepted', async () => {
+        const { getByRole } = render(<DescriptionHarness />);
+        const textarea = getByRole('textbox', { name: 'Description' }) as HTMLTextAreaElement;
+
+        fireEvent.change(textarea, { target: { value: 'drop this' } });
+        textarea.setSelectionRange(0, 9);
+        fireEvent.select(textarea);
+        fireEvent.keyDown(textarea, { key: '~' });
+
+        await waitFor(() => {
+            expect(textarea).toHaveValue('~~drop this~~');
+            expect(textarea.selectionStart).toBe(2);
+            expect(textarea.selectionEnd).toBe(11);
+        });
+    });
+
     it('wraps selected description text when native input replaces it with a backtick', async () => {
         const { getByRole } = render(<DescriptionHarness />);
         const textarea = getByRole('textbox', { name: 'Description' }) as HTMLTextAreaElement;
@@ -658,6 +674,22 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
             expect(textarea).toHaveValue('`run tests`');
             expect(textarea.selectionStart).toBe(1);
             expect(textarea.selectionEnd).toBe(10);
+        });
+    });
+
+    it('wraps selected description text when native input replaces it with a tilde', async () => {
+        const { getByRole } = render(<DescriptionHarness />);
+        const textarea = getByRole('textbox', { name: 'Description' }) as HTMLTextAreaElement;
+
+        fireEvent.change(textarea, { target: { value: 'drop this' } });
+        textarea.setSelectionRange(0, 9);
+        fireEvent.select(textarea);
+        fireEvent.change(textarea, { target: { value: '~' } });
+
+        await waitFor(() => {
+            expect(textarea).toHaveValue('~~drop this~~');
+            expect(textarea.selectionStart).toBe(2);
+            expect(textarea.selectionEnd).toBe(11);
         });
     });
 

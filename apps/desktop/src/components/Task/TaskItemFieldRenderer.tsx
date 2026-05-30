@@ -789,7 +789,7 @@ export function TaskItemFieldRenderer({
                 && !event.altKey
                 && !event.ctrlKey
                 && !event.metaKey
-                && ['[', '(', '{', '`'].includes(event.key)
+                && ['[', '(', '{', '`', '~'].includes(event.key)
             )
         ) {
             const next = event.key === 'Tab'
