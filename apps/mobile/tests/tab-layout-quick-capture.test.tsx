@@ -3,6 +3,7 @@ import { TouchableOpacity } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import Index from '../app/index';
 import TabLayout from '../app/(drawer)/(tabs)/_layout';
 
 const mockRouterPush = vi.hoisted(() => vi.fn());
@@ -15,15 +16,18 @@ const mockTaskSettings = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-router', () => {
+  function RedirectMock(props: { href: string }) {
+    return React.createElement('Redirect', props);
+  }
   function LinkMock({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
   function TabsScreenMock() {
     return null;
   }
-  const Tabs = ({ children, tabBar }: any) => React.createElement(
+  const Tabs = ({ children, tabBar, ...props }: any) => React.createElement(
     'Tabs',
-    null,
+    props,
     tabBar({
       state: {
         index: 0,
@@ -59,6 +63,7 @@ vi.mock('expo-router', () => {
   Tabs.Screen = TabsScreenMock;
   return {
     Link: LinkMock,
+    Redirect: RedirectMock,
     Tabs,
     useRouter: () => ({ push: mockRouterPush }),
   };
@@ -305,6 +310,28 @@ describe('mobile tab quick capture', () => {
     sheets = getQuickCaptureSheets(tree);
     expect(sheets).toHaveLength(1);
     expect(sheets[0]?.props.visible).toBe(true);
+  });
+
+  it('defaults cold tab startup to Focus', () => {
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<TabLayout />);
+    });
+
+    const tabs = tree.root.find((node) => String(node.type) === 'Tabs');
+    expect(tabs.props.initialRouteName).toBe('focus');
+  });
+
+  it('redirects root cold launch to Focus', () => {
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<Index />);
+    });
+
+    const redirect = tree.root.find((node) => String(node.type) === 'Redirect');
+    expect(redirect.props.href).toBe('/focus');
   });
 
   it('increments the open request id without key-remounting the sheet', () => {

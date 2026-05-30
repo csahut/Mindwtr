@@ -590,7 +590,7 @@ export default function TabLayout() {
   return (
     <QuickCaptureProvider value={{ openQuickCapture }}>
       <Tabs
-        initialRouteName="inbox"
+        initialRouteName="focus"
         tabBar={(props) => (
           <NativeTabBar
             {...props}

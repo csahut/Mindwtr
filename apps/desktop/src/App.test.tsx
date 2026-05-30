@@ -22,9 +22,9 @@ Object.defineProperty(window, 'electronAPI', {
 });
 
 describe('App', () => {
-    it('renders Inbox by default', () => {
+    it('renders Focus by default', () => {
         const { getByRole } = renderWithProviders(<App />);
-        expect(getByRole('heading', { name: 'Inbox' })).toBeInTheDocument();
+        expect(getByRole('heading', { name: 'Focus' })).toBeInTheDocument();
     });
 
     it('renders Sidebar navigation', () => {

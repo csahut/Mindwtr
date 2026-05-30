@@ -64,9 +64,11 @@ const SettingsView = lazy(wrapSettingsOpenImport(
     () => import('./components/views/SettingsView').then((m) => ({ default: m.SettingsView }))
 ));
 
+const DEFAULT_DESKTOP_VIEW = 'agenda';
+
 function App() {
-    const [currentView, setCurrentView] = useState('inbox');
-    const [activeView, setActiveView] = useState('inbox');
+    const [currentView, setCurrentView] = useState(DEFAULT_DESKTOP_VIEW);
+    const [activeView, setActiveView] = useState(DEFAULT_DESKTOP_VIEW);
     const [, startTransition] = useTransition();
     const fetchData = useTaskStore((state) => state.fetchData);
     const isLoading = useTaskStore((state) => state.isLoading);
