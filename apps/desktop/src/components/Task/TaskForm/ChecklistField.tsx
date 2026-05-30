@@ -1,6 +1,13 @@
 import { Check, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { generateUUID, type Task } from '@mindwtr/core';
+import {
+    applyMarkdownKeyboardShortcut,
+    applyMarkdownPairInsertion,
+    generateUUID,
+    type MarkdownSelection,
+    type MarkdownToolbarResult,
+    type Task,
+} from '@mindwtr/core';
 import { cn } from '../../../lib/utils';
 import {
     captureScrollSnapshot,
@@ -43,6 +50,7 @@ export function ChecklistField({
     const checklistDraftRef = useRef<Task['checklist']>(checklist || []);
     const checklistDirtyRef = useRef(false);
     const checklistInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+    const checklistSelectionRefs = useRef<Array<MarkdownSelection>>([]);
 
     useEffect(() => {
         setChecklistDraft(checklist || []);
@@ -52,6 +60,7 @@ export function ChecklistField({
 
     useEffect(() => {
         checklistInputRefs.current = [];
+        checklistSelectionRefs.current = [];
     }, [taskId]);
 
     useEffect(() => {
@@ -94,6 +103,39 @@ export function ChecklistField({
         });
     }, []);
 
+    const getInputSelection = useCallback((input: HTMLInputElement): MarkdownSelection => ({
+        start: input.selectionStart ?? input.value.length,
+        end: input.selectionEnd ?? input.value.length,
+    }), []);
+
+    const restoreInputSelection = useCallback((input: HTMLInputElement, selection: MarkdownSelection) => {
+        const applySelection = () => {
+            input.setSelectionRange(selection.start, selection.end);
+        };
+        if (typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(applySelection);
+        } else {
+            window.setTimeout(applySelection, 0);
+        }
+    }, []);
+
+    const updateChecklistItemTitle = useCallback((index: number, title: string) => {
+        const nextList = (checklistDraftRef.current || []).map((entry, i) =>
+            i === index ? { ...entry, title } : entry
+        );
+        updateChecklistDraft(nextList);
+    }, [updateChecklistDraft]);
+
+    const applyChecklistMarkdownResult = useCallback((
+        index: number,
+        result: MarkdownToolbarResult,
+        source: HTMLInputElement,
+    ) => {
+        updateChecklistItemTitle(index, result.value);
+        checklistSelectionRefs.current[index] = result.selection;
+        restoreInputSelection(source, result.selection);
+    }, [restoreInputSelection, updateChecklistItemTitle]);
+
     return (
         <div className="flex flex-col gap-2 w-full pt-2 border-t border-border/50">
             <label className="text-xs text-muted-foreground font-medium">{t('taskEdit.checklist')}</label>
@@ -127,15 +169,60 @@ export function ChecklistField({
                                 checklistInputRefs.current[index] = node;
                             }}
                             onChange={(event) => {
-                                const newList = (checklistDraft || []).map((entry, i) =>
-                                    i === index ? { ...entry, title: event.target.value } : entry
+                                const previousSelection = checklistSelectionRefs.current[index]
+                                    ?? getInputSelection(event.currentTarget);
+                                const pairedInsertion = applyMarkdownPairInsertion(
+                                    item.title,
+                                    event.target.value,
+                                    previousSelection,
                                 );
-                                updateChecklistDraft(newList);
+                                if (pairedInsertion) {
+                                    applyChecklistMarkdownResult(index, pairedInsertion, event.currentTarget);
+                                    return;
+                                }
+                                updateChecklistItemTitle(index, event.target.value);
+                                checklistSelectionRefs.current[index] = getInputSelection(event.currentTarget);
                             }}
                             onBlur={() => {
                                 commitChecklistDraft();
                             }}
+                            onSelect={(event) => {
+                                checklistSelectionRefs.current[index] = getInputSelection(event.currentTarget);
+                            }}
                             onKeyDown={(event) => {
+                                const currentValue = event.currentTarget.value;
+                                const selection = getInputSelection(event.currentTarget);
+                                checklistSelectionRefs.current[index] = selection;
+                                const lowerKey = event.key.toLowerCase();
+                                if ((event.metaKey || event.ctrlKey) && !event.altKey) {
+                                    if (lowerKey !== 'b' && lowerKey !== 'i') return;
+                                    const next = applyMarkdownKeyboardShortcut(currentValue, selection, {
+                                        key: event.key,
+                                        ctrlKey: event.ctrlKey,
+                                        metaKey: event.metaKey,
+                                    });
+                                    if (!next) return;
+                                    event.preventDefault();
+                                    applyChecklistMarkdownResult(index, next, event.currentTarget);
+                                    return;
+                                }
+                                if (
+                                    selection.start !== selection.end
+                                    && !event.altKey
+                                    && !event.ctrlKey
+                                    && !event.metaKey
+                                    && ['[', '(', '{', '`', '~'].includes(event.key)
+                                ) {
+                                    const next = applyMarkdownPairInsertion(
+                                        currentValue,
+                                        `${currentValue.slice(0, selection.start)}${event.key}${currentValue.slice(selection.end)}`,
+                                        selection,
+                                    );
+                                    if (!next) return;
+                                    event.preventDefault();
+                                    applyChecklistMarkdownResult(index, next, event.currentTarget);
+                                    return;
+                                }
                                 if (event.key === 'Enter') {
                                     event.preventDefault();
                                     event.stopPropagation();

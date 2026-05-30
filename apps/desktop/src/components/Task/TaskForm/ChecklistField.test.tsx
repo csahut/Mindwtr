@@ -24,6 +24,64 @@ function ChecklistHarness() {
 }
 
 describe('ChecklistField', () => {
+    it('wraps selected checklist text with Markdown character pairs', async () => {
+        const { getAllByRole } = render(<ChecklistHarness />);
+
+        const input = getAllByRole('textbox')[0] as HTMLInputElement;
+        input.setSelectionRange(0, input.value.length);
+        fireEvent.select(input);
+
+        const pairEvent = createEvent.keyDown(input, { key: '[', cancelable: true });
+        fireEvent(input, pairEvent);
+
+        expect(pairEvent.defaultPrevented).toBe(true);
+        await waitFor(() => {
+            expect((getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('[Item 1]');
+        });
+    });
+
+    it('applies Markdown bold and italic shortcuts inside checklist items', async () => {
+        const { getAllByRole } = render(<ChecklistHarness />);
+
+        const input = getAllByRole('textbox')[0] as HTMLInputElement;
+        input.setSelectionRange(0, input.value.length);
+        fireEvent.select(input);
+
+        const boldEvent = createEvent.keyDown(input, { key: 'b', ctrlKey: true, cancelable: true });
+        fireEvent(input, boldEvent);
+
+        expect(boldEvent.defaultPrevented).toBe(true);
+        await waitFor(() => {
+            expect((getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('**Item 1**');
+        });
+
+        const updatedInput = getAllByRole('textbox')[0] as HTMLInputElement;
+        updatedInput.setSelectionRange(2, updatedInput.value.length - 2);
+        fireEvent.select(updatedInput);
+
+        const italicEvent = createEvent.keyDown(updatedInput, { key: 'i', metaKey: true, cancelable: true });
+        fireEvent(updatedInput, italicEvent);
+
+        expect(italicEvent.defaultPrevented).toBe(true);
+        await waitFor(() => {
+            expect((getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('***Item 1***');
+        });
+    });
+
+    it('keeps native selected-text replacements paired in checklist items', async () => {
+        const { getAllByRole } = render(<ChecklistHarness />);
+
+        const input = getAllByRole('textbox')[0] as HTMLInputElement;
+        input.setSelectionRange(0, input.value.length);
+        fireEvent.select(input);
+
+        fireEvent.change(input, { target: { value: '`' } });
+
+        await waitFor(() => {
+            expect((getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('`Item 1`');
+        });
+    });
+
     it('keeps Tab and Shift+Tab navigation working after inserting with Enter', async () => {
         const { getAllByRole } = render(<ChecklistHarness />);
 

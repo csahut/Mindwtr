@@ -1,11 +1,28 @@
 import React from 'react';
-import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    type NativeSyntheticEvent,
+    type TextInputKeyPressEventData,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { generateUUID, getAttachmentDisplayTitle, resolveAutoTextDirection } from '@mindwtr/core';
+import {
+    generateUUID,
+    getAttachmentDisplayTitle,
+    resolveAutoTextDirection,
+    type MarkdownSelection,
+} from '@mindwtr/core';
 
 import { MarkdownReferenceAutocomplete } from '../markdown-reference-autocomplete';
 import { MarkdownText } from '../markdown-text';
 import { getControlledTextInputSelection } from '../text-input-selection';
+import {
+    applyMarkdownPairInsertionWithSelectionFallback,
+    applyMarkdownPairKeyPressWithSelectionFallback,
+    isRangeSelection,
+} from '../markdown-selection-utils';
 import type { TaskEditFieldRendererProps } from './TaskEditFieldRenderer.types';
 
 type ContentFieldId = 'description' | 'location' | 'attachments' | 'checklist';
@@ -13,6 +30,8 @@ type ContentFieldId = 'description' | 'location' | 'attachments' | 'checklist';
 type TaskEditContentFieldProps = TaskEditFieldRendererProps & {
     fieldId: ContentFieldId;
 };
+
+const getChecklistItemKey = (item: { id?: string }, index: number) => item.id || `index:${index}`;
 
 export function TaskEditContentField({
     addFileAttachment,
@@ -55,6 +74,126 @@ export function TaskEditContentField({
         writingDirection: resolvedDirection,
         textAlign: resolvedDirection === 'rtl' ? 'right' : 'left',
     } as const;
+    const checklistInputRefs = React.useRef<Record<string, TextInput | null>>({});
+    const checklistTitleRefs = React.useRef<Record<string, string>>({});
+    const checklistSelectionRefs = React.useRef<Record<string, MarkdownSelection>>({});
+    const lastChecklistRangeRefs = React.useRef<Record<string, MarkdownSelection | null>>({});
+    const ignoredNativePairChangeRefs = React.useRef<Record<string, {
+        nativeValue: string;
+        appliedValue: string;
+        selection: MarkdownSelection;
+    }>>({});
+
+    React.useEffect(() => {
+        const activeKeys = new Set<string>();
+        (editedTask.checklist || []).forEach((item, index) => {
+            const key = getChecklistItemKey(item, index);
+            activeKeys.add(key);
+            checklistTitleRefs.current[key] = item.title;
+        });
+        for (const key of Object.keys(checklistInputRefs.current)) {
+            if (activeKeys.has(key)) continue;
+            delete checklistInputRefs.current[key];
+            delete checklistTitleRefs.current[key];
+            delete checklistSelectionRefs.current[key];
+            delete lastChecklistRangeRefs.current[key];
+            delete ignoredNativePairChangeRefs.current[key];
+        }
+    }, [editedTask.checklist]);
+
+    const getChecklistSelection = React.useCallback((key: string, value: string): MarkdownSelection => (
+        checklistSelectionRefs.current[key] ?? { start: value.length, end: value.length }
+    ), []);
+
+    const restoreChecklistSelection = React.useCallback((key: string, selection: MarkdownSelection) => {
+        checklistSelectionRefs.current[key] = selection;
+        const applySelection = () => {
+            const input = checklistInputRefs.current[key];
+            input?.focus?.();
+            input?.setNativeProps?.({ selection });
+        };
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(applySelection);
+        } else {
+            setTimeout(applySelection, 0);
+        }
+        setTimeout(applySelection, 40);
+        setTimeout(applySelection, 140);
+        setTimeout(applySelection, 300);
+    }, []);
+
+    const updateChecklistTitle = React.useCallback((index: number, key: string, title: string) => {
+        checklistTitleRefs.current[key] = title;
+        setEditedTask((prev) => {
+            const nextChecklist = (prev.checklist || []).map((entry, entryIndex) =>
+                entryIndex === index ? { ...entry, title } : entry
+            );
+            return { ...prev, checklist: nextChecklist };
+        });
+    }, [setEditedTask]);
+
+    const handleChecklistSelectionChange = React.useCallback((key: string, selection: MarkdownSelection) => {
+        checklistSelectionRefs.current[key] = selection;
+        if (isRangeSelection(selection)) {
+            lastChecklistRangeRefs.current[key] = selection;
+        }
+    }, []);
+
+    const handleChecklistTitleChange = React.useCallback((index: number, key: string, text: string) => {
+        const previousValue = checklistTitleRefs.current[key] ?? '';
+        const ignoredNativeChange = ignoredNativePairChangeRefs.current[key];
+        if (
+            ignoredNativeChange
+            && text === ignoredNativeChange.nativeValue
+            && previousValue === ignoredNativeChange.appliedValue
+        ) {
+            delete ignoredNativePairChangeRefs.current[key];
+            restoreChecklistSelection(key, ignoredNativeChange.selection);
+            return;
+        }
+
+        const currentSelection = getChecklistSelection(key, previousValue);
+        const pairedInsertion = applyMarkdownPairInsertionWithSelectionFallback(
+            previousValue,
+            text,
+            currentSelection,
+            lastChecklistRangeRefs.current[key],
+        );
+        if (pairedInsertion) {
+            lastChecklistRangeRefs.current[key] = null;
+            updateChecklistTitle(index, key, pairedInsertion.result.value);
+            restoreChecklistSelection(key, pairedInsertion.result.selection);
+            return;
+        }
+
+        lastChecklistRangeRefs.current[key] = null;
+        updateChecklistTitle(index, key, text);
+    }, [getChecklistSelection, restoreChecklistSelection, updateChecklistTitle]);
+
+    const handleChecklistKeyPress = React.useCallback((
+        index: number,
+        key: string,
+        event: NativeSyntheticEvent<TextInputKeyPressEventData>,
+    ) => {
+        const previousValue = checklistTitleRefs.current[key] ?? '';
+        const pairedInsertion = applyMarkdownPairKeyPressWithSelectionFallback(
+            previousValue,
+            event.nativeEvent.key,
+            getChecklistSelection(key, previousValue),
+            lastChecklistRangeRefs.current[key],
+        );
+        if (!pairedInsertion) return;
+
+        event.preventDefault?.();
+        lastChecklistRangeRefs.current[key] = null;
+        ignoredNativePairChangeRefs.current[key] = {
+            nativeValue: `${previousValue.slice(0, pairedInsertion.baseSelection.start)}${event.nativeEvent.key}${previousValue.slice(pairedInsertion.baseSelection.end)}`,
+            appliedValue: pairedInsertion.result.value,
+            selection: pairedInsertion.result.selection,
+        };
+        updateChecklistTitle(index, key, pairedInsertion.result.value);
+        restoreChecklistSelection(key, pairedInsertion.result.selection);
+    }, [getChecklistSelection, restoreChecklistSelection, updateChecklistTitle]);
 
     switch (fieldId) {
         case 'description':
@@ -239,54 +378,60 @@ export function TaskEditContentField({
                 <View style={styles.formGroup}>
                     <Text style={[styles.label, { color: tc.secondaryText }]}>{t('taskEdit.checklist')}</Text>
                     <View style={[styles.checklistContainer, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
-                        {editedTask.checklist?.map((item, index) => (
-                            <View key={item.id || index} style={[styles.checklistItem, { borderBottomColor: tc.border }]}>
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        const nextChecklist = (editedTask.checklist || []).map((entry, entryIndex) =>
-                                            entryIndex === index ? { ...entry, isCompleted: !entry.isCompleted } : entry
-                                        );
-                                        setEditedTask((prev) => ({ ...prev, checklist: nextChecklist }));
-                                    }}
-                                    style={styles.checkboxTouch}
-                                >
-                                    <View style={[styles.checkbox, item.isCompleted && styles.checkboxChecked]}>
-                                        {item.isCompleted && <Text style={styles.checkmark}>✓</Text>}
-                                    </View>
-                                </TouchableOpacity>
-                                <TextInput
-                                    style={[
-                                        styles.checklistInput,
-                                        textDirectionStyle,
-                                        { color: item.isCompleted ? tc.secondaryText : tc.text },
-                                        item.isCompleted && styles.completedText,
-                                    ]}
-                                    value={item.title}
-                                    onFocus={(event) => {
-                                        handleInputFocus(event.nativeEvent.target);
-                                    }}
-                                    onChangeText={(text) => {
-                                        const nextChecklist = (editedTask.checklist || []).map((entry, entryIndex) =>
-                                            entryIndex === index ? { ...entry, title: text } : entry
-                                        );
-                                        setEditedTask((prev) => ({ ...prev, checklist: nextChecklist }));
-                                    }}
-                                    placeholder={t('taskEdit.itemNamePlaceholder')}
-                                    placeholderTextColor={tc.secondaryText}
-                                    accessibilityLabel={`${t('taskEdit.checklist')} ${index + 1}`}
-                                    accessibilityHint={t('taskEdit.itemNamePlaceholder')}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        const nextChecklist = (editedTask.checklist || []).filter((_, entryIndex) => entryIndex !== index);
-                                        setEditedTask((prev) => ({ ...prev, checklist: nextChecklist }));
-                                    }}
-                                    style={styles.deleteBtn}
-                                >
-                                    <Text style={[styles.deleteBtnText, { color: tc.secondaryText }]}>×</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ))}
+                        {editedTask.checklist?.map((item, index) => {
+                            const checklistItemKey = getChecklistItemKey(item, index);
+                            return (
+                                <View key={item.id || index} style={[styles.checklistItem, { borderBottomColor: tc.border }]}>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            const nextChecklist = (editedTask.checklist || []).map((entry, entryIndex) =>
+                                                entryIndex === index ? { ...entry, isCompleted: !entry.isCompleted } : entry
+                                            );
+                                            setEditedTask((prev) => ({ ...prev, checklist: nextChecklist }));
+                                        }}
+                                        style={styles.checkboxTouch}
+                                    >
+                                        <View style={[styles.checkbox, item.isCompleted && styles.checkboxChecked]}>
+                                            {item.isCompleted && <Text style={styles.checkmark}>✓</Text>}
+                                        </View>
+                                    </TouchableOpacity>
+                                    <TextInput
+                                        ref={(node) => {
+                                            checklistInputRefs.current[checklistItemKey] = node;
+                                        }}
+                                        style={[
+                                            styles.checklistInput,
+                                            textDirectionStyle,
+                                            { color: item.isCompleted ? tc.secondaryText : tc.text },
+                                            item.isCompleted && styles.completedText,
+                                        ]}
+                                        value={item.title}
+                                        onFocus={(event) => {
+                                            handleInputFocus(event.nativeEvent.target);
+                                        }}
+                                        onChangeText={(text) => handleChecklistTitleChange(index, checklistItemKey, text)}
+                                        onKeyPress={(event) => handleChecklistKeyPress(index, checklistItemKey, event)}
+                                        onSelectionChange={(event) => handleChecklistSelectionChange(
+                                            checklistItemKey,
+                                            event.nativeEvent.selection,
+                                        )}
+                                        placeholder={t('taskEdit.itemNamePlaceholder')}
+                                        placeholderTextColor={tc.secondaryText}
+                                        accessibilityLabel={`${t('taskEdit.checklist')} ${index + 1}`}
+                                        accessibilityHint={t('taskEdit.itemNamePlaceholder')}
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            const nextChecklist = (editedTask.checklist || []).filter((_, entryIndex) => entryIndex !== index);
+                                            setEditedTask((prev) => ({ ...prev, checklist: nextChecklist }));
+                                        }}
+                                        style={styles.deleteBtn}
+                                    >
+                                        <Text style={[styles.deleteBtnText, { color: tc.secondaryText }]}>×</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            );
+                        })}
                         <TouchableOpacity
                             style={styles.addChecklistBtn}
                             onPress={() => {

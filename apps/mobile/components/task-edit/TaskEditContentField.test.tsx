@@ -141,6 +141,21 @@ const baseProps: any = {
   visibleAttachments: [],
 };
 
+const createChecklistState = () => {
+  let state: any = {
+    id: 'task-1',
+    title: 'Task',
+    checklist: [{ id: 'check-1', title: 'Item 1', isCompleted: false }],
+  };
+  const setEditedTask = vi.fn((next: any) => {
+    state = typeof next === 'function' ? next(state) : next;
+  });
+  return {
+    getState: () => state,
+    setEditedTask,
+  };
+};
+
 describe('TaskEditContentField', () => {
   it('does not register the long description input as a keyboard auto-scroll target', () => {
     const handleInputFocus = vi.fn();
@@ -187,5 +202,67 @@ describe('TaskEditContentField', () => {
 
       expect(input.props.selection).toEqual({ start: 9, end: 9 });
     });
+  });
+
+  it('wraps selected checklist item text from mobile key presses', () => {
+    const { getState, setEditedTask } = createChecklistState();
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(
+        <TaskEditContentField
+          {...baseProps}
+          fieldId="checklist"
+          editedTask={getState()}
+          setEditedTask={setEditedTask}
+        />
+      );
+    });
+
+    const input = tree.root.findByProps({ accessibilityLabel: 'taskEdit.checklist 1' });
+
+    act(() => {
+      input.props.onSelectionChange({ nativeEvent: { selection: { start: 0, end: 6 } } });
+    });
+
+    const preventDefault = vi.fn();
+    act(() => {
+      input.props.onKeyPress({ nativeEvent: { key: '[' }, preventDefault });
+    });
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(getState().checklist[0].title).toBe('[Item 1]');
+
+    const callsAfterKeyPress = setEditedTask.mock.calls.length;
+    act(() => {
+      input.props.onChangeText('[');
+    });
+
+    expect(setEditedTask).toHaveBeenCalledTimes(callsAfterKeyPress);
+  });
+
+  it('wraps selected checklist item text from native mobile text changes', () => {
+    const { getState, setEditedTask } = createChecklistState();
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(
+        <TaskEditContentField
+          {...baseProps}
+          fieldId="checklist"
+          editedTask={getState()}
+          setEditedTask={setEditedTask}
+        />
+      );
+    });
+
+    const input = tree.root.findByProps({ accessibilityLabel: 'taskEdit.checklist 1' });
+
+    act(() => {
+      input.props.onSelectionChange({ nativeEvent: { selection: { start: 0, end: 6 } } });
+      input.props.onChangeText('~');
+    });
+
+    expect(getState().checklist[0].title).toBe('~~Item 1~~');
   });
 });
