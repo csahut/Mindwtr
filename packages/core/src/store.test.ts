@@ -413,6 +413,7 @@ describe('TaskStore', () => {
     });
 
     it('filters soft-deleted attachments from visible tasks while preserving tombstones in _allTasks', async () => {
+        vi.setSystemTime(new Date('2026-03-02T10:00:00.000Z'));
         const now = '2026-03-01T10:00:00.000Z';
         mockStorage.getData = vi.fn().mockResolvedValue({
             tasks: [
