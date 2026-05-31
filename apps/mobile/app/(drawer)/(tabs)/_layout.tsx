@@ -12,6 +12,7 @@ import { MobileAreaSwitcher } from '@/components/mobile-area-switcher';
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { useMobileSyncBadge } from '@/hooks/use-mobile-sync-badge';
 import { useThemeColors } from '@/hooks/use-theme-colors';
+import { MOBILE_HOME_TAB_ROUTE } from '@/lib/home-route';
 import { useLanguage } from '../../../contexts/language-context';
 import { QuickCaptureSheet } from '@/components/quick-capture-sheet';
 import { QuickCaptureProvider } from '../../../contexts/quick-capture-context';
@@ -590,7 +591,7 @@ export default function TabLayout() {
   return (
     <QuickCaptureProvider value={{ openQuickCapture }}>
       <Tabs
-        initialRouteName="focus"
+        initialRouteName={MOBILE_HOME_TAB_ROUTE}
         tabBar={(props) => (
           <NativeTabBar
             {...props}
@@ -669,7 +670,7 @@ export default function TabLayout() {
       })}
       >
       <Tabs.Screen
-        name="focus"
+        name={MOBILE_HOME_TAB_ROUTE}
         options={{
           title: t('tab.next'),
           tabBarIcon: ({ color, focused }) => (

@@ -45,7 +45,7 @@ vi.mock('expo-router', () => {
       },
       descriptors: {
         'inbox-key': { options: { title: 'Inbox' } },
-        'focus-key': { options: { title: 'Next' } },
+        'focus-key': { options: { title: 'Focus' } },
         'capture-key': { options: { title: 'Add task' } },
         'projects-key': { options: { title: 'Projects' } },
         'calendar-key': { options: { title: 'Calendar' } },
@@ -143,7 +143,7 @@ vi.mock('../contexts/language-context', () => ({
       'search.savedSearches': 'Saved searches',
       'tab.inbox': 'Inbox',
       'tab.menu': 'Menu',
-      'tab.next': 'Next',
+      'tab.next': 'Focus',
       'tab.review': 'Review',
       'common.close': 'Close',
     }[key] ?? key),
@@ -199,6 +199,14 @@ const getTabButton = (tree: ReturnType<typeof create>, label: string) => {
   );
   if (!button) throw new Error(`${label} tab button not found`);
   return button;
+};
+
+const getBottomTabLabels = (tree: ReturnType<typeof create>) => {
+  const tabLabels = new Set(['Focus', 'Inbox', 'Add task', 'Projects', 'Calendar', 'Contexts', 'Review', 'Menu']);
+  return tree.root
+    .findAllByType(TouchableOpacity)
+    .map((node) => node.props.accessibilityLabel)
+    .filter((label): label is string => typeof label === 'string' && tabLabels.has(label));
 };
 
 const getQuickCaptureSheets = (tree: ReturnType<typeof create>) => (
@@ -321,6 +329,7 @@ describe('mobile tab quick capture', () => {
 
     const tabs = tree.root.find((node) => String(node.type) === 'Tabs');
     expect(tabs.props.initialRouteName).toBe('focus');
+    expect(getBottomTabLabels(tree).slice(0, 2)).toEqual(['Focus', 'Inbox']);
   });
 
   it('redirects root cold launch to Focus', () => {
