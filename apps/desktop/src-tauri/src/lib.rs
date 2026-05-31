@@ -19,6 +19,8 @@ use std::io::{self, Read, Write};
 use std::net::TcpListener;
 #[cfg(target_os = "macos")]
 use std::os::raw::c_char;
+#[cfg(target_os = "linux")]
+use std::os::unix::net::{UnixListener, UnixStream};
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 use std::path::Path;
@@ -148,6 +150,14 @@ const DROPBOX_OAUTH_TIMEOUT_SECS: u64 = 180;
 const DROPBOX_TOKEN_REFRESH_SKEW_MS: i64 = 60_000;
 const DROPBOX_DEFAULT_TOKEN_LIFETIME_SECS: i64 = 4 * 60 * 60;
 const QUICK_ADD_CLI_FLAG: &str = "--quick-add";
+#[cfg(target_os = "linux")]
+const FLATPAK_INSTANCE_REQUEST_SHOW: &str = "show\n";
+#[cfg(target_os = "linux")]
+const FLATPAK_INSTANCE_REQUEST_QUICK_ADD: &str = "quick-add\n";
+#[cfg(target_os = "linux")]
+const FLATPAK_INSTANCE_SOCKET_FILE_NAME: &str = "instance.sock";
+#[cfg(target_os = "linux")]
+const FLATPAK_TRAY_ICON_DIR_NAME: &str = "tray-icon";
 const QUICK_ADD_WINDOW_LABEL: &str = "quick-add";
 const QUICK_ADD_WINDOW_URL: &str = "index.html?quickAddWindow=1";
 const QUICK_ADD_TARGET_MAIN: &str = "main";
@@ -618,6 +628,173 @@ where
 }
 
 #[cfg(target_os = "linux")]
+struct FlatpakInstanceListener {
+    listener: UnixListener,
+    socket_path: PathBuf,
+}
+
+#[cfg(target_os = "linux")]
+struct FlatpakInstanceSocketCleanup(PathBuf);
+
+#[cfg(target_os = "linux")]
+impl Drop for FlatpakInstanceSocketCleanup {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn flatpak_runtime_dir() -> PathBuf {
+    env::var_os("XDG_RUNTIME_DIR")
+        .and_then(|value| {
+            if value.as_os_str().is_empty() {
+                None
+            } else {
+                Some(PathBuf::from(value))
+            }
+        })
+        .unwrap_or_else(env::temp_dir)
+}
+
+#[cfg(target_os = "linux")]
+fn flatpak_app_runtime_dir(runtime_dir: &Path) -> PathBuf {
+    runtime_dir.join(APP_NAME)
+}
+
+#[cfg(target_os = "linux")]
+fn flatpak_instance_socket_path(runtime_dir: &Path) -> PathBuf {
+    flatpak_app_runtime_dir(runtime_dir).join(FLATPAK_INSTANCE_SOCKET_FILE_NAME)
+}
+
+#[cfg(target_os = "linux")]
+fn flatpak_tray_icon_temp_dir(runtime_dir: &Path) -> PathBuf {
+    flatpak_app_runtime_dir(runtime_dir).join(FLATPAK_TRAY_ICON_DIR_NAME)
+}
+
+#[cfg(target_os = "linux")]
+fn flatpak_instance_request<I, S>(args: I) -> &'static str
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    if launch_requests_quick_add(args) {
+        FLATPAK_INSTANCE_REQUEST_QUICK_ADD
+    } else {
+        FLATPAK_INSTANCE_REQUEST_SHOW
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn notify_existing_flatpak_instance(socket_path: &Path, args: &[String]) -> io::Result<()> {
+    let mut stream = UnixStream::connect(socket_path)?;
+    stream.write_all(flatpak_instance_request(args.iter()).as_bytes())?;
+    stream.flush()
+}
+
+#[cfg(target_os = "linux")]
+fn bind_flatpak_instance_listener(args: &[String]) -> io::Result<FlatpakInstanceListener> {
+    let runtime_dir = flatpak_runtime_dir();
+    let socket_path = flatpak_instance_socket_path(&runtime_dir);
+    if let Some(parent) = socket_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    if socket_path.exists() {
+        match notify_existing_flatpak_instance(&socket_path, args) {
+            Ok(()) => std::process::exit(0),
+            Err(error) => {
+                log::warn!("Removing stale Flatpak instance socket after notify failed: {error}");
+                let _ = fs::remove_file(&socket_path);
+            }
+        }
+    }
+
+    match UnixListener::bind(&socket_path) {
+        Ok(listener) => Ok(FlatpakInstanceListener {
+            listener,
+            socket_path,
+        }),
+        Err(error) if error.kind() == io::ErrorKind::AddrInUse => {
+            if notify_existing_flatpak_instance(&socket_path, args).is_ok() {
+                std::process::exit(0);
+            }
+            Err(error)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn prepare_flatpak_instance_listener(args: &[String]) -> Option<FlatpakInstanceListener> {
+    if !is_flatpak() {
+        return None;
+    }
+
+    match bind_flatpak_instance_listener(args) {
+        Ok(listener) => Some(listener),
+        Err(error) => {
+            log::warn!("Failed to prepare Flatpak single-instance fallback: {error}");
+            None
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn handle_flatpak_instance_request(app: &tauri::AppHandle, request: &str) {
+    if request.trim().eq_ignore_ascii_case("quick-add") {
+        show_quick_add_window(app);
+    } else {
+        show_main(app);
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn run_flatpak_instance_listener(app: tauri::AppHandle, listener: UnixListener) {
+    for stream in listener.incoming() {
+        match stream {
+            Ok(mut stream) => {
+                let mut request = String::new();
+                if let Err(error) = stream.read_to_string(&mut request) {
+                    log::warn!("Failed to read Flatpak instance request: {error}");
+                    continue;
+                }
+                handle_flatpak_instance_request(&app, &request);
+            }
+            Err(error) => {
+                log::warn!("Flatpak instance listener stopped: {error}");
+                break;
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn start_flatpak_instance_listener(
+    app: &tauri::AppHandle,
+    flatpak_instance_listener: FlatpakInstanceListener,
+) {
+    let FlatpakInstanceListener {
+        listener,
+        socket_path,
+    } = flatpak_instance_listener;
+    let app_for_thread = app.clone();
+    let cleanup_path = socket_path.clone();
+
+    match std::thread::Builder::new()
+        .name("flatpak-instance-listener".to_string())
+        .spawn(move || run_flatpak_instance_listener(app_for_thread, listener))
+    {
+        Ok(_) => {
+            let _ = app.manage(FlatpakInstanceSocketCleanup(cleanup_path));
+        }
+        Err(error) => {
+            log::warn!("Failed to start Flatpak instance listener: {error}");
+            let _ = fs::remove_file(cleanup_path);
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
 fn normalize_spellcheck_language(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -698,7 +875,10 @@ fn enable_desktop_spellcheck(_window: &tauri::WebviewWindow) {}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let initial_launch_requests_quick_add = launch_requests_quick_add(env::args());
+    let launch_args = env::args().collect::<Vec<_>>();
+    let initial_launch_requests_quick_add = launch_requests_quick_add(launch_args.iter());
+    #[cfg(target_os = "linux")]
+    let flatpak_instance_listener = prepare_flatpak_instance_listener(&launch_args);
 
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -865,6 +1045,10 @@ pub fn run() {
             }
 
             let handle = app.handle();
+            #[cfg(target_os = "linux")]
+            if let Some(listener) = flatpak_instance_listener {
+                start_flatpak_instance_listener(&handle, listener);
+            }
             if let Err(error) = create_quick_add_window(&handle) {
                 log::warn!("{error}");
             }
@@ -883,10 +1067,23 @@ pub fn run() {
                         .or_else(|| handle.default_window_icon().cloned());
 
                     if let Some(tray_icon) = tray_icon {
-                        let _ = TrayIconBuilder::with_id("main")
+                        let mut tray_builder = TrayIconBuilder::with_id("main")
                             .icon(tray_icon)
                             .menu(&tray_menu)
-                            .show_menu_on_left_click(false)
+                            .show_menu_on_left_click(false);
+                        #[cfg(target_os = "linux")]
+                        if is_flatpak_install {
+                            let tray_icon_temp_dir =
+                                flatpak_tray_icon_temp_dir(&flatpak_runtime_dir());
+                            if let Err(error) = fs::create_dir_all(&tray_icon_temp_dir) {
+                                log::warn!(
+                                    "Failed to prepare Flatpak tray icon directory: {error}"
+                                );
+                            } else {
+                                tray_builder = tray_builder.temp_dir_path(tray_icon_temp_dir);
+                            }
+                        }
+                        let _ = tray_builder
                             .on_menu_event(move |app, event| match event.id().as_ref() {
                                 "quick_add" => {
                                     show_quick_add_window(app);
@@ -1126,6 +1323,34 @@ arch=x86_64
         assert!(launch_requests_quick_add(["mindwtr", "--QUICK-ADD"]));
         assert!(!launch_requests_quick_add(["mindwtr"]));
         assert!(!launch_requests_quick_add(["mindwtr", "--foo"]));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn flatpak_instance_request_preserves_quick_add_launches() {
+        assert_eq!(
+            flatpak_instance_request(["mindwtr", "--quick-add"]),
+            FLATPAK_INSTANCE_REQUEST_QUICK_ADD
+        );
+        assert_eq!(
+            flatpak_instance_request(["mindwtr"]),
+            FLATPAK_INSTANCE_REQUEST_SHOW
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn flatpak_runtime_paths_are_app_scoped() {
+        let runtime_dir = Path::new("/run/user/1000");
+
+        assert_eq!(
+            flatpak_instance_socket_path(runtime_dir),
+            PathBuf::from("/run/user/1000/mindwtr/instance.sock")
+        );
+        assert_eq!(
+            flatpak_tray_icon_temp_dir(runtime_dir),
+            PathBuf::from("/run/user/1000/mindwtr/tray-icon")
+        );
     }
 
     #[cfg(target_os = "linux")]
