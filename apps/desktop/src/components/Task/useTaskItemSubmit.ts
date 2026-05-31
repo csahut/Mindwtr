@@ -142,6 +142,9 @@ export function useTaskItemSubmit({
             if (parsed.byDay && parsed.byDay.length > 0) {
                 recurrenceValue.byDay = parsed.byDay;
             }
+            if (parsed.byMonthDay && parsed.byMonthDay.length > 0) {
+                recurrenceValue.byMonthDay = parsed.byMonthDay;
+            }
             if (parsed.count) {
                 recurrenceValue.count = parsed.count;
             }

@@ -57,6 +57,11 @@ describe('recurrence', () => {
             byDay: ['1MO'],
             rrule: 'FREQ=MONTHLY;BYDAY=1MO',
         });
+        expect(normalizeRecurrenceForLoad({ rrule: 'FREQ=MONTHLY;BYMONTHDAY=9' })).toEqual({
+            rule: 'monthly',
+            byMonthDay: [9],
+            rrule: 'FREQ=MONTHLY;BYMONTHDAY=9',
+        });
     });
 
     it('creates next instance using weekly BYDAY (strict)', () => {
@@ -646,6 +651,30 @@ describe('recurrence', () => {
         const projected = createProjectedRecurringTask(task, '2026-06-30T12:00:00.000Z');
 
         expect(projected?.startTime).toBe('2026-07-02T09:00');
+        expect(projected?.dueDate).toBeUndefined();
+    });
+
+    it('projects a start-only monthly day-of-month recurrence into the calendar preview', () => {
+        const task: Task = {
+            id: 't-projected-ninth-day',
+            title: 'Ninth day planning',
+            status: 'next',
+            tags: [],
+            contexts: [],
+            startTime: '2026-06-01T09:00',
+            recurrence: {
+                rule: 'monthly',
+                strategy: 'strict',
+                byMonthDay: [9],
+            },
+            showFutureRecurrence: true,
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+        };
+
+        const projected = createProjectedRecurringTask(task, '2026-06-30T12:00:00.000Z');
+
+        expect(projected?.startTime).toBe('2026-07-09T09:00');
         expect(projected?.dueDate).toBeUndefined();
     });
 

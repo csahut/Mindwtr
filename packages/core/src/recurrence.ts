@@ -175,6 +175,7 @@ export function normalizeRecurrenceForLoad(value: unknown): Recurrence | undefin
             ? {
                 rule: parsed.rule,
                 ...(parsed.byDay ? { byDay: parsed.byDay } : {}),
+                ...(parsed.byMonthDay ? { byMonthDay: parsed.byMonthDay } : {}),
                 ...(parsed.weekStart ? { weekStart: parsed.weekStart } : {}),
                 ...(parsed.count ? { count: parsed.count } : {}),
                 ...(parsed.until ? { until: parsed.until } : {}),
@@ -200,6 +201,10 @@ export function normalizeRecurrenceForLoad(value: unknown): Recurrence | undefin
         ? normalizeWeekdays(recurrence.byDay)
         : undefined;
     const byDay = explicitByDay ?? parsed.byDay;
+    const explicitByMonthDay = Array.isArray(recurrence.byMonthDay)
+        ? normalizeMonthDays(recurrence.byMonthDay.map(String))
+        : undefined;
+    const byMonthDay = explicitByMonthDay ?? parsed.byMonthDay;
     const weekStart = normalizeWeekStart(recurrence.weekStart) ?? parsed.weekStart;
     const count = typeof recurrence.count === 'number' && Number.isFinite(recurrence.count) && recurrence.count > 0
         ? Math.round(recurrence.count)
@@ -222,6 +227,7 @@ export function normalizeRecurrenceForLoad(value: unknown): Recurrence | undefin
         rule,
         ...(strategy ? { strategy } : {}),
         ...(byDay ? { byDay } : {}),
+        ...(byMonthDay ? { byMonthDay } : {}),
         ...(weekStart ? { weekStart } : {}),
         ...(count ? { count } : {}),
         ...(until ? { until } : {}),
@@ -323,6 +329,10 @@ function getRecurrenceByDay(value: Task['recurrence']): RecurrenceByDay[] | unde
 function getRecurrenceByMonthDay(value: Task['recurrence']): number[] | undefined {
     if (!value || typeof value === 'string') return undefined;
     const recurrence = value as Recurrence;
+    const explicit = Array.isArray(recurrence.byMonthDay)
+        ? normalizeMonthDays(recurrence.byMonthDay.map(String))
+        : undefined;
+    if (explicit && explicit.length > 0) return explicit;
     if (recurrence.rrule) {
         const parsed = parseRRuleString(recurrence.rrule);
         return parsed.byMonthDay;
@@ -899,6 +909,7 @@ export function createNextRecurringTask(
         nextRecurrence = {
             ...recurrence,
             ...nextAnchorDays,
+            ...(byMonthDay ? { byMonthDay } : {}),
             ...(typeof recurrence.count === 'number' || count ? { count } : {}),
             ...(typeof recurrence.until === 'string' || until ? { until } : {}),
             ...(count ? { completedOccurrences: nextCompletedOccurrences } : {}),

@@ -414,6 +414,7 @@ function TaskEditModalInner({
                 rule: 'monthly',
                 strategy: recurrenceStrategyValue,
                 ...(customMode === 'nth' ? { byDay: [`${customOrdinal}${customWeekday}` as RecurrenceByDay] } : {}),
+                ...(customMode === 'date' ? { byMonthDay: [safeMonthDay] } : {}),
                 rrule,
             },
         }));

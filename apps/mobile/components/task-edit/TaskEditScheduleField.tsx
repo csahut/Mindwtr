@@ -108,6 +108,7 @@ export function TaskEditScheduleField({
             : buildRRuleString(rule, byDay, interval, { byMonthDay, count, until });
         return buildRecurrenceValue(rule, hasOverride('strategy') ? overrides.strategy ?? recurrenceStrategyValue : recurrenceStrategyValue, {
             byDay,
+            byMonthDay,
             count,
             until,
             completedOccurrences,

@@ -63,17 +63,21 @@ export function useTaskEditDates({
             const byDay = typeof recurrence === 'object' && recurrence.byDay?.length
                 ? recurrence.byDay
                 : parsed.byDay;
+            const byMonthDay = typeof recurrence === 'object' && recurrence.byMonthDay?.length
+                ? recurrence.byMonthDay
+                : parsed.byMonthDay;
             const completedOccurrences = typeof recurrence === 'object'
                 ? recurrence.completedOccurrences
                 : undefined;
             const rrule = buildRRuleString(rule, byDay, parsed.interval, {
-                byMonthDay: parsed.byMonthDay,
+                byMonthDay,
                 until,
             });
             return {
                 ...prev,
                 recurrence: buildRecurrenceValue(rule, strategy, {
                     byDay,
+                    byMonthDay,
                     until,
                     completedOccurrences,
                     rrule,

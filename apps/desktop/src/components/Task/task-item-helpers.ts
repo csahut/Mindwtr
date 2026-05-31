@@ -194,5 +194,8 @@ export function getRecurrenceRRuleValue(recurrence: Task['recurrence']): string 
     if (rec.byDay && rec.byDay.length > 0) {
         return buildRRuleString(rec.rule, rec.byDay, undefined, { count, until });
     }
+    if (rec.byMonthDay && rec.byMonthDay.length > 0) {
+        return buildRRuleString(rec.rule, undefined, undefined, { byMonthDay: rec.byMonthDay, count, until });
+    }
     return rec.rule ? buildRRuleString(rec.rule, undefined, undefined, { count, until }) : '';
 }

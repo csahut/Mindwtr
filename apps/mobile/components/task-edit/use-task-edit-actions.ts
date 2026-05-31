@@ -293,6 +293,7 @@ export function useTaskEditActions({
                 const parsed = parseRRuleString(recurrenceRRuleValue);
                 updates.recurrence = buildRecurrenceValue(recurrenceRule, recurrenceStrategyValue, {
                     byDay: parsed.byDay,
+                    byMonthDay: parsed.byMonthDay,
                     count: parsed.count,
                     until: parsed.until,
                     completedOccurrences,

@@ -155,6 +155,7 @@ describe('TaskEditScheduleField', () => {
         expect(next.recurrence).toMatchObject({
             rule: 'monthly',
             strategy: 'strict',
+            byMonthDay: [15],
             rrule: 'FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=15',
         });
     });

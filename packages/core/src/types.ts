@@ -35,6 +35,7 @@ export interface Recurrence {
     rule: RecurrenceRule;
     strategy?: RecurrenceStrategy; // Defaults to 'strict'
     byDay?: RecurrenceByDay[]; // Explicit weekdays for weekly/monthly recurrences
+    byMonthDay?: number[]; // Explicit month days for monthly recurrences
     weekStart?: RecurrenceWeekday; // RFC 5545 WKST for weekly interval anchoring
     count?: number; // Total occurrences in the series, including the current task
     until?: string; // ISO date/datetime when the series should stop
