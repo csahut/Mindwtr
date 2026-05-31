@@ -33,6 +33,13 @@ export type SettingsSyncLabels = {
     syncBackendWebdav: string;
     syncBackendCloud: string;
     syncBackendCloudkit: string;
+    syncBackendChoiceHint: string;
+    syncBackendGroupCloud: string;
+    syncBackendGroupCloudDesc: string;
+    syncBackendGroupFile: string;
+    syncBackendGroupFileDesc: string;
+    syncBackendGroupAdvanced: string;
+    syncBackendGroupAdvancedDesc: string;
     syncPreferences: string;
     syncPreferencesDesc: string;
     syncPreferenceAppearance: string;

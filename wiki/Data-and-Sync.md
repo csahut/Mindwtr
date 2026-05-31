@@ -51,9 +51,17 @@ Mindwtr directly supports five sync backends:
 
 - **Native iCloud / CloudKit Sync**: Apple-only native sync where available
 - **File Sync**: a user-selected folder/file (`data.json` + `attachments/`)
+- **Dropbox OAuth Sync**: direct Dropbox App Folder sync in supported builds
 - **WebDAV**: any compatible WebDAV endpoint
 - **Mindwtr Cloud (Self-Hosted)**: your own `apps/cloud` endpoint
-- **Dropbox OAuth Sync**: direct Dropbox App Folder sync in supported builds
+
+In **Settings → Sync**, supported builds show these as one backend selector, then explain the selected setup path:
+
+- **Cloud Sync**: **Dropbox** and **iCloud** on Apple platforms
+- **Folder / File Sync**: **File**
+- **Advanced / Custom Server**: **WebDAV** and **Self-Hosted**
+
+Existing Dropbox setups continue to work; they are simply shown as the top-level **Dropbox** backend under the **Cloud Sync** explanation instead of being nested under a self-hosted/cloud-provider picker.
 
 ### Direct vs indirect provider support
 
@@ -62,15 +70,17 @@ Mindwtr directly supports five sync backends:
 - **Important**: native iCloud sync is **Apple-only**. Android, Windows, and Linux should use File Sync, WebDAV, Mindwtr Cloud, or Dropbox instead.
 
 **Quick guidance:**
+- **Dropbox**: easiest cross-platform cloud option in supported builds; connect with OAuth and Mindwtr uses its Dropbox App Folder.
 - **Syncthing**: device-to-device file sync. Best on the same LAN/subnet. For remote sync, use a Syncthing relay or a mesh VPN (Nebula/Tailscale).
 - **WebDAV**: use a provider that supports WebDAV (e.g., Nextcloud, ownCloud, Fastmail, self-hosted).
-- **Dropbox**: use native Dropbox sync (supported builds) or File Sync.
 - **iCloud**: use native iCloud sync on supported Apple builds, or iCloud Drive via File Sync.
 - **Google Drive/OneDrive**: use File Sync (and Android bridge apps when needed).
 
 ## Sync Recommendations
 
-- **Best for multi-device:** WebDAV or Mindwtr Cloud (self-hosted). The app controls the sync cycle and merges per item.
+- **Easiest plug-and-play cloud sync:** Dropbox OAuth in supported builds.
+- **Best Apple-only setup:** native iCloud / CloudKit on supported Apple builds.
+- **Best BYOS remote sync:** WebDAV or Mindwtr Cloud (Self-Hosted). The app controls the sync cycle and merges per item.
 - **File Sync (Syncthing/Dropbox/etc.):** works, but **conflicts are file-level** because `data.json` is a single file.
 - **Best practices for File Sync:** avoid editing on two devices at the same time, and wait for sync to finish before opening the app on another device. If conflicts appear, keep the newest `data.json` and delete the `data.json.sync-conflict-*` copies.
 
@@ -207,6 +217,7 @@ Mindwtr also supports direct Dropbox sync in supported desktop/mobile builds.
 - **Scope**: Dropbox App Folder (`/Apps/Mindwtr/`)
 - **Synced data**: `data.json` and `attachments/*`
 - **Auth**: OAuth 2.0 + PKCE
+- **Setup**: choose **Dropbox** in **Settings → Sync**, connect your account, then run **Test connection**
 - **Guide**: [[Dropbox Sync]]
 
 ---

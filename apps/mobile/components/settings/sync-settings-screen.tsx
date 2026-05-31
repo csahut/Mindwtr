@@ -53,6 +53,12 @@ import { SettingsTopBar } from './settings.shell';
 import { styles } from './settings.styles';
 
 type SettingsScreenMode = 'sync' | 'data';
+type VisibleSyncBackendOption = 'off' | 'file' | 'dropbox' | 'webdav' | 'selfhosted' | 'cloudkit';
+type VisibleSyncBackendGroup = {
+    description: string;
+    options: VisibleSyncBackendOption[];
+    title: string;
+};
 
 function SyncSettingsView({ mode }: { mode: SettingsScreenMode }) {
     const tc = useThemeColors();
@@ -116,7 +122,30 @@ function SyncSettingsView({ mode }: { mode: SettingsScreenMode }) {
     const analyticsHeartbeatEnabled = analyticsHeartbeatAvailable && settings.analytics?.heartbeatEnabled !== false;
     const pendingRemoteDeleteCount = settings.attachments?.pendingRemoteDeletes?.length ?? 0;
     const isBackupBusy = backupAction !== null;
-    const backendOptions: ('off' | 'file' | 'webdav' | 'cloud')[] = ['off', 'file', 'webdav', 'cloud'];
+    const backendGroups: VisibleSyncBackendGroup[] = [
+        {
+            title: t('settings.syncBackendGroupCloud'),
+            description: t('settings.syncBackendGroupCloudDesc'),
+            options: [
+                ...(!isFossBuild ? (['dropbox'] as const) : []),
+                ...(supportsNativeICloudSync ? (['cloudkit'] as const) : []),
+            ],
+        },
+        {
+            title: t('settings.syncBackendGroupFile'),
+            description: t('settings.syncBackendGroupFileDesc'),
+            options: ['file'],
+        },
+        {
+            title: t('settings.syncBackendGroupAdvanced'),
+            description: t('settings.syncBackendGroupAdvancedDesc'),
+            options: ['webdav', 'selfhosted'],
+        },
+    ];
+    const backendControlOptions: VisibleSyncBackendOption[] = [
+        'off',
+        ...backendGroups.flatMap((group) => group.options),
+    ];
     const showSettingsWarning = useCallback((title: string, message: string, durationMs = 4200) => {
         showToast({
             title,
@@ -397,6 +426,57 @@ function SyncSettingsView({ mode }: { mode: SettingsScreenMode }) {
     const isScheduledBackgroundSyncBackend = syncBackend === 'webdav' || syncBackend === 'cloud' || syncBackend === 'cloudkit';
     const cloudKitStatusDetails = getCloudKitStatusDetails(cloudKitAccountStatus);
     const isCloudSyncSelected = syncBackend === 'cloud' || syncBackend === 'cloudkit';
+    const isSelfHostedSyncSelected = syncBackend === 'cloud' && (cloudProvider === 'selfhosted' || isFossBuild);
+    const isDropboxSyncSelected = syncBackend === 'cloud' && cloudProvider === 'dropbox' && !isFossBuild;
+    const isCloudKitSyncSelected = syncBackend === 'cloudkit' && cloudProvider === 'cloudkit' && supportsNativeICloudSync;
+    const getBackendOptionLabel = useCallback((option: VisibleSyncBackendOption): string => {
+        switch (option) {
+            case 'off':
+                return t('settings.syncBackendOff');
+            case 'file':
+                return t('settings.syncBackendFile');
+            case 'dropbox':
+                return t('settings.cloudProviderDropbox');
+            case 'webdav':
+                return t('settings.syncBackendWebdav');
+            case 'selfhosted':
+                return t('settings.cloudProviderSelfHosted');
+            case 'cloudkit':
+                return 'iCloud';
+        }
+    }, [t]);
+    const isBackendOptionSelected = useCallback((option: VisibleSyncBackendOption): boolean => {
+        switch (option) {
+            case 'off':
+            case 'file':
+            case 'webdav':
+                return syncBackend === option;
+            case 'dropbox':
+                return isDropboxSyncSelected;
+            case 'selfhosted':
+                return isSelfHostedSyncSelected;
+            case 'cloudkit':
+                return isCloudKitSyncSelected;
+        }
+    }, [isCloudKitSyncSelected, isDropboxSyncSelected, isSelfHostedSyncSelected, syncBackend]);
+    const selectedBackendGroup = backendGroups.find((group) =>
+        group.options.some((option) => isBackendOptionSelected(option))
+    );
+    const handleSelectVisibleBackend = useCallback((option: VisibleSyncBackendOption) => {
+        switch (option) {
+            case 'dropbox':
+                handleSelectCloudProvider('dropbox');
+                return;
+            case 'selfhosted':
+                handleSelectCloudProvider('selfhosted');
+                return;
+            case 'cloudkit':
+                handleSelectCloudProvider('cloudkit');
+                return;
+            default:
+                handleSelectSyncBackend(option);
+        }
+    }, [handleSelectCloudProvider, handleSelectSyncBackend]);
     const dataLabel = t('settings.data');
 
     useEffect(() => {
@@ -443,53 +523,59 @@ function SyncSettingsView({ mode }: { mode: SettingsScreenMode }) {
                                     <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
                                         {syncBackend === 'off'
                                             ? t('settings.syncBackendOff')
-                                            : syncBackend === 'webdav'
+                                            : syncBackend === 'file'
+                                                ? t('settings.syncBackendFile')
+                                                : syncBackend === 'webdav'
                                                     ? t('settings.syncBackendWebdav')
-                                                    : isCloudSyncSelected
-                                                        ? cloudProvider === 'cloudkit'
-                                                            ? 'iCloud (CloudKit)'
-                                                            : t('settings.syncBackendCloud')
-                                                        : t('settings.syncBackendFile')}
+                                                    : isCloudKitSyncSelected
+                                                        ? 'iCloud (CloudKit)'
+                                                        : isDropboxSyncSelected
+                                                            ? t('settings.cloudProviderDropbox')
+                                                            : t('settings.cloudProviderSelfHosted')}
                                     </Text>
                                 </View>
-                                <View style={[styles.backendToggle, { marginTop: 8, width: '100%' }]}>
-                                    {backendOptions.map((backend) => (
-                                        <TouchableOpacity
-                                            key={backend}
-                                            style={[
-                                                styles.backendOption,
-                                                {
-                                                    borderColor: tc.border,
-                                                    backgroundColor: (backend === 'cloud' ? isCloudSyncSelected : syncBackend === backend)
-                                                        ? tc.filterBg
-                                                        : 'transparent',
-                                                },
-                                            ]}
-                                            onPress={() => {
-                                                handleSelectSyncBackend(backend);
-                                            }}
-                                        >
-                                            <Text
+                                <Text style={[styles.settingDescription, { color: tc.secondaryText, marginTop: 8 }]}>
+                                    {t('settings.syncBackendChoiceHint')}
+                                </Text>
+                                <View style={[styles.backendToggle, { marginTop: 10, width: '100%' }]}>
+                                    {backendControlOptions.map((backend) => {
+                                        const selected = isBackendOptionSelected(backend);
+                                        return (
+                                            <TouchableOpacity
+                                                key={backend}
                                                 style={[
-                                                    styles.backendOptionText,
+                                                    styles.backendOption,
                                                     {
-                                                        color: (backend === 'cloud' ? isCloudSyncSelected : syncBackend === backend)
-                                                            ? tc.tint
-                                                            : tc.secondaryText,
+                                                        borderColor: selected ? tc.tint : tc.border,
+                                                        backgroundColor: selected ? tc.filterBg : 'transparent',
                                                     },
                                                 ]}
+                                                onPress={() => {
+                                                    handleSelectVisibleBackend(backend);
+                                                }}
                                             >
-                                                {backend === 'off'
-                                                    ? t('settings.syncBackendOff')
-                                                    : backend === 'file'
-                                                            ? t('settings.syncBackendFile')
-                                                            : backend === 'webdav'
-                                                                ? t('settings.syncBackendWebdav')
-                                                                : t('settings.syncBackendCloud')}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                                <Text
+                                                    style={[
+                                                        styles.backendOptionText,
+                                                        { color: selected ? tc.tint : tc.secondaryText },
+                                                    ]}
+                                                >
+                                                    {getBackendOptionLabel(backend)}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
                                 </View>
+                                {selectedBackendGroup && (
+                                    <View style={{ gap: 4, marginTop: 12 }}>
+                                        <Text style={[styles.settingLabel, { color: tc.text }]}>
+                                            {selectedBackendGroup.title}
+                                        </Text>
+                                        <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                            {selectedBackendGroup.description}
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
                         </View>
 
@@ -532,59 +618,7 @@ function SyncSettingsView({ mode }: { mode: SettingsScreenMode }) {
 
                         {isCloudSyncSelected && (
                             <>
-                                <Text style={[styles.sectionTitle, { color: tc.text, marginTop: 16 }]}>{t('settings.syncBackendCloud')}</Text>
-                                <View style={[styles.settingCard, { backgroundColor: tc.cardBg }]}>
-                                    <View style={styles.settingRowColumn}>
-                                        <Text style={[styles.settingLabel, { color: tc.text }]}>{t('settings.cloudProvider')}</Text>
-                                        <View style={[styles.backendToggle, { marginTop: 8, width: '100%' }]}>
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.backendOption,
-                                                    { borderColor: tc.border, backgroundColor: cloudProvider === 'selfhosted' ? tc.filterBg : 'transparent' },
-                                                ]}
-                                                onPress={() => {
-                                                    handleSelectCloudProvider('selfhosted');
-                                                }}
-                                            >
-                                                <Text style={[styles.backendOptionText, { color: cloudProvider === 'selfhosted' ? tc.tint : tc.secondaryText }]}>
-                                                    {t('settings.cloudProviderSelfHosted')}
-                                                </Text>
-                                            </TouchableOpacity>
-                                            {!isFossBuild && (
-                                                <TouchableOpacity
-                                                    style={[
-                                                        styles.backendOption,
-                                                        { borderColor: tc.border, backgroundColor: cloudProvider === 'dropbox' ? tc.filterBg : 'transparent' },
-                                                    ]}
-                                                    onPress={() => {
-                                                        handleSelectCloudProvider('dropbox');
-                                                    }}
-                                                >
-                                                    <Text style={[styles.backendOptionText, { color: cloudProvider === 'dropbox' ? tc.tint : tc.secondaryText }]}>
-                                                        Dropbox
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            )}
-                                            {supportsNativeICloudSync && (
-                                                <TouchableOpacity
-                                                    style={[
-                                                        styles.backendOption,
-                                                        { borderColor: tc.border, backgroundColor: cloudProvider === 'cloudkit' ? tc.filterBg : 'transparent' },
-                                                    ]}
-                                                    onPress={() => {
-                                                        handleSelectCloudProvider('cloudkit');
-                                                    }}
-                                                >
-                                                    <Text style={[styles.backendOptionText, { color: cloudProvider === 'cloudkit' ? tc.tint : tc.secondaryText }]}>
-                                                        iCloud
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            )}
-                                        </View>
-                                    </View>
-                                </View>
-
-                                {cloudProvider === 'cloudkit' && supportsNativeICloudSync ? (
+                                {isCloudKitSyncSelected ? (
                                     <SyncCloudKitBackendPanel
                                         helpText={cloudKitStatusDetails.helpText}
                                         isSyncEnabled={cloudKitStatusDetails.syncEnabled}
@@ -596,7 +630,7 @@ function SyncSettingsView({ mode }: { mode: SettingsScreenMode }) {
                                         t={t}
                                         tc={tc}
                                     />
-                                ) : cloudProvider === 'selfhosted' || isFossBuild ? (
+                                ) : isSelfHostedSyncSelected ? (
                                     <SyncSelfHostedBackendPanel
                                         initialAllowInsecureHttp={cloudAllowInsecureHttp}
                                         initialToken={cloudToken}
@@ -610,7 +644,7 @@ function SyncSettingsView({ mode }: { mode: SettingsScreenMode }) {
                                         t={t}
                                         tc={tc}
                                     />
-                                ) : (
+                                ) : isDropboxSyncSelected ? (
                                     <SyncDropboxBackendPanel
                                         dropboxBusy={dropboxBusy}
                                         dropboxConfigured={dropboxConfigured}
@@ -627,7 +661,7 @@ function SyncSettingsView({ mode }: { mode: SettingsScreenMode }) {
                                         t={t}
                                         tc={tc}
                                     />
-                                )}
+                                ) : null}
                             </>
                         )}
 

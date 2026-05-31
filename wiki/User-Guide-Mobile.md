@@ -589,8 +589,9 @@ Customize how Mindwtr works for your GTD workflow:
 See [[Data and Sync]] for sync setup.
 
 **Sync Backend:**
-- **File** — Sync via a shared JSON file (Dropbox, Google Drive, etc.)
-- **WebDAV** — Sync to a WebDAV server (Nextcloud, ownCloud, etc.)
+- **Cloud Sync** — Dropbox in supported builds, plus iCloud on iOS where available
+- **Folder / File Sync** — File sync via a shared JSON file/folder (Google Drive, Syncthing, OneDrive, etc.)
+- **Advanced / Custom Server** — WebDAV or Self-Hosted Mindwtr Cloud
 
 **Other Options:**
 - **Sync** — Manually trigger sync

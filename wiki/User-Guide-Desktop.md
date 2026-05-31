@@ -477,8 +477,9 @@ Access Settings from the sidebar.
 ### Data & Sync
 
 **Sync Backend:**
-- **File** — Sync via a shared JSON file (Dropbox, Google Drive, etc.)
-- **WebDAV** — Sync to a WebDAV server (Nextcloud, ownCloud, etc.)
+- **Cloud Sync** — Dropbox in supported builds, plus iCloud on macOS where available
+- **Folder / File Sync** — File sync via a shared JSON file/folder (Google Drive, Syncthing, OneDrive, etc.)
+- **Advanced / Custom Server** — WebDAV or Self-Hosted Mindwtr Cloud
 
 **Settings sync options:**
 - Choose which preferences sync across devices (theme, language/date format, GTD defaults, external calendar URLs, AI settings, Saved Filters)

@@ -245,6 +245,38 @@ describe('useSyncSettingsTransportActions', () => {
         expect(mocked.resetSyncStatusForBackendSwitch).toHaveBeenCalledTimes(2);
     });
 
+    it('stores Dropbox as the cloud backend with a Dropbox provider for first-level UI selection', async () => {
+        await renderHarness({ dropboxConfigured: true });
+
+        mocked.asyncStorage.multiSet.mockClear();
+        mocked.resetSyncStatusForBackendSwitch.mockClear();
+
+        await act(async () => {
+            latestHookResult?.handleSelectCloudProvider('dropbox');
+        });
+
+        expect(latestHookResult?.cloudProvider).toBe('dropbox');
+        expect(latestHookResult?.syncBackend).toBe('cloud');
+        expect(mocked.asyncStorage.multiSet).toHaveBeenCalledWith([
+            [CLOUD_PROVIDER_KEY, 'dropbox'],
+            [SYNC_BACKEND_KEY, 'cloud'],
+        ]);
+        expect(mocked.resetSyncStatusForBackendSwitch).toHaveBeenCalledTimes(1);
+    });
+
+    it('loads the legacy cloud backend plus Dropbox provider as top-level Dropbox', async () => {
+        mocked.asyncStorage.multiGet.mockResolvedValue([
+            [SYNC_BACKEND_KEY, 'cloud'],
+            [CLOUD_PROVIDER_KEY, 'dropbox'],
+        ]);
+
+        await renderHarness({ dropboxConfigured: true });
+
+        expect(latestHookResult?.syncBackend).toBe('cloud');
+        expect(latestHookResult?.cloudProvider).toBe('dropbox');
+        expect(mocked.asyncStorage.setItem).not.toHaveBeenCalledWith(CLOUD_PROVIDER_KEY, 'selfhosted');
+    });
+
     it('normalizes the WebDAV url before testing the mobile connection', async () => {
         mocked.webdavGetJson.mockResolvedValue(null);
         await renderHarness();
