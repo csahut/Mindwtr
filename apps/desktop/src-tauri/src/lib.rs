@@ -667,8 +667,8 @@ fn flatpak_instance_socket_path(runtime_dir: &Path) -> PathBuf {
 }
 
 #[cfg(target_os = "linux")]
-fn flatpak_tray_icon_temp_dir(runtime_dir: &Path) -> PathBuf {
-    flatpak_app_runtime_dir(runtime_dir).join(FLATPAK_TRAY_ICON_DIR_NAME)
+fn flatpak_tray_icon_temp_dir(app_cache_dir: &Path) -> PathBuf {
+    app_cache_dir.join(FLATPAK_TRAY_ICON_DIR_NAME)
 }
 
 #[cfg(target_os = "linux")]
@@ -1073,14 +1073,24 @@ pub fn run() {
                             .show_menu_on_left_click(false);
                         #[cfg(target_os = "linux")]
                         if is_flatpak_install {
-                            let tray_icon_temp_dir =
-                                flatpak_tray_icon_temp_dir(&flatpak_runtime_dir());
-                            if let Err(error) = fs::create_dir_all(&tray_icon_temp_dir) {
-                                log::warn!(
-                                    "Failed to prepare Flatpak tray icon directory: {error}"
-                                );
-                            } else {
-                                tray_builder = tray_builder.temp_dir_path(tray_icon_temp_dir);
+                            match handle.path().app_cache_dir() {
+                                Ok(app_cache_dir) => {
+                                    let tray_icon_temp_dir =
+                                        flatpak_tray_icon_temp_dir(&app_cache_dir);
+                                    if let Err(error) = fs::create_dir_all(&tray_icon_temp_dir) {
+                                        log::warn!(
+                                            "Failed to prepare Flatpak tray icon directory: {error}"
+                                        );
+                                    } else {
+                                        tray_builder =
+                                            tray_builder.temp_dir_path(tray_icon_temp_dir);
+                                    }
+                                }
+                                Err(error) => {
+                                    log::warn!(
+                                        "Failed to resolve Flatpak tray icon cache directory: {error}"
+                                    );
+                                }
                             }
                         }
                         let _ = tray_builder
@@ -1347,9 +1357,16 @@ arch=x86_64
             flatpak_instance_socket_path(runtime_dir),
             PathBuf::from("/run/user/1000/mindwtr/instance.sock")
         );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn flatpak_tray_icon_path_uses_app_cache_dir() {
+        let app_cache_dir = Path::new("/home/user/.var/app/tech.dongdongbh.mindwtr/cache");
+
         assert_eq!(
-            flatpak_tray_icon_temp_dir(runtime_dir),
-            PathBuf::from("/run/user/1000/mindwtr/tray-icon")
+            flatpak_tray_icon_temp_dir(app_cache_dir),
+            PathBuf::from("/home/user/.var/app/tech.dongdongbh.mindwtr/cache/tray-icon")
         );
     }
 
