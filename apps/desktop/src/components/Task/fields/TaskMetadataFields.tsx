@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { TaskEnergyLevel, TaskPriority, TaskStatus, TimeEstimate } from '@mindwtr/core';
 
 import { cn } from '../../../lib/utils';
@@ -10,6 +10,116 @@ type PillOption<TValue extends string> = {
 };
 
 const selectedPillClassName = 'border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90';
+
+const canonicalToken = (value: string): string =>
+    value.trim().replace(/^[@#]/, '').toLowerCase();
+
+const splitTokens = (value: string): string[] =>
+    value.split(',').map((item) => item.trim()).filter(Boolean);
+
+const uniqueOptions = (options: string[]): string[] => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    options.forEach((option) => {
+        const trimmed = option.trim();
+        const key = canonicalToken(trimmed);
+        if (!trimmed || seen.has(key)) return;
+        seen.add(key);
+        result.push(trimmed);
+    });
+    return result;
+};
+
+const matchesOption = (option: string, query: string): boolean => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const bareQuery = canonicalToken(query);
+    if (!normalizedQuery && !bareQuery) return false;
+    const normalizedOption = option.trim().toLowerCase();
+    const bareOption = canonicalToken(option);
+    return normalizedOption.includes(normalizedQuery) || bareOption.includes(bareQuery);
+};
+
+const getCurrentTokenQuery = (value: string, cursor: number | null): string => {
+    const index = typeof cursor === 'number' ? cursor : value.length;
+    const beforeCursor = value.slice(0, index);
+    const commaIndex = beforeCursor.lastIndexOf(',');
+    return beforeCursor.slice(commaIndex + 1).trim();
+};
+
+const getTokensOutsideCurrentQuery = (value: string, cursor: number | null): string[] => {
+    const index = typeof cursor === 'number' ? cursor : value.length;
+    const beforeCursor = value.slice(0, index);
+    const afterCursor = value.slice(index);
+    const tokenStart = beforeCursor.lastIndexOf(',') + 1;
+    const nextComma = afterCursor.indexOf(',');
+    const tokenEnd = nextComma === -1 ? value.length : index + nextComma;
+    return [
+        ...splitTokens(value.slice(0, tokenStart)),
+        ...splitTokens(value.slice(tokenEnd)),
+    ];
+};
+
+const replaceCurrentToken = (value: string, cursor: number | null, token: string): string => {
+    const index = typeof cursor === 'number' ? cursor : value.length;
+    const beforeCursor = value.slice(0, index);
+    const afterCursor = value.slice(index);
+    const tokenStart = beforeCursor.lastIndexOf(',') + 1;
+    const nextComma = afterCursor.indexOf(',');
+    const tokenEnd = nextComma === -1 ? value.length : index + nextComma;
+    const nextTokens = [
+        ...splitTokens(value.slice(0, tokenStart)),
+        token,
+        ...splitTokens(value.slice(tokenEnd)),
+    ];
+    const seen = new Set<string>();
+    return nextTokens
+        .filter((item) => {
+            const key = canonicalToken(item);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        })
+        .join(', ');
+};
+
+function SuggestionList({
+    activeIndex,
+    suggestions,
+    onSelect,
+}: {
+    activeIndex: number;
+    suggestions: string[];
+    onSelect: (value: string) => void;
+}) {
+    if (suggestions.length === 0) return null;
+    return (
+        <div
+            role="listbox"
+            className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
+        >
+            {suggestions.map((suggestion, index) => (
+                <button
+                    key={suggestion}
+                    type="button"
+                    role="option"
+                    aria-selected={index === activeIndex}
+                    onMouseDown={(event) => {
+                        event.preventDefault();
+                        onSelect(suggestion);
+                    }}
+                    className={cn(
+                        'flex w-full items-center px-2.5 py-1.5 text-left text-xs transition-colors',
+                        index === activeIndex
+                            ? 'bg-primary text-primary-foreground'
+                            : 'hover:bg-muted/70'
+                    )}
+                >
+                    {suggestion}
+                </button>
+            ))}
+        </div>
+    );
+}
 
 function PillOptionField<TValue extends string>({
     ariaLabel,
@@ -89,6 +199,7 @@ function ToggleTokenField({
     ariaLabel,
     label,
     options,
+    suggestions = options,
     placeholder,
     value,
     onChange,
@@ -96,32 +207,109 @@ function ToggleTokenField({
     ariaLabel: string;
     label: string;
     options: string[];
+    suggestions?: string[];
     placeholder: string;
     value: string;
     onChange: (value: string) => void;
 }) {
+    const inputRef = useRef<HTMLInputElement | null>(null);
+    const [focused, setFocused] = useState(false);
+    const [cursor, setCursor] = useState<number | null>(null);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const query = getCurrentTokenQuery(value, cursor);
+    const currentTokens = useMemo(() => splitTokens(value), [value]);
+    const otherTokenKeys = useMemo(
+        () => new Set(getTokensOutsideCurrentQuery(value, cursor).map(canonicalToken)),
+        [cursor, value]
+    );
+    const filteredSuggestions = useMemo(() => {
+        if (!focused || !query) return [];
+        const trimmedQuery = query.trim().toLowerCase();
+        return uniqueOptions(suggestions)
+            .filter((option) => matchesOption(option, query))
+            .filter((option) => option.trim().toLowerCase() !== trimmedQuery)
+            .filter((option) => !otherTokenKeys.has(canonicalToken(option)))
+            .slice(0, 6);
+    }, [focused, otherTokenKeys, query, suggestions]);
+
+    useEffect(() => {
+        setActiveIndex(0);
+    }, [query]);
+
+    const selectSuggestion = (suggestion: string) => {
+        onChange(replaceCurrentToken(value, cursor, suggestion));
+        setCursor(null);
+        setFocused(false);
+        requestAnimationFrame(() => inputRef.current?.focus());
+    };
+
+    const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (filteredSuggestions.length === 0) return;
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setActiveIndex((index) => (index + 1) % filteredSuggestions.length);
+            return;
+        }
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActiveIndex((index) => (index - 1 + filteredSuggestions.length) % filteredSuggestions.length);
+            return;
+        }
+        if (event.key === 'Enter' || event.key === ',') {
+            event.preventDefault();
+            event.stopPropagation();
+            selectSuggestion(filteredSuggestions[activeIndex] ?? filteredSuggestions[0]);
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            setFocused(false);
+        }
+    };
+
     return (
         <div className="flex flex-col gap-1 w-full">
             <label className={taskEditorLabelClassName}>{label}</label>
-            <input
-                type="text"
-                aria-label={ariaLabel}
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                placeholder={placeholder}
-                className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground placeholder:text-muted-foreground"
-            />
+            <div className="relative">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    aria-label={ariaLabel}
+                    aria-autocomplete="list"
+                    aria-expanded={filteredSuggestions.length > 0}
+                    value={value}
+                    onChange={(event) => {
+                        setCursor(event.currentTarget.selectionStart);
+                        onChange(event.target.value);
+                    }}
+                    onClick={(event) => setCursor(event.currentTarget.selectionStart)}
+                    onKeyUp={(event) => setCursor(event.currentTarget.selectionStart)}
+                    onKeyDown={handleKeyDown}
+                    onFocus={(event) => {
+                        setFocused(true);
+                        setCursor(event.currentTarget.selectionStart);
+                    }}
+                    onBlur={() => setFocused(false)}
+                    placeholder={placeholder}
+                    className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground placeholder:text-muted-foreground"
+                />
+                <SuggestionList
+                    activeIndex={activeIndex}
+                    suggestions={filteredSuggestions}
+                    onSelect={selectSuggestion}
+                />
+            </div>
             <div className="flex flex-wrap gap-2 pt-1">
                 {options.map((token) => {
-                    const currentTokens = value.split(',').map((item) => item.trim()).filter(Boolean);
-                    const isActive = currentTokens.includes(token);
+                    const isActive = currentTokens.some((item) => canonicalToken(item) === canonicalToken(token));
                     return (
                         <button
                             key={token}
                             type="button"
                             onClick={() => {
                                 const nextTokens = isActive
-                                    ? currentTokens.filter((item) => item !== token)
+                                    ? currentTokens.filter((item) => canonicalToken(item) !== canonicalToken(token))
                                     : [...currentTokens, token];
                                 onChange(nextTokens.join(', '));
                             }}
@@ -136,6 +324,97 @@ function ToggleTokenField({
                         </button>
                     );
                 })}
+            </div>
+        </div>
+    );
+}
+
+function AutocompleteTextField({
+    ariaLabel,
+    label,
+    options,
+    placeholder,
+    value,
+    onChange,
+}: {
+    ariaLabel: string;
+    label: string;
+    options: string[];
+    placeholder: string;
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const inputRef = useRef<HTMLInputElement | null>(null);
+    const [focused, setFocused] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const query = value.trim();
+    const suggestions = useMemo(() => {
+        if (!focused || !query) return [];
+        const queryKey = query.toLowerCase();
+        return uniqueOptions(options)
+            .filter((option) => option.toLowerCase().includes(queryKey))
+            .filter((option) => option.toLowerCase() !== queryKey)
+            .slice(0, 6);
+    }, [focused, options, query]);
+
+    useEffect(() => {
+        setActiveIndex(0);
+    }, [query]);
+
+    const selectSuggestion = (suggestion: string) => {
+        onChange(suggestion);
+        setFocused(false);
+        requestAnimationFrame(() => inputRef.current?.focus());
+    };
+
+    const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (suggestions.length === 0) return;
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setActiveIndex((index) => (index + 1) % suggestions.length);
+            return;
+        }
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActiveIndex((index) => (index - 1 + suggestions.length) % suggestions.length);
+            return;
+        }
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            event.stopPropagation();
+            selectSuggestion(suggestions[activeIndex] ?? suggestions[0]);
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            setFocused(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-1">
+            <label className={taskEditorLabelClassName}>{label}</label>
+            <div className="relative">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={value}
+                    aria-label={ariaLabel}
+                    aria-autocomplete="list"
+                    aria-expanded={suggestions.length > 0}
+                    onChange={(event) => onChange(event.target.value)}
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => setFocused(true)}
+                    onBlur={() => setFocused(false)}
+                    placeholder={placeholder}
+                    className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
+                />
+                <SuggestionList
+                    activeIndex={activeIndex}
+                    suggestions={suggestions}
+                    onSelect={selectSuggestion}
+                />
             </div>
         </div>
     );
@@ -229,24 +508,23 @@ export function EnergyLevelField({
 export function AssignedToField({
     t,
     value,
+    options = [],
     onChange,
 }: {
     t: (key: string) => string;
     value: string;
+    options?: string[];
     onChange: (value: string) => void;
 }) {
     return (
-        <div className="flex flex-col gap-1">
-            <label className={taskEditorLabelClassName}>{t('taskEdit.assignedTo')}</label>
-            <input
-                type="text"
-                value={value}
-                aria-label={t('taskEdit.assignedTo')}
-                onChange={(event) => onChange(event.target.value)}
-                placeholder={t('taskEdit.assignedToPlaceholder')}
-                className="text-xs bg-muted/50 border border-border rounded px-2 py-1 text-foreground"
-            />
-        </div>
+        <AutocompleteTextField
+            ariaLabel={t('taskEdit.assignedTo')}
+            label={t('taskEdit.assignedTo')}
+            options={options}
+            placeholder={t('taskEdit.assignedToPlaceholder')}
+            value={value}
+            onChange={onChange}
+        />
     );
 }
 
@@ -287,11 +565,13 @@ export function ContextsField({
     t,
     value,
     options,
+    suggestions,
     onChange,
 }: {
     t: (key: string) => string;
     value: string;
     options: string[];
+    suggestions?: string[];
     onChange: (value: string) => void;
 }) {
     return (
@@ -299,6 +579,7 @@ export function ContextsField({
             ariaLabel={t('task.aria.contexts')}
             label={t('taskEdit.contextsLabel')}
             options={options}
+            suggestions={suggestions}
             placeholder={t('taskEdit.contextsPlaceholder')}
             value={value}
             onChange={onChange}
@@ -310,11 +591,13 @@ export function TagsField({
     t,
     value,
     options,
+    suggestions,
     onChange,
 }: {
     t: (key: string) => string;
     value: string;
     options: string[];
+    suggestions?: string[];
     onChange: (value: string) => void;
 }) {
     return (
@@ -322,6 +605,7 @@ export function TagsField({
             ariaLabel={t('task.aria.tags')}
             label={t('taskEdit.tagsLabel')}
             options={options}
+            suggestions={suggestions}
             placeholder={t('taskEdit.tagsPlaceholder')}
             value={value}
             onChange={onChange}

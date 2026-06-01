@@ -503,8 +503,11 @@ export type TaskItemFieldRendererData = {
     dateFormatSetting?: string | null;
     nativeDateInputLocale: string;
     defaultScheduleTime: string;
+    allContextOptions: string[];
+    allTagOptions: string[];
     popularContextOptions: string[];
     popularTagOptions: string[];
+    assignedToOptions: string[];
 };
 
 export type TaskItemFieldRendererHandlers = {
@@ -574,8 +577,11 @@ export function TaskItemFieldRenderer({
         dateFormatSetting,
         nativeDateInputLocale,
         defaultScheduleTime,
+        allContextOptions,
+        allTagOptions,
         popularContextOptions,
         popularTagOptions,
+        assignedToOptions,
     } = data;
 
     const [reviewTimeDraft, setReviewTimeDraft] = useState('');
@@ -1141,7 +1147,7 @@ export function TaskItemFieldRenderer({
         case 'energyLevel':
             return <EnergyLevelField t={t} value={editEnergyLevel} onChange={setEditEnergyLevel} />;
         case 'assignedTo':
-            return <AssignedToField t={t} value={editAssignedTo} onChange={setEditAssignedTo} />;
+            return <AssignedToField t={t} value={editAssignedTo} options={assignedToOptions} onChange={setEditAssignedTo} />;
         case 'recurrence':
             return (
                 <RecurrenceField
@@ -1165,9 +1171,25 @@ export function TaskItemFieldRenderer({
         case 'timeEstimate':
             return <TimeEstimateField t={t} value={editTimeEstimate} onChange={setEditTimeEstimate} />;
         case 'contexts':
-            return <ContextsField t={t} value={editContexts} options={popularContextOptions} onChange={setEditContexts} />;
+            return (
+                <ContextsField
+                    t={t}
+                    value={editContexts}
+                    options={popularContextOptions}
+                    suggestions={allContextOptions}
+                    onChange={setEditContexts}
+                />
+            );
         case 'tags':
-            return <TagsField t={t} value={editTags} options={popularTagOptions} onChange={setEditTags} />;
+            return (
+                <TagsField
+                    t={t}
+                    value={editTags}
+                    options={popularTagOptions}
+                    suggestions={allTagOptions}
+                    onChange={setEditTags}
+                />
+            );
         case 'location':
             return (
                 <div className="flex flex-col gap-1">

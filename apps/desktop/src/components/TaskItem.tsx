@@ -318,6 +318,7 @@ export const TaskItem = memo(function TaskItem({
         popularContextOptions,
         popularTagOptions,
         allContexts,
+        assignedToOptions,
     } = useTaskItemProjectContext({
         task,
         project: storeProject,
@@ -499,8 +500,11 @@ export const TaskItem = memo(function TaskItem({
         dateFormatSetting: settings?.dateFormat,
         nativeDateInputLocale,
         defaultScheduleTime: normalizeClockTimeInput(settings?.gtd?.defaultScheduleTime) || '',
+        allContextOptions: allContexts,
+        allTagOptions: tagOptions,
         popularContextOptions,
         popularTagOptions,
+        assignedToOptions,
     }), [
         t,
         task,
@@ -528,8 +532,11 @@ export const TaskItem = memo(function TaskItem({
         settings?.dateFormat,
         nativeDateInputLocale,
         settings?.gtd?.defaultScheduleTime,
+        allContexts,
+        tagOptions,
         popularContextOptions,
         popularTagOptions,
+        assignedToOptions,
     ]);
     const fieldRendererHandlers = useMemo(() => ({
         toggleDescriptionPreview,

@@ -13,6 +13,27 @@ type UseTaskItemProjectContextParams = {
     setEditAreaId: (value: string) => void;
 };
 
+const normalizeTokenOption = (token: string, prefix: '@' | '#'): string => {
+    const bareToken = token.trim().replace(/^[@#]/, '');
+    return bareToken ? `${prefix}${bareToken}` : '';
+};
+
+const uniquePrefixedTokenOptions = (tokens: string[], prefix: '@' | '#'): string[] => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    tokens.forEach((token) => {
+        const normalized = normalizeTokenOption(token, prefix);
+        const key = normalized.toLowerCase();
+        if (!normalized || seen.has(key)) return;
+        seen.add(key);
+        result.push(normalized);
+    });
+    return result;
+};
+
+const sortTokenOptions = (tokens: string[]): string[] =>
+    [...tokens].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
 export function useTaskItemProjectContext({
     task,
     project,
@@ -48,6 +69,7 @@ export function useTaskItemProjectContext({
     const [popularTagOptions, setPopularTagOptions] = useState<string[]>([]);
     const [allContexts, setAllContexts] = useState<string[]>([]);
     const [popularContextOptions, setPopularContextOptions] = useState<string[]>([]);
+    const [assignedToOptions, setAssignedToOptions] = useState<string[]>([]);
 
     useEffect(() => {
         if (!isEditing) return;
@@ -71,10 +93,34 @@ export function useTaskItemProjectContext({
             setProjectContext(null);
         }
 
-        setTagOptions(getUsedTaskTokens(storeTasks, (candidate) => candidate.tags, { prefix: '#' }));
-        setPopularTagOptions(getFrequentTaskTokens(storeTasks, (candidate) => candidate.tags, 8, { prefix: '#' }));
-        setAllContexts(getUsedTaskTokens(storeTasks, (candidate) => candidate.contexts, { prefix: '@' }));
-        setPopularContextOptions(getFrequentTaskTokens(storeTasks, (candidate) => candidate.contexts, 5, { prefix: '@' }));
+        const allTagOptions = uniquePrefixedTokenOptions(
+            getUsedTaskTokens(storeTasks, (candidate) => candidate.tags),
+            '#'
+        );
+        const frequentTagOptions = uniquePrefixedTokenOptions(
+            getFrequentTaskTokens(storeTasks, (candidate) => candidate.tags, 8),
+            '#'
+        );
+        const allContextOptions = uniquePrefixedTokenOptions(
+            getUsedTaskTokens(storeTasks, (candidate) => candidate.contexts),
+            '@'
+        );
+        const frequentContextOptions = uniquePrefixedTokenOptions(
+            getFrequentTaskTokens(storeTasks, (candidate) => candidate.contexts, 5),
+            '@'
+        );
+        setTagOptions(sortTokenOptions(allTagOptions));
+        setPopularTagOptions(frequentTagOptions);
+        setAllContexts(sortTokenOptions(allContextOptions));
+        setPopularContextOptions(frequentContextOptions);
+        setAssignedToOptions(
+            Array.from(new Set(
+                storeTasks
+                    .filter((candidate) => !candidate.deletedAt)
+                    .map((candidate) => candidate.assignedTo?.trim())
+                    .filter((value): value is string => Boolean(value))
+            )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+        );
     }, [editProjectId, isEditing, project, setEditAreaId, task.id, task.projectId]);
 
     return {
@@ -87,5 +133,6 @@ export function useTaskItemProjectContext({
         popularTagOptions,
         allContexts,
         popularContextOptions,
+        assignedToOptions,
     };
 }

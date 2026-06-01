@@ -35,6 +35,8 @@ const t = (key: string) => {
         'taskEdit.contextsPlaceholder': 'Add contexts',
         'taskEdit.tagsLabel': 'Tags',
         'taskEdit.tagsPlaceholder': 'Add tags',
+        'taskEdit.assignedTo': 'Assigned to',
+        'taskEdit.assignedToPlaceholder': 'Delegate to...',
         'task.aria.startDate': 'Start date',
         'task.aria.startTime': 'Start time',
         'task.aria.dueDate': 'Due date',
@@ -120,8 +122,11 @@ const createData = (overrides: Partial<TaskItemFieldRendererData> = {}): TaskIte
     dateFormatSetting: 'system',
     nativeDateInputLocale: 'en-US',
     defaultScheduleTime: '',
+    allContextOptions: [],
+    allTagOptions: [],
     popularContextOptions: [],
     popularTagOptions: [],
+    assignedToOptions: [],
     ...overrides,
 });
 
@@ -181,6 +186,62 @@ function DescriptionPreviewHarness() {
             handlers={{
                 ...createHandlers(),
                 editDescriptionFromPreview: () => setShowDescriptionPreview(false),
+            }}
+        />
+    );
+}
+
+function ContextAutocompleteHarness() {
+    const [editContexts, setEditContexts] = useState('');
+
+    return (
+        <TaskItemFieldRenderer
+            fieldId="contexts"
+            data={createData({
+                editContexts,
+                allContextOptions: ['@computer', '@phone'],
+                popularContextOptions: [],
+            })}
+            handlers={{
+                ...createHandlers(),
+                setEditContexts,
+            }}
+        />
+    );
+}
+
+function TagAutocompleteHarness() {
+    const [editTags, setEditTags] = useState('');
+
+    return (
+        <TaskItemFieldRenderer
+            fieldId="tags"
+            data={createData({
+                editTags,
+                allTagOptions: ['#music', '#mindwtr'],
+                popularTagOptions: [],
+            })}
+            handlers={{
+                ...createHandlers(),
+                setEditTags,
+            }}
+        />
+    );
+}
+
+function AssignedToAutocompleteHarness() {
+    const [editAssignedTo, setEditAssignedTo] = useState('');
+
+    return (
+        <TaskItemFieldRenderer
+            fieldId="assignedTo"
+            data={createData({
+                editAssignedTo,
+                assignedToOptions: ['Alex', 'Jordan'],
+            })}
+            handlers={{
+                ...createHandlers(),
+                setEditAssignedTo,
             }}
         />
     );
@@ -594,6 +655,50 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
         fireEvent.click(getByRole('button', { name: 'Follow-up' }));
 
         expect(handlers.setEditTags).toHaveBeenCalledWith('Launch, Follow-up');
+    });
+
+    it('suggests existing contexts while typing without requiring @', async () => {
+        const { findByRole, getByRole } = render(<ContextAutocompleteHarness />);
+        const input = getByRole('textbox', { name: 'Contexts' });
+
+        fireEvent.focus(input);
+        fireEvent.change(input, { target: { value: 'computer' } });
+
+        expect(await findByRole('option', { name: '@computer' })).toBeInTheDocument();
+
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(input).toHaveValue('@computer');
+    });
+
+    it('lets keyboard navigation choose between existing tag suggestions', async () => {
+        const { findByRole, getByRole } = render(<TagAutocompleteHarness />);
+        const input = getByRole('textbox', { name: 'Tags' });
+
+        fireEvent.focus(input);
+        fireEvent.change(input, { target: { value: 'm' } });
+
+        expect(await findByRole('option', { name: '#music' })).toBeInTheDocument();
+        expect(await findByRole('option', { name: '#mindwtr' })).toBeInTheDocument();
+
+        fireEvent.keyDown(input, { key: 'ArrowDown' });
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(input).toHaveValue('#mindwtr');
+    });
+
+    it('suggests existing assignees in the assigned-to field', async () => {
+        const { findByRole, getByRole } = render(<AssignedToAutocompleteHarness />);
+        const input = getByRole('textbox', { name: 'Assigned to' });
+
+        fireEvent.focus(input);
+        fireEvent.change(input, { target: { value: 'ale' } });
+
+        expect(await findByRole('option', { name: 'Alex' })).toBeInTheDocument();
+
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(input).toHaveValue('Alex');
     });
 
     it('updates weekly recurrence intervals without dropping selected weekdays', () => {
