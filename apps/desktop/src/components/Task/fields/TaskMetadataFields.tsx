@@ -11,11 +11,26 @@ type PillOption<TValue extends string> = {
 
 const selectedPillClassName = 'border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90';
 
+const simplePrefixedTokenPattern = /^[@#][^\s,]+$/u;
+
 const canonicalToken = (value: string): string =>
     value.trim().replace(/^[@#]/, '').toLowerCase();
 
+const isSimplePrefixedToken = (value: string): boolean =>
+    simplePrefixedTokenPattern.test(value.trim());
+
 const splitTokens = (value: string): string[] =>
-    value.split(',').map((item) => item.trim()).filter(Boolean);
+    value
+        .split(',')
+        .flatMap((item) => {
+            const trimmed = item.trim();
+            if (!trimmed) return [];
+            const whitespaceTokens = trimmed.split(/\s+/).filter(Boolean);
+            if (whitespaceTokens.length > 1 && whitespaceTokens.every(isSimplePrefixedToken)) {
+                return whitespaceTokens;
+            }
+            return [trimmed];
+        });
 
 const uniqueOptions = (options: string[]): string[] => {
     const seen = new Set<string>();
@@ -39,37 +54,45 @@ const matchesOption = (option: string, query: string): boolean => {
     return normalizedOption.includes(normalizedQuery) || bareOption.includes(bareQuery);
 };
 
-const getCurrentTokenQuery = (value: string, cursor: number | null): string => {
-    const index = typeof cursor === 'number' ? cursor : value.length;
-    const beforeCursor = value.slice(0, index);
-    const commaIndex = beforeCursor.lastIndexOf(',');
-    return beforeCursor.slice(commaIndex + 1).trim();
-};
-
-const getTokensOutsideCurrentQuery = (value: string, cursor: number | null): string[] => {
+const getCurrentTokenBounds = (value: string, cursor: number | null): { start: number; end: number } => {
     const index = typeof cursor === 'number' ? cursor : value.length;
     const beforeCursor = value.slice(0, index);
     const afterCursor = value.slice(index);
-    const tokenStart = beforeCursor.lastIndexOf(',') + 1;
+    let tokenStart = beforeCursor.lastIndexOf(',') + 1;
+    const segmentBeforeCursor = beforeCursor.slice(tokenStart);
+    const activeAfterSpaceMatch = segmentBeforeCursor.match(/\s+([^\s,]*)$/u);
+    if (activeAfterSpaceMatch?.index !== undefined && activeAfterSpaceMatch[1]) {
+        const priorTokens = segmentBeforeCursor.slice(0, activeAfterSpaceMatch.index).trim().split(/\s+/);
+        const priorToken = priorTokens[priorTokens.length - 1] ?? '';
+        if (isSimplePrefixedToken(priorToken)) {
+            tokenStart += activeAfterSpaceMatch.index + activeAfterSpaceMatch[0].length - activeAfterSpaceMatch[1].length;
+        }
+    }
     const nextComma = afterCursor.indexOf(',');
     const tokenEnd = nextComma === -1 ? value.length : index + nextComma;
+    return { start: tokenStart, end: tokenEnd };
+};
+
+const getCurrentTokenQuery = (value: string, cursor: number | null): string => {
+    const { start } = getCurrentTokenBounds(value, cursor);
+    const index = typeof cursor === 'number' ? cursor : value.length;
+    return value.slice(start, index).trim();
+};
+
+const getTokensOutsideCurrentQuery = (value: string, cursor: number | null): string[] => {
+    const { start, end } = getCurrentTokenBounds(value, cursor);
     return [
-        ...splitTokens(value.slice(0, tokenStart)),
-        ...splitTokens(value.slice(tokenEnd)),
+        ...splitTokens(value.slice(0, start)),
+        ...splitTokens(value.slice(end)),
     ];
 };
 
 const replaceCurrentToken = (value: string, cursor: number | null, token: string): string => {
-    const index = typeof cursor === 'number' ? cursor : value.length;
-    const beforeCursor = value.slice(0, index);
-    const afterCursor = value.slice(index);
-    const tokenStart = beforeCursor.lastIndexOf(',') + 1;
-    const nextComma = afterCursor.indexOf(',');
-    const tokenEnd = nextComma === -1 ? value.length : index + nextComma;
+    const { start, end } = getCurrentTokenBounds(value, cursor);
     const nextTokens = [
-        ...splitTokens(value.slice(0, tokenStart)),
+        ...splitTokens(value.slice(0, start)),
         token,
-        ...splitTokens(value.slice(tokenEnd)),
+        ...splitTokens(value.slice(end)),
     ];
     const seen = new Set<string>();
     return nextTokens
@@ -222,15 +245,19 @@ function ToggleTokenField({
         () => new Set(getTokensOutsideCurrentQuery(value, cursor).map(canonicalToken)),
         [cursor, value]
     );
+    const suggestionOptions = useMemo(
+        () => uniqueOptions([...suggestions, ...options]),
+        [options, suggestions]
+    );
     const filteredSuggestions = useMemo(() => {
         if (!focused || !query) return [];
         const trimmedQuery = query.trim().toLowerCase();
-        return uniqueOptions(suggestions)
+        return suggestionOptions
             .filter((option) => matchesOption(option, query))
             .filter((option) => option.trim().toLowerCase() !== trimmedQuery)
             .filter((option) => !otherTokenKeys.has(canonicalToken(option)))
             .slice(0, 6);
-    }, [focused, otherTokenKeys, query, suggestions]);
+    }, [focused, otherTokenKeys, query, suggestionOptions]);
 
     useEffect(() => {
         setActiveIndex(0);

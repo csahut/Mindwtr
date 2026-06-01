@@ -191,16 +191,24 @@ function DescriptionPreviewHarness() {
     );
 }
 
-function ContextAutocompleteHarness() {
-    const [editContexts, setEditContexts] = useState('');
+function ContextAutocompleteHarness({
+    initialValue = '',
+    allContextOptions = ['@computer', '@phone'],
+    popularContextOptions = [],
+}: {
+    initialValue?: string;
+    allContextOptions?: string[];
+    popularContextOptions?: string[];
+} = {}) {
+    const [editContexts, setEditContexts] = useState(initialValue);
 
     return (
         <TaskItemFieldRenderer
             fieldId="contexts"
             data={createData({
                 editContexts,
-                allContextOptions: ['@computer', '@phone'],
-                popularContextOptions: [],
+                allContextOptions,
+                popularContextOptions,
             })}
             handlers={{
                 ...createHandlers(),
@@ -669,6 +677,42 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
         fireEvent.keyDown(input, { key: 'Enter' });
 
         expect(input).toHaveValue('@computer');
+    });
+
+    it('suggests visible context chips after a comma when the full option list is empty', async () => {
+        const { findByRole, getByRole } = render(
+            <ContextAutocompleteHarness
+                initialValue="@health, com"
+                allContextOptions={[]}
+                popularContextOptions={['@computer']}
+            />
+        );
+        const input = getByRole('textbox', { name: 'Contexts' }) as HTMLInputElement;
+        input.setSelectionRange(input.value.length, input.value.length);
+
+        fireEvent.focus(input);
+
+        expect(await findByRole('option', { name: '@computer' })).toBeInTheDocument();
+
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(input).toHaveValue('@health, @computer');
+    });
+
+    it('treats a space after a completed prefixed context as a new token query', async () => {
+        const { findByRole, getByRole } = render(
+            <ContextAutocompleteHarness initialValue="@health comp" />
+        );
+        const input = getByRole('textbox', { name: 'Contexts' }) as HTMLInputElement;
+        input.setSelectionRange(input.value.length, input.value.length);
+
+        fireEvent.focus(input);
+
+        expect(await findByRole('option', { name: '@computer' })).toBeInTheDocument();
+
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(input).toHaveValue('@health, @computer');
     });
 
     it('lets keyboard navigation choose between existing tag suggestions', async () => {
