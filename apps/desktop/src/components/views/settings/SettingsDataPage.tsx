@@ -25,7 +25,9 @@ type SettingsDataPageProps = Pick<
     | 'onClearPendingRemoteDeletes'
     | 'onRunAttachmentsCleanup'
     | 'isCleaningAttachments'
->;
+> & {
+    onAddGettingStartedContent: () => Promise<void> | void;
+};
 
 export function SettingsDataPage(props: SettingsDataPageProps) {
     return (
@@ -38,6 +40,7 @@ export function SettingsDataPage(props: SettingsDataPageProps) {
                 onImportTodoist={props.onImportTodoist}
                 onImportDgt={props.onImportDgt}
                 onImportOmniFocus={props.onImportOmniFocus}
+                onAddGettingStartedContent={props.onAddGettingStartedContent}
             />
             <AttachmentsCleanupSection
                 t={props.t}

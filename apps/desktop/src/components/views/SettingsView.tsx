@@ -68,6 +68,7 @@ import { useSyncSettings } from "./settings/useSyncSettings";
 import { useConfirmDialog } from "../../hooks/useConfirmDialog";
 import { usePerformanceMonitor } from "../../hooks/usePerformanceMonitor";
 import { checkBudget } from "../../config/performanceBudgets";
+import { useUiStore } from "../../store/ui-store";
 import {
   DEFAULT_LOCAL_API_PORT,
   getLocalApiServerStatus,
@@ -238,6 +239,11 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
   const settings =
     useTaskStore((state) => state.settings) ?? ({} as AppData["settings"]);
   const updateSettings = useTaskStore((state) => state.updateSettings);
+  const seedGettingStarted = useTaskStore((state) => state.seedGettingStarted);
+  const visibleDataCount = useTaskStore((state) => (
+    state.tasks.length + state.projects.length + state.sections.length + state.areas.length
+  ));
+  const showToast = useUiStore((state) => state.showToast);
   const isTauri = isTauriRuntime();
   const isFlatpak = isFlatpakRuntime();
   const isLinux = useMemo(() => {
@@ -616,6 +622,31 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
     await clearLog();
     showSaved();
   };
+
+  const handleAddGettingStartedContent = useCallback(async () => {
+    if (visibleDataCount > 0) {
+      const confirmed = await requestConfirmation({
+        title: "Add Getting Started content?",
+        description: "This adds a guided Getting Started project and sample inbox items to your current data. Existing Getting Started content will not be duplicated.",
+        confirmLabel: "Add content",
+        cancelLabel,
+      });
+      if (!confirmed) return;
+    }
+
+    try {
+      const result = await seedGettingStarted();
+      if (result.id) {
+        useUiStore.getState().setProjectView({ selectedProjectId: result.id });
+        showToast("Getting Started content is ready in Projects.", "success");
+        return;
+      }
+      showToast("Getting Started content was not created.", "info");
+    } catch (error) {
+      showToast("Failed to add Getting Started content.", "error");
+      reportError("Failed to add Getting Started content", error);
+    }
+  }, [cancelLabel, requestConfirmation, seedGettingStarted, showToast, visibleDataCount]);
 
   const attachmentsLastCleanupDisplay = useMemo(() => {
     if (!attachmentsLastCleanupAt) return "";
@@ -1263,6 +1294,7 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
           onImportTodoist={handleImportTodoist}
           onImportDgt={handleImportDgt}
           onImportOmniFocus={handleImportOmniFocus}
+          onAddGettingStartedContent={handleAddGettingStartedContent}
           attachmentsLastCleanupDisplay={attachmentsLastCleanupDisplay}
           pendingRemoteDeleteCount={pendingRemoteDeleteCount}
           onClearPendingRemoteDeletes={handleClearPendingRemoteDeletes}

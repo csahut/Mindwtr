@@ -10,7 +10,9 @@ type DataTransferSectionProps = Pick<
     | 'onImportTodoist'
     | 'onImportDgt'
     | 'onImportOmniFocus'
->;
+> & {
+    onAddGettingStartedContent: () => Promise<void> | void;
+};
 
 function TransferActionButton({
     description,
@@ -47,6 +49,7 @@ export function DataTransferSection({
     onImportOmniFocus,
     onImportTodoist,
     onRestoreBackup,
+    onAddGettingStartedContent,
     t,
     transferAction,
 }: DataTransferSectionProps) {
@@ -83,6 +86,13 @@ export function DataTransferSection({
                         description={t.restoreBackupDesc}
                         statusText={transferAction === 'restore' ? t.syncing : null}
                         onClick={() => void onRestoreBackup()}
+                    />
+                    <TransferActionButton
+                        disabled={disabled}
+                        label="Add Getting Started content"
+                        description="Create or restore the guided setup project and sample inbox items."
+                        statusText={null}
+                        onClick={() => void onAddGettingStartedContent()}
                     />
                     <TransferActionButton
                         disabled={disabled}

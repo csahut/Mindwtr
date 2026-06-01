@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { DataTransferSection } from './DataTransferSection';
@@ -25,6 +25,7 @@ const baseProps = {
     onImportTodoist: vi.fn(),
     onImportDgt: vi.fn(),
     onImportOmniFocus: vi.fn(),
+    onAddGettingStartedContent: vi.fn(),
 } as unknown as ComponentProps<typeof DataTransferSection>;
 
 describe('DataTransferSection', () => {
@@ -35,5 +36,19 @@ describe('DataTransferSection', () => {
             'href',
             'https://github.com/dongdongbh/Mindwtr/wiki/Data-and-Sync#imports-and-migrations'
         );
+    });
+
+    it('exposes a recovery action for Getting Started content', () => {
+        const onAddGettingStartedContent = vi.fn();
+        const { getByRole } = render(
+            <DataTransferSection
+                {...baseProps}
+                onAddGettingStartedContent={onAddGettingStartedContent}
+            />
+        );
+
+        fireEvent.click(getByRole('button', { name: /add getting started content/i }));
+
+        expect(onAddGettingStartedContent).toHaveBeenCalledTimes(1);
     });
 });
