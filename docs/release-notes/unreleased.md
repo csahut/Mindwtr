@@ -1,6 +1,6 @@
 # Mindwtr Unreleased
 
-Changes collected after `v0.9.6` and before the next version tag.
+Changes collected after `v0.9.7` and before the next version tag.
 
 ## Highlights
 

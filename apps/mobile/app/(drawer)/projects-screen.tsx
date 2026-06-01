@@ -106,7 +106,7 @@ export default function ProjectsScreen() {
   const pickerCardMaxHeight = Math.min(windowHeight * 0.8, 560);
   const areaListMaxHeight = Math.min(windowHeight * 0.4, 280);
   const areaManagerListMaxHeight = Math.min(windowHeight * 0.45, 320);
-  const overlayModalPresentation = Platform.OS === 'ios' ? 'overFullScreen' : 'fullScreen';
+  const overlayModalPresentation = 'overFullScreen' as const;
 
   const colors = AREA_PRESET_COLORS;
   const colorDisplayByHex: Record<string, { nameKey: string; swatch: string }> = {

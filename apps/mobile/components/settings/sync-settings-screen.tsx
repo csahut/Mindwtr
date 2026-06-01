@@ -819,29 +819,6 @@ function SyncSettingsView({
                             tc={tc}
                         />
 
-                        <View style={[styles.settingCard, { backgroundColor: tc.cardBg, marginTop: 16 }]}>
-                            <TouchableOpacity
-                                accessibilityRole="button"
-                                activeOpacity={0.75}
-                                disabled={isGettingStartedActionBusy}
-                                onPress={() => handleAddGettingStartedContent()}
-                                style={[styles.settingRow, { opacity: isGettingStartedActionBusy ? 0.58 : 1 }]}
-                                testID="mobile-add-getting-started-content"
-                            >
-                                <View style={styles.settingInfo}>
-                                    <Text style={[styles.settingLabel, { color: tc.text }]}>
-                                        Add Getting Started content
-                                    </Text>
-                                    <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                        Re-add the guided starter project and sample inbox items without duplicating existing starter content.
-                                    </Text>
-                                </View>
-                                <Text style={[styles.linkText, { color: isGettingStartedActionBusy ? tc.secondaryText : tc.tint }]}>
-                                    {gettingStartedBusy ? t('common.loading') : t('common.add')}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-
                         <AppleRemindersImportSection
                             addTask={addTask}
                             disabled={isBackupBusy || isSyncing}

@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+        window.localStorage.setItem('mindwtr:desktop:first-run-onboarding:v1', 'dismissed');
+    });
+});
+
 const openInbox = async (page: import('@playwright/test').Page) => {
     const inboxNav = page.locator('[data-sidebar-item][data-view="inbox"]');
     await expect(inboxNav).toBeVisible();

@@ -88,6 +88,25 @@
   <url type="bugtracker">https://github.com/dongdongbh/Mindwtr/issues</url>
   <url type="vcs-browser">https://github.com/dongdongbh/Mindwtr</url>
   <releases>
+    <release version="0.9.7" date="2026-06-01">
+      <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v0.9.7</url>
+      <description>
+        <p>Mindwtr 0.9.7 improves first-run setup, desktop task editing, Focus planning, sync safety, and Linux desktop integration.</p>
+        <p xml:lang="de">Mindwtr 0.9.7 verbessert Ersteinrichtung, Aufgabenbearbeitung im Desktop, Focus-Planung, Sync-Sicherheit und die Linux-Desktop-Integration.</p>
+        <ul>
+          <li>Added clearer first-run setup and fuller Getting Started guidance.</li>
+          <li xml:lang="de">Klarere Ersteinrichtung und vollere Erste-Schritte-Hilfe hinzugefuegt.</li>
+          <li>Added checklist drag reorder, metadata autocomplete, stronger task labels, and bulk selection controls across desktop Select-mode views.</li>
+          <li xml:lang="de">Checklisten-Sortierung per Ziehen, Metadaten-Autovervollstaendigung, staerkere Aufgabenbeschriftungen und Mehrfachauswahl in Desktop-Auswahlansichten hinzugefuegt.</li>
+          <li>Improved Focus planning with simpler filters, clearer copy, a defer action, and warnings for incoherent task dates.</li>
+          <li xml:lang="de">Focus-Planung mit einfacheren Filtern, klareren Texten, einer Verschiebeaktion und Warnungen fuer unstimmige Aufgabendaten verbessert.</li>
+          <li>Made sync safer with clearer backend selection, stale cache cleanup, and preserved area merge tombstones.</li>
+          <li xml:lang="de">Sync mit klarerer Backend-Auswahl, Aufraeumen veralteter Cache-Eintraege und beibehaltenen Bereichs-Loeschmarken sicherer gemacht.</li>
+          <li>Improved Linux desktop reliability with Flatpak tray icon cache handling and launch handoff behavior.</li>
+          <li xml:lang="de">Linux-Desktop-Zuverlaessigkeit durch Flatpak-Tray-Icon-Cache und Startuebergabe verbessert.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.9.6" date="2026-05-29">
       <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v0.9.6</url>
       <description>

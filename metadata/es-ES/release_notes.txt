@@ -1,3 +1,3 @@
-- Se agregan filtros de listas y fragmentos Markdown de tareas mas claros.
-- Mejora la planificacion de calendario con envio a Apple Calendar y vista de proxima repeticion.
-- Markdown, listas, captura con Siri, avisos de proyecto y reintentos de sync son mas fiables.
+- Se agregan configuracion inicial y una guia de primeros pasos mas completa.
+- Focus se abre de forma mas consistente y editar tareas es mas rapido.
+- Los proyectos borrados, sync, avisos de fechas y solicitudes de IA son mas fiables.

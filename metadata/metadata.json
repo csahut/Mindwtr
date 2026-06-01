@@ -30,7 +30,7 @@
           "完全离线可用，无需互联网连接",
           "完全开源，安全透明"
         ],
-        "ReleaseNotes": "• 改进 Markdown、清单编辑和任务摘要显示。\n• 新增可折叠项目面板，并让选中状态和任务搜索更清楚。\n• Windows 深色窗口、快速添加、项目下拉框、托盘恢复和同步冲突提示更可靠。",
+        "ReleaseNotes": "• 首次设置和入门指南更清楚。\n• 清单拖放排序、任务元数据自动补全和批量选择让任务处理更快。\n• 同步清理、日期警告和 AI 请求更可靠。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -82,7 +82,7 @@
           "No internet connection required to function",
           "Open source and transparent"
         ],
-        "ReleaseNotes": "• Improved Markdown, checklist editing, and task description snippets.\n• Added a collapsible project panel with clearer selected states and task search matches.\n• Windows dark chrome, quick add, project dropdowns, tray restore, and sync conflict toasts are more reliable.",
+        "ReleaseNotes": "• First-run setup and Getting Started guidance are clearer.\n• Checklist drag reorder, task metadata autocomplete, and bulk selection make task work faster.\n• Sync cleanup, date warnings, and AI requests are more reliable.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -131,7 +131,7 @@
           "Offline nutzbar ohne staendige Internetverbindung",
           "Open Source und transparent"
         ],
-        "ReleaseNotes": "• Markdown, Checklisten-Bearbeitung und Aufgabenbeschreibungsausschnitte verbessert.\n• Einklappbares Projektpanel mit klareren Auswahlzustaenden und Aufgabensuchtreffern hinzugefuegt.\n• Windows-Dunkelmodus-Fenster, Schnellhinzufuegen, Projektauswahl, Tray-Wiederherstellung und Sync-Konfliktmeldungen sind zuverlaessiger.",
+        "ReleaseNotes": "• Ersteinrichtung und Erste-Schritte-Hilfe sind klarer.\n• Checklisten-Sortierung per Ziehen, Aufgabenmetadaten-Autovervollstaendigung und Mehrfachauswahl machen Aufgabenarbeit schneller.\n• Sync-Bereinigung, Datumswarnungen und KI-Anfragen sind zuverlaessiger.",
         "Images": [],
         "RecommendedHardware": [],
         "MinimumHardware": [],
@@ -160,7 +160,7 @@
           "No requiere conexión a internet para funcionar",
           "Código abierto y transparente"
         ],
-        "ReleaseNotes": "• Mejoran Markdown, la edicion de listas y los fragmentos de descripcion de tareas.\n• Se agrega un panel de proyectos plegable con estados seleccionados y busqueda de tareas mas claros.\n• Ventana oscura de Windows, entrada rapida, selector de proyectos, restauracion desde bandeja y avisos de sync son mas fiables.",
+        "ReleaseNotes": "• La configuracion inicial y la guia de primeros pasos son mas claras.\n• Reordenar listas, autocompletar metadatos y seleccion multiple agilizan el trabajo.\n• Limpieza de sync, avisos de fechas y solicitudes de IA son mas fiables.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
