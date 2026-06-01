@@ -42,4 +42,18 @@ describe('DesktopOnboardingFlow', () => {
 
         expect(queryByRole('dialog')).not.toBeInTheDocument();
     });
+
+    it('shows progress and inline errors for start fresh', () => {
+        const props = baseProps();
+        const { getByRole, getByText } = render(
+            <DesktopOnboardingFlow
+                {...props}
+                busy
+                error="Failed to create Getting Started onboarding."
+            />
+        );
+
+        expect(getByRole('button', { name: /starting/i })).toBeDisabled();
+        expect(getByText('Failed to create Getting Started onboarding.')).toBeInTheDocument();
+    });
 });

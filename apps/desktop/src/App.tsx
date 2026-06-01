@@ -95,6 +95,7 @@ function App() {
     const [desktopOnboardingDismissed, setDesktopOnboardingDismissed] = useState(readDesktopOnboardingDismissed);
     const [desktopOnboardingOpen, setDesktopOnboardingOpen] = useState(false);
     const [desktopOnboardingBusy, setDesktopOnboardingBusy] = useState(false);
+    const [desktopOnboardingError, setDesktopOnboardingError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
     const fetchData = useTaskStore((state) => state.fetchData);
     const seedGettingStarted = useTaskStore((state) => state.seedGettingStarted);
@@ -736,23 +737,27 @@ function App() {
     }, [dismissDesktopOnboarding, handleViewChange]);
 
     const handleStartFreshOnboarding = useCallback(() => {
+        if (desktopOnboardingBusy) return;
         setDesktopOnboardingBusy(true);
+        setDesktopOnboardingError(null);
         seedGettingStarted()
             .then((result) => {
+                if (!result.id) {
+                    setDesktopOnboardingError('Getting Started was not created. Try again or import your data instead.');
+                    showToast('Getting Started was not created.', 'info');
+                    return;
+                }
                 dismissDesktopOnboarding();
-                showToast(
-                    result.id
-                        ? 'Getting Started is ready in Projects.'
-                        : 'Getting Started was not created.',
-                    result.id ? 'success' : 'info'
-                );
+                handleViewChange('projects');
+                showToast('Getting Started is ready in Projects.', 'success');
             })
             .catch((error) => {
+                setDesktopOnboardingError('Failed to create Getting Started onboarding. Try again, or use Import/Sync instead.');
                 showToast('Failed to create Getting Started onboarding.', 'error');
                 void logError(error, { scope: 'onboarding', step: 'seedGettingStarted' });
             })
             .finally(() => setDesktopOnboardingBusy(false));
-    }, [dismissDesktopOnboarding, seedGettingStarted, showToast]);
+    }, [desktopOnboardingBusy, dismissDesktopOnboarding, handleViewChange, seedGettingStarted, showToast]);
 
     const LoadingFallback = ({ view }: { view: string }) => {
         useEffect(() => {
@@ -780,6 +785,7 @@ function App() {
     useEffect(() => {
         return subscribeDesktopOnboardingEvent(() => {
             setDesktopOnboardingBusy(false);
+            setDesktopOnboardingError(null);
             setDesktopOnboardingDismissed(false);
             setDesktopOnboardingOpen(true);
         });
@@ -846,6 +852,7 @@ function App() {
                     <DesktopOnboardingFlow
                         isOpen={desktopOnboardingOpen}
                         busy={desktopOnboardingBusy}
+                        error={desktopOnboardingError}
                         onOpenSync={() => openSettingsPage('sync')}
                         onOpenImport={() => openSettingsPage('data')}
                         onStartFresh={handleStartFreshOnboarding}

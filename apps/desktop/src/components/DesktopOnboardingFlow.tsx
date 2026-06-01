@@ -3,6 +3,7 @@ import { Database, Download, RefreshCw, X } from 'lucide-react';
 type DesktopOnboardingFlowProps = {
     isOpen: boolean;
     busy?: boolean;
+    error?: string | null;
     onOpenSync: () => void;
     onOpenImport: () => void;
     onStartFresh: () => void;
@@ -12,6 +13,7 @@ type DesktopOnboardingFlowProps = {
 export function DesktopOnboardingFlow({
     isOpen,
     busy = false,
+    error = null,
     onOpenSync,
     onOpenImport,
     onStartFresh,
@@ -93,13 +95,18 @@ export function DesktopOnboardingFlow({
                         </span>
                         <span className="min-w-0 flex-1">
                             <span className="block text-sm font-semibold">
-                                Start fresh
+                                {busy ? 'Starting...' : 'Start fresh'}
                             </span>
                             <span className="mt-0.5 block text-xs text-primary-foreground/80">
                                 Add the Getting Started project and a few sample inbox items.
                             </span>
                         </span>
                     </button>
+                    {error ? (
+                        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                            {error}
+                        </div>
+                    ) : null}
                 </div>
 
                 <div className="flex items-center justify-between gap-4 border-t border-border bg-muted/20 px-6 py-4">
