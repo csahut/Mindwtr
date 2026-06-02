@@ -60,6 +60,28 @@ const DATE_POPOVER_WIDTH = 288;
 const DATE_POPOVER_APPROX_HEIGHT = 340;
 const DATE_POPOVER_MARGIN = 8;
 
+const isRangeSelection = (selection: MarkdownSelection | null | undefined): selection is MarkdownSelection => (
+    selection != null && selection.start !== selection.end
+);
+
+const getPairInsertionSelection = (
+    currentValue: string,
+    eventSelection: MarkdownSelection,
+    pairSnapshot: { value: string; selection: MarkdownSelection } | null | undefined,
+    fallbackSelection: MarkdownSelection | null | undefined,
+): MarkdownSelection => {
+    if (eventSelection.start !== eventSelection.end) {
+        return eventSelection;
+    }
+    if (pairSnapshot?.value === currentValue && isRangeSelection(pairSnapshot.selection)) {
+        return pairSnapshot.selection;
+    }
+    if (isRangeSelection(fallbackSelection)) {
+        return fallbackSelection;
+    }
+    return eventSelection;
+};
+
 type DateInputOrder = 'dmy' | 'mdy' | 'ymd';
 
 function parseDateInputDate(value: string): Date | null {
@@ -587,6 +609,7 @@ export function TaskItemFieldRenderer({
     const [reviewTimeDraft, setReviewTimeDraft] = useState('');
     const [descriptionExpanded, setDescriptionExpanded] = useState(false);
     const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const lastDescriptionPairSelectionRef = useRef<{ value: string; selection: MarkdownSelection } | null>(null);
     const descriptionSelectionRef = useRef<MarkdownSelection>({
         start: editDescription.length,
         end: editDescription.length,
@@ -604,6 +627,7 @@ export function TaskItemFieldRenderer({
             start: editDescription.length,
             end: editDescription.length,
         };
+        lastDescriptionPairSelectionRef.current = null;
         descriptionUndoRef.current = [];
         setDescriptionUndoDepth(0);
     }, [taskId]);
@@ -701,6 +725,8 @@ export function TaskItemFieldRenderer({
         setEditDescription(value);
         if (options?.nextSelection) {
             descriptionSelectionRef.current = options.nextSelection;
+        } else {
+            lastDescriptionPairSelectionRef.current = null;
         }
     };
     const restoreDescriptionTextareaSelection = (
@@ -745,6 +771,7 @@ export function TaskItemFieldRenderer({
         selection: descriptionSelectionRef.current,
         textareaRef: descriptionTextareaRef,
         onApplyResult: (next) => {
+            lastDescriptionPairSelectionRef.current = null;
             applyDescriptionValue(next.value, {
                 baseSelection: descriptionSelectionRef.current,
                 nextSelection: next.selection,
@@ -762,12 +789,19 @@ export function TaskItemFieldRenderer({
             start: event.currentTarget.selectionStart ?? currentValue.length,
             end: event.currentTarget.selectionEnd ?? currentValue.length,
         };
-        const applyDescriptionKeyboardResult = (next: MarkdownToolbarResult) => {
+        const applyDescriptionKeyboardResult = (
+            next: MarkdownToolbarResult,
+            baseSelection = selection,
+            rememberPairRange = false,
+        ) => {
             applyDescriptionValue(next.value, {
-                baseSelection: selection,
+                baseSelection,
                 nextSelection: next.selection,
             });
             descriptionSelectionRef.current = next.selection;
+            lastDescriptionPairSelectionRef.current = rememberPairRange && isRangeSelection(next.selection)
+                ? { value: next.value, selection: next.selection }
+                : null;
             restoreDescriptionTextareaSelection(eventTextarea, next.selection);
         };
         const lowerKey = event.key.toLowerCase();
@@ -794,7 +828,13 @@ export function TaskItemFieldRenderer({
         }
 
         const isPairInsertionKey = !event.altKey && !event.ctrlKey && !event.metaKey && event.key.length === 1;
+        if (!isPairInsertionKey && event.key !== 'Tab') {
+            lastDescriptionPairSelectionRef.current = null;
+        }
         if (event.key === 'Tab' || isPairInsertionKey) {
+            const pairSelection = isPairInsertionKey
+                ? getPairInsertionSelection(currentValue, selection, lastDescriptionPairSelectionRef.current, descriptionSelectionRef.current)
+                : selection;
             const next = event.key === 'Tab'
                 ? applyMarkdownKeyboardShortcut(currentValue, selection, {
                     key: event.key,
@@ -802,12 +842,12 @@ export function TaskItemFieldRenderer({
                 })
                 : applyMarkdownPairInsertion(
                     currentValue,
-                    `${currentValue.slice(0, selection.start)}${event.key}${currentValue.slice(selection.end)}`,
-                    selection,
+                    `${currentValue.slice(0, pairSelection.start)}${event.key}${currentValue.slice(pairSelection.end)}`,
+                    pairSelection,
                 );
             if (!next) return;
             event.preventDefault();
-            applyDescriptionKeyboardResult(next);
+            applyDescriptionKeyboardResult(next, pairSelection, isPairInsertionKey);
             return;
         }
 
@@ -816,6 +856,7 @@ export function TaskItemFieldRenderer({
         if (!next) return;
 
         event.preventDefault();
+        lastDescriptionPairSelectionRef.current = null;
         applyDescriptionKeyboardResult(next);
     };
     const handleDescriptionPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -834,6 +875,7 @@ export function TaskItemFieldRenderer({
         );
         if (!next) return;
         event.preventDefault();
+        lastDescriptionPairSelectionRef.current = null;
         applyDescriptionValue(next.value, {
             baseSelection: selection,
             nextSelection: next.selection,
@@ -854,10 +896,14 @@ export function TaskItemFieldRenderer({
                 nextSelection: pairedInsertion.selection,
             });
             descriptionSelectionRef.current = pairedInsertion.selection;
+            lastDescriptionPairSelectionRef.current = isRangeSelection(pairedInsertion.selection)
+                ? { value: pairedInsertion.value, selection: pairedInsertion.selection }
+                : null;
             restoreDescriptionTextareaSelection(source, pairedInsertion.selection);
             return;
         }
 
+        lastDescriptionPairSelectionRef.current = null;
         applyDescriptionValue(value);
         descriptionSelectionRef.current = selection;
     };
@@ -948,6 +994,9 @@ export function TaskItemFieldRenderer({
                     onDescriptionChange={applyDescriptionValue}
                     onSelectionChange={(selection) => {
                         descriptionSelectionRef.current = selection;
+                        if (isRangeSelection(selection)) {
+                            lastDescriptionPairSelectionRef.current = null;
+                        }
                     }}
                     onUndo={handleDescriptionUndo}
                     onApplyAction={handleDescriptionApplyAction}

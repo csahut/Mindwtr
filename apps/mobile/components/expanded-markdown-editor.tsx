@@ -184,6 +184,8 @@ export function ExpandedMarkdownEditor({
         selectionRef.current = selection;
         if (isRangeSelection(selection)) {
             lastRangeSelectionRef.current = selection;
+        } else {
+            lastRangeSelectionRef.current = null;
         }
         setEditorSelection(selection);
     }, [selection]);
@@ -238,6 +240,8 @@ export function ExpandedMarkdownEditor({
         selectionRef.current = nextSelection;
         if (isRangeSelection(nextSelection)) {
             lastRangeSelectionRef.current = nextSelection;
+        } else {
+            lastRangeSelectionRef.current = null;
         }
         setEditorSelection(nextSelection);
         onSelectionChange(nextSelection);
@@ -248,6 +252,8 @@ export function ExpandedMarkdownEditor({
         selectionRef.current = nextSelection;
         if (isRangeSelection(nextSelection)) {
             lastRangeSelectionRef.current = nextSelection;
+        } else {
+            lastRangeSelectionRef.current = null;
         }
         setEditorSelection(nextSelection);
         onSelectionChange(nextSelection);
@@ -327,9 +333,9 @@ export function ExpandedMarkdownEditor({
             fallbackSelection,
         );
         if (pastedUrl) {
-            lastRangeSelectionRef.current = null;
             valueRef.current = pastedUrl.result.value;
             selectionRef.current = pastedUrl.result.selection;
+            lastRangeSelectionRef.current = isRangeSelection(pastedUrl.result.selection) ? pastedUrl.result.selection : null;
             setEditorValue(pastedUrl.result.value);
             setEditorSelection(pastedUrl.result.selection);
             onChange(pastedUrl.result.value);
@@ -345,9 +351,9 @@ export function ExpandedMarkdownEditor({
             fallbackSelection,
         );
         if (pairedInsertion) {
-            lastRangeSelectionRef.current = null;
             valueRef.current = pairedInsertion.result.value;
             selectionRef.current = pairedInsertion.result.selection;
+            lastRangeSelectionRef.current = isRangeSelection(pairedInsertion.result.selection) ? pairedInsertion.result.selection : null;
             setEditorValue(pairedInsertion.result.value);
             setEditorSelection(pairedInsertion.result.selection);
             onChange(pairedInsertion.result.value);
@@ -387,7 +393,6 @@ export function ExpandedMarkdownEditor({
         );
         if (pairedInsertion) {
             event.preventDefault?.();
-            lastRangeSelectionRef.current = null;
             ignoredNativePairChangeRef.current = {
                 nativeValue: `${valueRef.current.slice(0, pairedInsertion.baseSelection.start)}${event.nativeEvent.key}${valueRef.current.slice(pairedInsertion.baseSelection.end)}`,
                 appliedValue: pairedInsertion.result.value,
@@ -395,6 +400,7 @@ export function ExpandedMarkdownEditor({
             };
             valueRef.current = pairedInsertion.result.value;
             selectionRef.current = pairedInsertion.result.selection;
+            lastRangeSelectionRef.current = isRangeSelection(pairedInsertion.result.selection) ? pairedInsertion.result.selection : null;
             setEditorValue(pairedInsertion.result.value);
             setEditorSelection(pairedInsertion.result.selection);
             onChange(pairedInsertion.result.value);
@@ -410,9 +416,9 @@ export function ExpandedMarkdownEditor({
         );
         if (!next) return;
         event.preventDefault?.();
-        lastRangeSelectionRef.current = null;
         valueRef.current = next.value;
         selectionRef.current = next.selection;
+        lastRangeSelectionRef.current = isRangeSelection(next.selection) ? next.selection : null;
         setEditorValue(next.value);
         setEditorSelection(next.selection);
         onChange(next.value);
@@ -431,7 +437,7 @@ export function ExpandedMarkdownEditor({
 
         valueRef.current = next.value;
         selectionRef.current = next.selection;
-        lastRangeSelectionRef.current = null;
+        lastRangeSelectionRef.current = isRangeSelection(next.selection) ? next.selection : null;
         setEditorValue(next.value);
         setEditorSelection(next.selection);
 
@@ -446,7 +452,7 @@ export function ExpandedMarkdownEditor({
     const handleAutocompleteApply = React.useCallback((next: MarkdownToolbarResult) => {
         valueRef.current = next.value;
         selectionRef.current = next.selection;
-        lastRangeSelectionRef.current = null;
+        lastRangeSelectionRef.current = isRangeSelection(next.selection) ? next.selection : null;
         setEditorValue(next.value);
         setEditorSelection(next.selection);
         onChange(next.value);

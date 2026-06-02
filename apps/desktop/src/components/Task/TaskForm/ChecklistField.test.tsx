@@ -69,6 +69,27 @@ describe('ChecklistField', () => {
         });
     });
 
+    it('keeps repeated checklist backticks on the selected text when the input selection briefly collapses', async () => {
+        const { getAllByRole } = render(<ChecklistHarness />);
+
+        const input = getAllByRole('textbox')[0] as HTMLInputElement;
+        input.setSelectionRange(0, input.value.length);
+        fireEvent.select(input);
+        fireEvent.keyDown(input, { key: '`' });
+
+        await waitFor(() => {
+            expect((getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('`Item 1`');
+        });
+
+        const onceInput = getAllByRole('textbox')[0] as HTMLInputElement;
+        onceInput.setSelectionRange(onceInput.value.length, onceInput.value.length);
+        fireEvent.keyDown(onceInput, { key: '`' });
+
+        await waitFor(() => {
+            expect((getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('``Item 1``');
+        });
+    });
+
     it('applies Markdown bold and italic shortcuts inside checklist items', async () => {
         const { getAllByRole } = render(<ChecklistHarness />);
 

@@ -150,6 +150,7 @@ export function TaskEditContentField({
 
     const restoreChecklistSelection = React.useCallback((key: string, selection: MarkdownSelection) => {
         checklistSelectionRefs.current[key] = selection;
+        lastChecklistRangeRefs.current[key] = isRangeSelection(selection) ? selection : null;
         const applySelection = () => {
             const input = checklistInputRefs.current[key];
             input?.focus?.();
@@ -179,6 +180,8 @@ export function TaskEditContentField({
         checklistSelectionRefs.current[key] = selection;
         if (isRangeSelection(selection)) {
             lastChecklistRangeRefs.current[key] = selection;
+        } else {
+            lastChecklistRangeRefs.current[key] = null;
         }
     }, []);
 
@@ -227,7 +230,9 @@ export function TaskEditContentField({
             lastChecklistRangeRefs.current[key],
         );
         if (pairedInsertion) {
-            lastChecklistRangeRefs.current[key] = null;
+            lastChecklistRangeRefs.current[key] = isRangeSelection(pairedInsertion.result.selection)
+                ? pairedInsertion.result.selection
+                : null;
             updateChecklistTitle(index, key, pairedInsertion.result.value);
             restoreChecklistSelection(key, pairedInsertion.result.selection);
             return;
@@ -252,12 +257,14 @@ export function TaskEditContentField({
         if (!pairedInsertion) return;
 
         event.preventDefault?.();
-        lastChecklistRangeRefs.current[key] = null;
         ignoredNativePairChangeRefs.current[key] = {
             nativeValue: `${previousValue.slice(0, pairedInsertion.baseSelection.start)}${event.nativeEvent.key}${previousValue.slice(pairedInsertion.baseSelection.end)}`,
             appliedValue: pairedInsertion.result.value,
             selection: pairedInsertion.result.selection,
         };
+        lastChecklistRangeRefs.current[key] = isRangeSelection(pairedInsertion.result.selection)
+            ? pairedInsertion.result.selection
+            : null;
         updateChecklistTitle(index, key, pairedInsertion.result.value);
         restoreChecklistSelection(key, pairedInsertion.result.selection);
     }, [getChecklistSelection, restoreChecklistSelection, updateChecklistTitle]);

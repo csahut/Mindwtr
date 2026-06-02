@@ -40,6 +40,28 @@ type ChecklistFieldProps = {
     resetTaskChecklist: (taskId: string) => void;
 };
 
+const isRangeSelection = (selection: MarkdownSelection | null | undefined): selection is MarkdownSelection => (
+    selection != null && selection.start !== selection.end
+);
+
+const getPairInsertionSelection = (
+    currentValue: string,
+    eventSelection: MarkdownSelection,
+    pairSnapshot: { value: string; selection: MarkdownSelection } | null | undefined,
+    fallbackSelection: MarkdownSelection | null | undefined,
+): MarkdownSelection => {
+    if (eventSelection.start !== eventSelection.end) {
+        return eventSelection;
+    }
+    if (pairSnapshot?.value === currentValue && isRangeSelection(pairSnapshot.selection)) {
+        return pairSnapshot.selection;
+    }
+    if (isRangeSelection(fallbackSelection)) {
+        return fallbackSelection;
+    }
+    return eventSelection;
+};
+
 const areChecklistsEqual = (a: Task['checklist'], b: Task['checklist']): boolean => {
     if (a === b) return true;
     const listA = a || [];
@@ -132,6 +154,7 @@ export function ChecklistField({
     const checklistDirtyRef = useRef(false);
     const checklistInputRefs = useRef<Array<HTMLInputElement | null>>([]);
     const checklistSelectionRefs = useRef<Array<MarkdownSelection>>([]);
+    const lastChecklistPairSelectionRefs = useRef<Array<{ value: string; selection: MarkdownSelection } | null>>([]);
 
     useEffect(() => {
         setChecklistDraft(checklist || []);
@@ -142,6 +165,7 @@ export function ChecklistField({
     useEffect(() => {
         checklistInputRefs.current = [];
         checklistSelectionRefs.current = [];
+        lastChecklistPairSelectionRefs.current = [];
     }, [taskId]);
 
     useEffect(() => {
@@ -222,9 +246,13 @@ export function ChecklistField({
         index: number,
         result: MarkdownToolbarResult,
         source: HTMLInputElement,
+        rememberPairRange = false,
     ) => {
         updateChecklistItemTitle(index, result.value);
         checklistSelectionRefs.current[index] = result.selection;
+        lastChecklistPairSelectionRefs.current[index] = rememberPairRange && isRangeSelection(result.selection)
+            ? { value: result.value, selection: result.selection }
+            : null;
         restoreInputSelection(source, result.selection);
     }, [restoreInputSelection, updateChecklistItemTitle]);
 
@@ -297,9 +325,10 @@ export function ChecklistField({
                                                     previousSelection,
                                                 );
                                                 if (pairedInsertion) {
-                                                    applyChecklistMarkdownResult(index, pairedInsertion, event.currentTarget);
+                                                    applyChecklistMarkdownResult(index, pairedInsertion, event.currentTarget, true);
                                                     return;
                                                 }
+                                                lastChecklistPairSelectionRefs.current[index] = null;
                                                 updateChecklistItemTitle(index, event.target.value);
                                                 checklistSelectionRefs.current[index] = getInputSelection(event.currentTarget);
                                             }}
@@ -307,16 +336,20 @@ export function ChecklistField({
                                                 commitChecklistDraft();
                                             }}
                                             onSelect={(event) => {
-                                                checklistSelectionRefs.current[index] = getInputSelection(event.currentTarget);
+                                                const selection = getInputSelection(event.currentTarget);
+                                                checklistSelectionRefs.current[index] = selection;
+                                                if (isRangeSelection(selection)) {
+                                                    lastChecklistPairSelectionRefs.current[index] = null;
+                                                }
                                             }}
                                             onKeyDown={(event) => {
                                                 const currentValue = event.currentTarget.value;
-                                                const selection = getInputSelection(event.currentTarget);
-                                                checklistSelectionRefs.current[index] = selection;
+                                                const eventSelection = getInputSelection(event.currentTarget);
                                                 const lowerKey = event.key.toLowerCase();
                                                 if ((event.metaKey || event.ctrlKey) && !event.altKey) {
                                                     if (lowerKey !== 'b' && lowerKey !== 'i') return;
-                                                    const next = applyMarkdownKeyboardShortcut(currentValue, selection, {
+                                                    checklistSelectionRefs.current[index] = eventSelection;
+                                                    const next = applyMarkdownKeyboardShortcut(currentValue, eventSelection, {
                                                         key: event.key,
                                                         ctrlKey: event.ctrlKey,
                                                         metaKey: event.metaKey,
@@ -327,6 +360,13 @@ export function ChecklistField({
                                                     return;
                                                 }
                                                 if (!event.altKey && !event.ctrlKey && !event.metaKey && event.key.length === 1) {
+                                                    const selection = getPairInsertionSelection(
+                                                        currentValue,
+                                                        eventSelection,
+                                                        lastChecklistPairSelectionRefs.current[index],
+                                                        checklistSelectionRefs.current[index],
+                                                    );
+                                                    checklistSelectionRefs.current[index] = selection;
                                                     const next = applyMarkdownPairInsertion(
                                                         currentValue,
                                                         `${currentValue.slice(0, selection.start)}${event.key}${currentValue.slice(selection.end)}`,
@@ -334,9 +374,10 @@ export function ChecklistField({
                                                     );
                                                     if (!next) return;
                                                     event.preventDefault();
-                                                    applyChecklistMarkdownResult(index, next, event.currentTarget);
+                                                    applyChecklistMarkdownResult(index, next, event.currentTarget, true);
                                                     return;
                                                 }
+                                                lastChecklistPairSelectionRefs.current[index] = null;
                                                 if (event.key === 'Enter') {
                                                     event.preventDefault();
                                                     event.stopPropagation();

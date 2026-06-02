@@ -172,6 +172,7 @@ export function useTaskDescriptionEditor({
         descriptionDraftRef.current = text;
         if (options?.nextSelection) {
             descriptionSelectionRef.current = options.nextSelection;
+            lastDescriptionRangeRef.current = isRangeSelection(options.nextSelection) ? options.nextSelection : null;
             setDescriptionSelection(options.nextSelection);
         }
         resetCopilotDraft();
@@ -303,6 +304,8 @@ export function useTaskDescriptionEditor({
         descriptionSelectionRef.current = selection;
         if (isRangeSelection(selection)) {
             lastDescriptionRangeRef.current = selection;
+        } else {
+            lastDescriptionRangeRef.current = null;
         }
         setDescriptionSelection(selection);
     }, []);

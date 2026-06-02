@@ -133,6 +133,50 @@ describe('markdown selection replacement fallbacks', () => {
         });
     });
 
+    it('keeps repeated mobile backtick key presses on the fallback range after selection collapses', () => {
+        const once = applyMarkdownPairKeyPressWithSelectionFallback(
+            'run tests',
+            '`',
+            { start: 0, end: 9 },
+        );
+        expect(once).toEqual({
+            result: {
+                value: '`run tests`',
+                selection: { start: 1, end: 10 },
+            },
+            baseSelection: { start: 0, end: 9 },
+        });
+
+        const twice = applyMarkdownPairKeyPressWithSelectionFallback(
+            once!.result.value,
+            '`',
+            { start: once!.result.selection.end, end: once!.result.selection.end },
+            once!.result.selection,
+        );
+        expect(twice).toEqual({
+            result: {
+                value: '``run tests``',
+                selection: { start: 2, end: 11 },
+            },
+            baseSelection: { start: 1, end: 10 },
+        });
+
+        expect(
+            applyMarkdownPairKeyPressWithSelectionFallback(
+                twice!.result.value,
+                '`',
+                { start: twice!.result.selection.end, end: twice!.result.selection.end },
+                twice!.result.selection,
+            ),
+        ).toEqual({
+            result: {
+                value: '```\nrun tests\n```',
+                selection: { start: 4, end: 13 },
+            },
+            baseSelection: { start: 2, end: 11 },
+        });
+    });
+
     it('wraps selected text from a mobile triple-backtick text change', () => {
         expect(
             applyMarkdownPairInsertionWithSelectionFallback(

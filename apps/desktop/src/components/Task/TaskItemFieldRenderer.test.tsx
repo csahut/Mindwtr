@@ -873,6 +873,36 @@ describe('TaskItemFieldRenderer date clear buttons', () => {
         });
     });
 
+    it('keeps repeated description backticks on the selected text when the textarea selection briefly collapses', async () => {
+        const { getByRole } = render(<DescriptionHarness />);
+        const textarea = getByRole('textbox', { name: 'Description' }) as HTMLTextAreaElement;
+
+        fireEvent.change(textarea, { target: { value: 'run tests' } });
+        textarea.setSelectionRange(0, 9);
+        fireEvent.select(textarea);
+        fireEvent.keyDown(textarea, { key: '`' });
+
+        await waitFor(() => {
+            expect(textarea).toHaveValue('`run tests`');
+        });
+
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        fireEvent.keyDown(textarea, { key: '`' });
+
+        await waitFor(() => {
+            expect(textarea).toHaveValue('``run tests``');
+        });
+
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        fireEvent.keyDown(textarea, { key: '`' });
+
+        await waitFor(() => {
+            expect(textarea).toHaveValue('```\nrun tests\n```');
+            expect(textarea.selectionStart).toBe(4);
+            expect(textarea.selectionEnd).toBe(13);
+        });
+    });
+
     it('wraps selected description text when a tilde key press is intercepted', async () => {
         const { getByRole } = render(<DescriptionHarness />);
         const textarea = getByRole('textbox', { name: 'Description' }) as HTMLTextAreaElement;
