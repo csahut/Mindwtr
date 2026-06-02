@@ -145,17 +145,23 @@ const parseCalendarViewMode = (value: string | null): CalendarViewMode => (
     value === 'day' || value === 'week' || value === 'schedule' ? value : 'month'
 );
 
+const needsCalendarSelectedDate = (viewMode: CalendarViewMode): boolean => (
+    viewMode === 'day' || viewMode === 'week' || viewMode === 'schedule'
+);
+
 const getInitialCalendarState = (fallback: Date): { currentMonth: Date; selectedDate: Date | null; viewMode: CalendarViewMode } => {
     if (typeof window === 'undefined') {
         return { currentMonth: fallback, selectedDate: null, viewMode: 'month' };
     }
     const params = new URLSearchParams(window.location.search);
-    const selectedDate = parseCalendarDateParam(params.get('calendarDate'));
+    const viewMode = parseCalendarViewMode(params.get('calendarView'));
+    const selectedDate = parseCalendarDateParam(params.get('calendarDate'))
+        ?? (needsCalendarSelectedDate(viewMode) ? new Date(fallback) : null);
     const monthDate = parseCalendarDateParam(`${params.get('calendarMonth') ?? ''}-01`);
     return {
         currentMonth: selectedDate ?? monthDate ?? fallback,
         selectedDate,
-        viewMode: parseCalendarViewMode(params.get('calendarView')),
+        viewMode,
     };
 };
 
@@ -943,38 +949,44 @@ export function useDesktopCalendarController() {
         setCurrentMonth((prev) => setYear(prev, yearValue));
     };
     const handlePrevMonth = () => {
-        setSelectedDate(null);
         resetSelectedDayState();
         setIsMonthPickerOpen(false);
-        setCurrentMonth((prev) => {
-            if (viewMode === 'day') return subDays(prev, 1);
-            if (viewMode === 'week') return subWeeks(prev, 1);
-            if (viewMode === 'schedule') return subWeeks(prev, 2);
-            return subMonths(prev, 1);
-        });
+        const next = viewMode === 'day'
+            ? subDays(currentMonth, 1)
+            : viewMode === 'week'
+            ? subWeeks(currentMonth, 1)
+            : viewMode === 'schedule'
+            ? subWeeks(currentMonth, 2)
+            : subMonths(currentMonth, 1);
+        setCurrentMonth(next);
+        setSelectedDate(needsCalendarSelectedDate(viewMode) ? next : null);
     };
     const handleNextMonth = () => {
-        setSelectedDate(null);
         resetSelectedDayState();
         setIsMonthPickerOpen(false);
-        setCurrentMonth((prev) => {
-            if (viewMode === 'day') return addDays(prev, 1);
-            if (viewMode === 'week') return addWeeks(prev, 1);
-            if (viewMode === 'schedule') return addWeeks(prev, 2);
-            return addMonths(prev, 1);
-        });
+        const next = viewMode === 'day'
+            ? addDays(currentMonth, 1)
+            : viewMode === 'week'
+            ? addWeeks(currentMonth, 1)
+            : viewMode === 'schedule'
+            ? addWeeks(currentMonth, 2)
+            : addMonths(currentMonth, 1);
+        setCurrentMonth(next);
+        setSelectedDate(needsCalendarSelectedDate(viewMode) ? next : null);
     };
     const handleToday = () => {
         const nextToday = new Date();
         setCurrentMonth(nextToday);
-        setSelectedDate(null);
+        setSelectedDate(needsCalendarSelectedDate(viewMode) ? nextToday : null);
         resetSelectedDayState();
         setIsMonthPickerOpen(false);
     };
     const handleViewModeChange = (nextMode: CalendarViewMode) => {
         setViewMode(nextMode);
-        if (nextMode !== 'month' && selectedDate) {
-            setCurrentMonth(selectedDate);
+        if (needsCalendarSelectedDate(nextMode)) {
+            const nextDate = selectedDate ?? new Date();
+            setSelectedDate(nextDate);
+            setCurrentMonth(nextDate);
         }
         setIsMonthPickerOpen(false);
     };

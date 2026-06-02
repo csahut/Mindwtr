@@ -171,6 +171,29 @@ describe('CalendarView', () => {
         expect(markerStyle).toContain('color: hsl(var(--primary-foreground));');
     });
 
+    it('starts a restored schedule view from today instead of the first day of the month', async () => {
+        window.history.replaceState(null, '', '/?calendarView=schedule&calendarMonth=2026-04');
+        storeMocks.taskStoreState.tasks = [
+            makeTask({
+                id: 'month-start-task',
+                title: 'Month start task',
+                dueDate: '2026-04-01T12:00:00',
+            }),
+            makeTask({
+                id: 'today-task',
+                title: 'Today task',
+                dueDate: '2026-04-03T12:00:00',
+            }),
+        ];
+
+        renderCalendar();
+        await flushCalendarEffects();
+
+        expect(screen.queryByText('Month start task')).not.toBeInTheDocument();
+        expect(screen.getAllByText('Today task').length).toBeGreaterThan(0);
+        expect(window.location.search).toContain('calendarDate=2026-04-03');
+    });
+
     it('rejects rolled-over date values in calendar composer parsing', () => {
         expect(combineDateAndTime('2026-02-30', '09:00')).toBeNull();
         expect(combineDateAndTime('2026-02-28', '09:00')?.getDate()).toBe(28);
