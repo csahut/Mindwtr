@@ -2,6 +2,7 @@ import React from 'react';
 import type { RefObject } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { AtSign, CalendarDays, ChevronDown, ChevronUp, Clock, Flag, Folder, Mic, SlidersHorizontal, Square, X } from 'lucide-react-native';
+import { tFallback } from '@mindwtr/core';
 import type { ThemeColors } from '@/hooks/use-theme-colors';
 import { QuickDateChips } from '../QuickDateChips';
 import { styles } from './quick-capture-sheet.styles';
@@ -38,10 +39,6 @@ interface QuickCaptureSheetBodyProps {
   onToggleRecording: () => void;
   onValueChange: (value: string) => void;
   optionsExpanded: boolean;
-  hasArea: boolean;
-  hasContexts: boolean;
-  hasPriority: boolean;
-  hasProject: boolean;
   prioritiesEnabled: boolean;
   priorityLabel: string;
   projectLabel: string;
@@ -86,10 +83,6 @@ export function QuickCaptureSheetBody({
   onToggleRecording,
   onValueChange,
   optionsExpanded,
-  hasArea,
-  hasContexts,
-  hasPriority,
-  hasProject,
   prioritiesEnabled,
   priorityLabel,
   projectLabel,
@@ -103,8 +96,7 @@ export function QuickCaptureSheetBody({
   value,
   visible,
 }: QuickCaptureSheetBodyProps) {
-  const hasMetadataSummary = Boolean(dueDate || hasContexts || hasArea || hasProject || hasPriority);
-  const optionsToggleLabel = optionsExpanded ? t('taskEdit.hideOptions') : t('taskEdit.moreOptions');
+  const optionsToggleLabel = optionsExpanded ? t('taskEdit.hideOptions') : tFallback(t, 'common.more', 'More');
 
   return (
     <Modal
@@ -209,6 +201,25 @@ export function QuickCaptureSheetBody({
             )}
 
             <View style={styles.optionsHeaderRow}>
+              {!optionsExpanded && (
+                <TouchableOpacity
+                  style={[styles.collapsedContextChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
+                  onPress={onOpenContextPicker}
+                  onLongPress={onResetContexts}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('taskEdit.contextsLabel')}: ${contextLabel}`}
+                >
+                  <AtSign size={16} color={tc.text} />
+                  <Text
+                    style={[styles.collapsedContextText, { color: tc.text }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
+                  >
+                    {contextLabel}
+                  </Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[styles.optionsToggle, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
                 onPress={onToggleOptions}
@@ -231,109 +242,6 @@ export function QuickCaptureSheetBody({
                 )}
               </TouchableOpacity>
             </View>
-
-            {!optionsExpanded && hasMetadataSummary && (
-              <View style={styles.summaryRow}>
-                {dueDate && (
-                  <TouchableOpacity
-                    style={[styles.summaryChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
-                    onPress={onOpenDueDatePicker}
-                    onLongPress={onResetDueDate}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t('taskEdit.dueDate')}: ${dueLabel}`}
-                  >
-                    <CalendarDays size={14} color={tc.secondaryText} />
-                    <Text
-                      style={[styles.summaryChipText, { color: tc.secondaryText }]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
-                    >
-                      {dueLabel}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {hasContexts && (
-                  <TouchableOpacity
-                    style={[styles.summaryChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
-                    onPress={onOpenContextPicker}
-                    onLongPress={onResetContexts}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t('taskEdit.contextsLabel')}: ${contextLabel}`}
-                  >
-                    <AtSign size={14} color={tc.secondaryText} />
-                    <Text
-                      style={[styles.summaryChipText, { color: tc.secondaryText }]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
-                    >
-                      {contextLabel}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {hasArea && (
-                  <TouchableOpacity
-                    style={[styles.summaryChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
-                    onPress={onOpenAreaPicker}
-                    onLongPress={onResetArea}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t('taskEdit.areaLabel')}: ${areaLabel}`}
-                  >
-                    <Text
-                      style={[styles.summaryChipText, { color: tc.secondaryText }]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
-                    >
-                      {areaLabel}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {hasProject && (
-                  <TouchableOpacity
-                    style={[styles.summaryChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
-                    onPress={onOpenProjectPicker}
-                    onLongPress={onResetProject}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t('taskEdit.project')}: ${projectLabel}`}
-                  >
-                    <Folder size={14} color={tc.secondaryText} />
-                    <Text
-                      style={[styles.summaryChipText, { color: tc.secondaryText }]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
-                    >
-                      {projectLabel}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {hasPriority && (
-                  <TouchableOpacity
-                    style={[styles.summaryChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
-                    onPress={onOpenPriorityPicker}
-                    onLongPress={onResetPriority}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t('taskEdit.priorityLabel')}: ${priorityLabel}`}
-                  >
-                    <Flag size={14} color={tc.secondaryText} />
-                    <Text
-                      style={[styles.summaryChipText, { color: tc.secondaryText }]}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
-                    >
-                      {priorityLabel}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
 
             {optionsExpanded && (
               <>

@@ -686,10 +686,6 @@ export function QuickCaptureSheet({
         onToggleRecording={handleToggleRecording}
         onValueChange={setValue}
         optionsExpanded={optionsExpanded}
-        hasArea={Boolean(selectedAreaId)}
-        hasContexts={contextTags.length > 0}
-        hasPriority={Boolean(priority)}
-        hasProject={Boolean(selectedProject)}
         prioritiesEnabled={prioritiesEnabled}
         priorityLabel={priorityLabel}
         projectLabel={projectLabel}

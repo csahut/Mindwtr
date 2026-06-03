@@ -160,10 +160,6 @@ describe('Quick capture modal composition', () => {
             dueTimeLabel="Change time"
             handleClose={vi.fn()}
             handleSave={vi.fn()}
-            hasArea={false}
-            hasContexts={false}
-            hasPriority={false}
-            hasProject={false}
             insetsBottom={0}
             inputRef={{ current: null }}
             onOpenAreaPicker={vi.fn()}
@@ -214,6 +210,80 @@ describe('Quick capture modal composition', () => {
     expect(modal.props.accessibilityViewIsModal).toBe(true);
   });
 
+  it('keeps collapsed capture focused on context and hides organizing fields behind More', () => {
+    let tree!: ReturnType<typeof create>;
+    const t = (key: string) => ({
+      'common.close': 'Close',
+      'common.more': 'More',
+      'common.save': 'Save',
+      'nav.addTask': 'Add Task',
+      'quickAdd.addAnother': 'Add another',
+      'quickAdd.audioRecord': 'Record',
+      'quickAdd.inputHint': 'Capture task title',
+      'quickAdd.inputLabel': 'Task title',
+      'taskEdit.areaLabel': 'Area',
+      'taskEdit.contextsLabel': 'Contexts',
+      'taskEdit.dueDate': 'Due Date',
+      'taskEdit.project': 'Project',
+      'taskEdit.priorityLabel': 'Priority',
+    })[key] ?? key;
+
+    act(() => {
+      tree = create(
+        <QuickCaptureSheetBody
+          addAnother={false}
+          areaLabel="Work"
+          contextLabel="@computer"
+          dueDate={new Date('2026-06-04T12:00:00.000Z')}
+          dueLabel="Tomorrow"
+          dueTimeLabel="Change time"
+          handleClose={vi.fn()}
+          handleSave={vi.fn()}
+          insetsBottom={0}
+          inputRef={{ current: null }}
+          onOpenAreaPicker={vi.fn()}
+          onOpenContextPicker={vi.fn()}
+          onOpenDueDatePicker={vi.fn()}
+          onOpenDueTimePicker={vi.fn()}
+          onOpenPriorityPicker={vi.fn()}
+          onOpenProjectPicker={vi.fn()}
+          onQuickDueDateSelect={vi.fn()}
+          onResetArea={vi.fn()}
+          onResetContexts={vi.fn()}
+          onResetDueDate={vi.fn()}
+          onResetDueTime={vi.fn()}
+          onResetPriority={vi.fn()}
+          onResetProject={vi.fn()}
+          onToggleOptions={vi.fn()}
+          onToggleAddAnother={vi.fn()}
+          onToggleRecording={vi.fn()}
+          onValueChange={vi.fn()}
+          optionsExpanded={false}
+          prioritiesEnabled
+          priorityLabel="High"
+          projectLabel="Launch"
+          recording={false}
+          recordingBusy={false}
+          recordingReady={false}
+          sheetMaxHeight={500}
+          showDueTime={false}
+          t={t}
+          tc={tc}
+          value=""
+          visible
+        />
+      );
+    });
+
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Contexts: @computer' }).length).toBeGreaterThan(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'More' }).length).toBeGreaterThan(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Due Date: Tomorrow' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Area: Work' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Project: Launch' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Priority: High' })).toHaveLength(0);
+    expect(tree.root.findAllByType(Text).some((node) => node.props.children === 'More')).toBe(true);
+  });
+
   it('bounds compact sheet text scaling so tablet controls cannot overlap', () => {
     let tree!: ReturnType<typeof create>;
 
@@ -228,10 +298,6 @@ describe('Quick capture modal composition', () => {
           dueTimeLabel="Change time"
           handleClose={vi.fn()}
           handleSave={vi.fn()}
-          hasArea={false}
-          hasContexts={false}
-          hasPriority={false}
-          hasProject={false}
           insetsBottom={0}
           inputRef={{ current: null }}
           onOpenAreaPicker={vi.fn()}
@@ -299,10 +365,6 @@ describe('Quick capture modal composition', () => {
             dueTimeLabel="Change time"
             handleClose={vi.fn()}
             handleSave={handleSave}
-            hasArea={false}
-            hasContexts={false}
-            hasPriority={false}
-            hasProject={false}
             insetsBottom={0}
             inputRef={{ current: null }}
             onOpenAreaPicker={vi.fn()}
