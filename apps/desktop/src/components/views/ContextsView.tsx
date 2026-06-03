@@ -4,6 +4,7 @@ import {
     matchesHierarchicalToken,
     isTaskInActiveProject,
     shallow,
+    sortTasksBy,
     TaskStatus,
     TaskEnergyLevel,
     getFrequentTaskTokens,
@@ -14,6 +15,7 @@ import {
     updateRangeSelection,
 } from '@mindwtr/core';
 import type { RangeSelectionOptions } from '@mindwtr/core';
+import type { TaskSortBy } from '@mindwtr/core';
 import { AtSign, ChevronDown, ChevronRight, Filter, Hash, Tag, type LucideIcon } from 'lucide-react';
 import { TokenPickerModal } from '../TokenPickerModal';
 import { BulkSelectionToolbar } from './list/BulkSelectionToolbar';
@@ -49,13 +51,14 @@ type BulkTokenPickerState = {
 
 export function ContextsView() {
     const perf = usePerformanceMonitor('ContextsView');
-    const { tasks, tasksById, projects, areas, settings } = useTaskStore(
+    const { tasks, tasksById, projects, areas, settings, updateSettings } = useTaskStore(
         (state) => ({
             tasks: state.tasks,
             tasksById: state._tasksById,
             projects: state.projects,
             areas: state.areas,
             settings: state.settings,
+            updateSettings: state.updateSettings,
         }),
         shallow
     );
@@ -69,7 +72,9 @@ export function ContextsView() {
         sanitizeContextsViewState
     );
     const selectedContext = persistedViewState.selectedContext;
-    const statusFilter = persistedViewState.statusFilter;
+    const statusFilters = persistedViewState.statusFilters;
+    const selectedStatusSet = useMemo(() => new Set(statusFilters), [statusFilters]);
+    const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
     const [searchQuery, setSearchQuery] = useState('');
     const [selectionMode, setSelectionMode] = useState(false);
     const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
@@ -90,12 +95,22 @@ export function ContextsView() {
             selectedContext: value,
         }));
     }, [setPersistedViewState]);
-    const setStatusFilter = useCallback((value: TaskStatus | 'all') => {
+    const setStatusFilters = useCallback((updater: (current: TaskStatus[]) => TaskStatus[]) => {
         setPersistedViewState((current) => ({
             ...current,
-            statusFilter: value,
+            statusFilters: updater(current.statusFilters),
         }));
     }, [setPersistedViewState]);
+    const clearStatusFilters = useCallback(() => {
+        setStatusFilters(() => []);
+    }, [setStatusFilters]);
+    const toggleStatusFilter = useCallback((value: TaskStatus) => {
+        setStatusFilters((current) => (
+            current.includes(value)
+                ? current.filter((status) => status !== value)
+                : [...current, value]
+        ));
+    }, [setStatusFilters]);
     useEffect(() => subscribeContextsTokenSelection(({ selectedContext: nextSelectedContext }) => {
         setSelectedContext(nextSelectedContext);
         setSearchQuery('');
@@ -140,13 +155,14 @@ export function ContextsView() {
         && isTaskInActiveProject(t, projectMap)
         && taskMatchesAreaFilter(t, resolvedAreaFilter, projectMap, areaById)
     );
+    const hasExplicitStatusFilter = statusFilters.length > 0;
     const baseTasks = activeTasks.filter(t =>
         t.status !== 'archived'
-        && (statusFilter === 'done' || t.status !== 'done')
+        && (selectedStatusSet.has('done') || t.status !== 'done')
     );
-    const scopedTasks = statusFilter === 'all'
-        ? baseTasks
-        : baseTasks.filter(t => t.status === statusFilter);
+    const scopedTasks = hasExplicitStatusFilter
+        ? baseTasks.filter(t => selectedStatusSet.has(t.status))
+        : baseTasks;
 
     // Extract unique context and tag tokens separately for the selector sidebar.
     const allContextTokens = Array.from(new Set(scopedTasks.flatMap(t => t.contexts || []))).sort();
@@ -177,7 +193,8 @@ export function ContextsView() {
     const filteredTasks = normalizedSearchQuery
         ? contextFilteredTasks.filter((task) => task.title.toLowerCase().includes(normalizedSearchQuery))
         : contextFilteredTasks;
-    const filteredTaskIds = filteredTasks.map((task) => task.id);
+    const sortedTasks = sortTasksBy(filteredTasks, sortBy);
+    const filteredTaskIds = sortedTasks.map((task) => task.id);
     const selectedVisibleCount = filteredTaskIds.filter((id) => multiSelectedIds.has(id)).length;
     const allVisibleTasksSelected = filteredTaskIds.length > 0 && selectedVisibleCount === filteredTaskIds.length;
     const shouldVirtualize = filteredTasks.length > LIST_VIRTUALIZATION_THRESHOLD;
@@ -190,7 +207,7 @@ export function ContextsView() {
         setListScrollTop(event.currentTarget.scrollTop);
     }, []);
     const { rowOffsets, totalHeight, startIndex, visibleTasks } = useVirtualList({
-        tasks: filteredTasks,
+        tasks: sortedTasks,
         shouldVirtualize,
         rowHeightsRef,
         measureVersion,
@@ -338,16 +355,16 @@ export function ContextsView() {
 
     useEffect(() => {
         setMultiSelectedIds((prev) => {
-            const visible = new Set(filteredTasks.map((task) => task.id));
+            const visible = new Set(sortedTasks.map((task) => task.id));
             const next = new Set(Array.from(prev).filter((id) => visible.has(id)));
             if (next.size === prev.size) return prev;
             return next;
         });
-        const visible = new Set(filteredTasks.map((task) => task.id));
+        const visible = new Set(sortedTasks.map((task) => task.id));
         if (multiSelectAnchorIdRef.current && !visible.has(multiSelectAnchorIdRef.current)) {
             multiSelectAnchorIdRef.current = null;
         }
-    }, [filteredTasks]);
+    }, [sortedTasks]);
 
     const removeTagLabelRaw = t('bulk.removeTag');
     const removeTagLabel = removeTagLabelRaw === 'bulk.removeTag' ? 'Remove tag' : removeTagLabelRaw;
@@ -549,7 +566,29 @@ export function ContextsView() {
                                 </p>
                             </div>
                             <div className="ml-auto">
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <div className="relative min-w-[172px]">
+                                        <select
+                                            value={sortBy}
+                                            onChange={(event) => updateSettings({ taskSortBy: event.target.value as TaskSortBy })}
+                                            aria-label={t('sort.label')}
+                                            className={cn(
+                                                "h-9 w-full appearance-none rounded-lg border border-border bg-card pl-3 pr-9 text-xs text-foreground transition-colors hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                            )}
+                                        >
+                                            <option value="default">{t('sort.default')}</option>
+                                            <option value="due">{t('sort.due')}</option>
+                                            <option value="start">{t('sort.start')}</option>
+                                            <option value="review">{t('sort.review')}</option>
+                                            <option value="title">{t('sort.title')}</option>
+                                            <option value="created">{t('sort.created')}</option>
+                                            <option value="created-desc">{t('sort.created-desc')}</option>
+                                        </select>
+                                        <ChevronDown
+                                            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                                            aria-hidden="true"
+                                        />
+                                    </div>
                                     <button
                                         onClick={() => {
                                             if (selectionMode) exitSelectionMode();
@@ -569,15 +608,23 @@ export function ContextsView() {
                         </header>
                         <div className="mb-4 flex flex-wrap gap-2">
                             {statusOptions.map((option) => {
-                                const isActive = statusFilter === option.value;
+                                const isActive = option.value === 'all'
+                                    ? statusFilters.length === 0
+                                    : selectedStatusSet.has(option.value);
                                 return (
                                     <button
                                         key={option.value}
-                                        onClick={() => setStatusFilter(option.value)}
+                                        onClick={() => {
+                                            if (option.value === 'all') {
+                                                clearStatusFilters();
+                                                return;
+                                            }
+                                            toggleStatusFilter(option.value);
+                                        }}
                                         className={cn(
                                             'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                                             isActive
-                                                ? 'border-primary bg-primary/10 text-primary'
+                                                ? 'border-primary bg-primary text-primary-foreground shadow-sm'
                                                 : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground'
                                         )}
                                         aria-pressed={isActive}
@@ -640,7 +687,7 @@ export function ContextsView() {
                                 !shouldVirtualize && "divide-y divide-border/30",
                             )}
                         >
-                            {filteredTasks.length > 0 ? (
+                            {sortedTasks.length > 0 ? (
                                 shouldVirtualize ? (
                                     <div style={{ height: totalHeight, position: 'relative' }}>
                                         {visibleTasks.map((task, visibleIndex) => {
@@ -661,7 +708,7 @@ export function ContextsView() {
                                         })}
                                     </div>
                                 ) : (
-                                    filteredTasks.map(task => (
+                                    sortedTasks.map(task => (
                                         <StoreTaskItem
                                             key={task.id}
                                             taskId={task.id}

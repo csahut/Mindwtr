@@ -4,16 +4,17 @@ export const CONTEXTS_VIEW_STATE_STORAGE_KEY = 'mindwtr:view:contexts:v1';
 export const NO_CONTEXT_TOKEN = '__no_context__';
 export const CONTEXTS_TOKEN_SELECTION_EVENT = 'mindwtr:contexts-token-selection';
 
-const CONTEXT_STATUS_VALUES: Array<TaskStatus | 'all'> = ['all', 'inbox', 'next', 'waiting', 'someday', 'reference', 'done'];
+const CONTEXT_STATUS_VALUES: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday', 'reference', 'done'];
+const LEGACY_CONTEXT_STATUS_VALUES: Array<TaskStatus | 'all'> = ['all', ...CONTEXT_STATUS_VALUES];
 
 export type ContextsPersistedViewState = {
     selectedContext: string | null;
-    statusFilter: TaskStatus | 'all';
+    statusFilters: TaskStatus[];
 };
 
 export const DEFAULT_CONTEXTS_VIEW_STATE: ContextsPersistedViewState = {
     selectedContext: null,
-    statusFilter: 'all',
+    statusFilters: [],
 };
 
 export type ContextsTokenSelectionEventDetail = {
@@ -25,16 +26,29 @@ export function sanitizeContextsViewState(
     fallback: ContextsPersistedViewState,
 ): ContextsPersistedViewState {
     const parsed = value && typeof value === 'object' && !Array.isArray(value)
-        ? value as Partial<ContextsPersistedViewState>
+        ? value as Partial<ContextsPersistedViewState> & { statusFilter?: unknown }
         : {};
     const selectedContext = typeof parsed.selectedContext === 'string' && parsed.selectedContext.trim()
         ? parsed.selectedContext
         : null;
+    const normalizeStatusFilters = (candidate: unknown, defaultValue: TaskStatus[]): TaskStatus[] => {
+        if (Array.isArray(candidate)) {
+            const next = candidate.filter((item): item is TaskStatus => (
+                typeof item === 'string' && CONTEXT_STATUS_VALUES.includes(item as TaskStatus)
+            ));
+            return Array.from(new Set(next));
+        }
+        if (LEGACY_CONTEXT_STATUS_VALUES.includes(candidate as TaskStatus | 'all')) {
+            return candidate === 'all' ? [] : [candidate as TaskStatus];
+        }
+        return defaultValue;
+    };
+    const legacyFallback = parsed.statusFilter === undefined
+        ? fallback.statusFilters
+        : normalizeStatusFilters(parsed.statusFilter, fallback.statusFilters);
     return {
         selectedContext,
-        statusFilter: CONTEXT_STATUS_VALUES.includes(parsed.statusFilter as TaskStatus | 'all')
-            ? parsed.statusFilter as TaskStatus | 'all'
-            : fallback.statusFilter,
+        statusFilters: normalizeStatusFilters(parsed.statusFilters, legacyFallback),
     };
 }
 

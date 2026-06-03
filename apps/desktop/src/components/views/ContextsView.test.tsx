@@ -124,6 +124,99 @@ describe('ContextsView', () => {
         expect(queryByText('Active office task')).not.toBeInTheDocument();
     });
 
+    it('allows multiple status filters while keeping Done hidden until selected', () => {
+        const tasks = [
+            makeTask('next-office', {
+                title: 'Next office task',
+                status: 'next',
+                contexts: ['@Office'],
+            }),
+            makeTask('waiting-office', {
+                title: 'Waiting office task',
+                status: 'waiting',
+                contexts: ['@Office'],
+            }),
+            makeTask('done-office', {
+                title: 'Done office task',
+                status: 'done',
+                contexts: ['@Office'],
+            }),
+        ];
+        useTaskStore.setState({
+            tasks,
+            _allTasks: tasks,
+            projects: [],
+            areas: [],
+            settings: {},
+        });
+
+        const { getAllByRole, getByText, queryByText } = renderContextsView();
+        const statusButton = (label: string) => {
+            const button = getAllByRole('button', { name: label }).find((item) => item.hasAttribute('aria-pressed'));
+            expect(button).toBeTruthy();
+            return button!;
+        };
+
+        expect(getByText('Next office task')).toBeInTheDocument();
+        expect(getByText('Waiting office task')).toBeInTheDocument();
+        expect(queryByText('Done office task')).not.toBeInTheDocument();
+
+        const nextButton = statusButton('Next');
+        fireEvent.click(nextButton);
+
+        expect(nextButton).toHaveAttribute('aria-pressed', 'true');
+        expect(nextButton).toHaveClass('bg-primary', 'text-primary-foreground');
+        expect(getByText('Next office task')).toBeInTheDocument();
+        expect(queryByText('Waiting office task')).not.toBeInTheDocument();
+        expect(queryByText('Done office task')).not.toBeInTheDocument();
+
+        fireEvent.click(statusButton('Waiting'));
+
+        expect(getByText('Next office task')).toBeInTheDocument();
+        expect(getByText('Waiting office task')).toBeInTheDocument();
+        expect(queryByText('Done office task')).not.toBeInTheDocument();
+
+        fireEvent.click(statusButton('Done'));
+
+        expect(getByText('Next office task')).toBeInTheDocument();
+        expect(getByText('Waiting office task')).toBeInTheDocument();
+        expect(getByText('Done office task')).toBeInTheDocument();
+    });
+
+    it('sorts context tasks with the shared task sort preference', () => {
+        const tasks = [
+            makeTask('task-b', {
+                title: 'Write brief',
+                contexts: ['@Office'],
+            }),
+            makeTask('task-a', {
+                title: 'Archive notes',
+                contexts: ['@Office'],
+            }),
+            makeTask('task-c', {
+                title: 'Plan launch',
+                contexts: ['@Office'],
+            }),
+        ];
+        useTaskStore.setState({
+            tasks,
+            _allTasks: tasks,
+            projects: [],
+            areas: [],
+            settings: {},
+        });
+
+        const { container, getByRole } = renderContextsView();
+
+        fireEvent.change(getByRole('combobox', { name: 'Sort' }), {
+            target: { value: 'title' },
+        });
+
+        const text = container.textContent ?? '';
+        expect(text.indexOf('Archive notes')).toBeLessThan(text.indexOf('Plan launch'));
+        expect(text.indexOf('Plan launch')).toBeLessThan(text.indexOf('Write brief'));
+    });
+
     it('applies task token navigation while the context view is mounted', () => {
         const { getByRole, getByText } = renderContextsView();
 
