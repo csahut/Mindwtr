@@ -203,7 +203,7 @@ function ManageSection({
     const [open, setOpen] = useState(defaultOpen);
 
     return (
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="rounded-lg border border-border bg-card overflow-visible">
             <button
                 type="button"
                 onClick={() => setOpen((prev) => !prev)}

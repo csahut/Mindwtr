@@ -60,7 +60,7 @@ export function AreaManagerModal({
             onClick={onClose}
         >
             <div
-                className="w-full max-w-lg bg-popover text-popover-foreground rounded-xl border shadow-2xl overflow-hidden flex flex-col"
+                className="w-full max-w-lg bg-popover text-popover-foreground rounded-xl border shadow-2xl overflow-visible flex flex-col"
                 onClick={stopPropagation}
             >
                 <div className="px-4 py-3 border-b flex items-center justify-between gap-2">
