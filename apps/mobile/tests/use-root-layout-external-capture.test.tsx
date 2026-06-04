@@ -16,23 +16,31 @@ type RouterMock = {
 };
 
 function TestHarness({
+  hasShareIntent = false,
   incomingUrl,
+  resetShareIntent = vi.fn(),
   router,
+  shareText = null,
+  shareWebUrl = null,
   showToast,
 }: {
+  hasShareIntent?: boolean;
   incomingUrl: string | null;
+  resetShareIntent?: ReturnType<typeof vi.fn>;
   router: RouterMock;
+  shareText?: string | null;
+  shareWebUrl?: string | null;
   showToast: ReturnType<typeof vi.fn>;
 }) {
   useRootLayoutExternalCapture({
     dataReady: true,
-    hasShareIntent: false,
+    hasShareIntent,
     incomingUrl,
     resolveText: (_key: string, fallback: string) => fallback,
-    resetShareIntent: vi.fn(),
+    resetShareIntent,
     router,
-    shareText: null,
-    shareWebUrl: null,
+    shareText,
+    shareWebUrl,
     showToast,
   });
   return null;
@@ -49,6 +57,57 @@ describe('useRootLayoutExternalCapture', () => {
       replace: vi.fn(),
     };
     showToast = vi.fn();
+  });
+
+  it('opens shared text capture with the shared text as a note', () => {
+    const resetShareIntent = vi.fn();
+
+    act(() => {
+      create(
+        <TestHarness
+          hasShareIntent
+          incomingUrl={null}
+          resetShareIntent={resetShareIntent}
+          router={router}
+          shareText="The paragraph I selected in another app"
+          showToast={showToast}
+        />
+      );
+    });
+
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: '/capture-modal',
+      params: {
+        initialProps: expect.any(String),
+      },
+    });
+    const params = router.replace.mock.calls[0][0].params;
+    expect(params.text).toBeUndefined();
+    expect(params.initialValue).toBeUndefined();
+    expect(JSON.parse(decodeURIComponent(params.initialProps))).toEqual({
+      description: 'The paragraph I selected in another app',
+    });
+    expect(resetShareIntent).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves distinct shared text and URL together in the note', () => {
+    act(() => {
+      create(
+        <TestHarness
+          hasShareIntent
+          incomingUrl={null}
+          router={router}
+          shareText="Read this before the project review"
+          shareWebUrl="https://example.com/review-notes"
+          showToast={showToast}
+        />
+      );
+    });
+
+    const params = router.replace.mock.calls[0][0].params;
+    expect(JSON.parse(decodeURIComponent(params.initialProps))).toEqual({
+      description: 'Read this before the project review\n\nhttps://example.com/review-notes',
+    });
   });
 
   it('opens a confirmation modal for App Actions capture links', () => {

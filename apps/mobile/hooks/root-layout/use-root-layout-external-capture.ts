@@ -48,6 +48,33 @@ const normalizeShortcutTags = (tags: string[]): string[] => {
     return normalized;
 };
 
+const trimSharedValue = (value: string | null | undefined): string => (
+    typeof value === 'string' ? value.trim() : ''
+);
+
+function buildShareIntentInitialProps({
+    shareText,
+    shareWebUrl,
+}: {
+    shareText?: string | null;
+    shareWebUrl?: string | null;
+}): Partial<Task> | null {
+    const noteParts: string[] = [];
+    const seen = new Set<string>();
+    for (const part of [trimSharedValue(shareText), trimSharedValue(shareWebUrl)]) {
+        if (!part) continue;
+        if (seen.has(part)) continue;
+        seen.add(part);
+        noteParts.push(part);
+    }
+
+    if (noteParts.length === 0) return null;
+
+    return {
+        description: noteParts.join('\n\n'),
+    };
+}
+
 export function useRootLayoutExternalCapture({
     dataReady,
     hasShareIntent,
@@ -92,15 +119,13 @@ export function useRootLayoutExternalCapture({
 
     useEffect(() => {
         if (!hasShareIntent) return;
-        const sharedText = typeof shareText === 'string'
-            ? shareText
-            : typeof shareWebUrl === 'string'
-                ? shareWebUrl
-                : '';
-        if (sharedText.trim()) {
+        const initialProps = buildShareIntentInitialProps({ shareText, shareWebUrl });
+        if (initialProps) {
             router.replace({
                 pathname: '/capture-modal',
-                params: { text: encodeURIComponent(sharedText.trim()) },
+                params: {
+                    initialProps: encodeURIComponent(JSON.stringify(initialProps)),
+                },
             });
         } else {
             void logError(new Error('Share intent payload missing text'), { scope: 'share-intent' });
