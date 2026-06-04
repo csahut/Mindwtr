@@ -30,7 +30,7 @@
           "完全离线可用，无需互联网连接",
           "完全开源，安全透明"
         ],
-        "ReleaseNotes": "• 首次设置和入门指南更清楚。\n• 清单拖放排序、任务元数据自动补全和批量选择让任务处理更快。\n• 同步清理、日期警告和 AI 请求更可靠。",
+        "ReleaseNotes": "• 项目可按到期日排序，并把已完成任务放在活动任务之后。\n• 任务选择、附件打开、关闭行为和清单搜索更可靠。\n• 备份恢复、区域删除同步、快速添加和重复任务处理更安全。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -82,7 +82,7 @@
           "No internet connection required to function",
           "Open source and transparent"
         ],
-        "ReleaseNotes": "• First-run setup and Getting Started guidance are clearer.\n• Checklist drag reorder, task metadata autocomplete, and bulk selection make task work faster.\n• Sync cleanup, date warnings, and AI requests are more reliable.",
+        "ReleaseNotes": "• Projects can sort by due date and group completed tasks below active work.\n• Selection, attachment opening, close behavior, and checklist search are more reliable.\n• Backup restore, area delete sync, quick add, and recurrence handling are safer.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -131,7 +131,7 @@
           "Offline nutzbar ohne staendige Internetverbindung",
           "Open Source und transparent"
         ],
-        "ReleaseNotes": "• Ersteinrichtung und Erste-Schritte-Hilfe sind klarer.\n• Checklisten-Sortierung per Ziehen, Aufgabenmetadaten-Autovervollstaendigung und Mehrfachauswahl machen Aufgabenarbeit schneller.\n• Sync-Bereinigung, Datumswarnungen und KI-Anfragen sind zuverlaessiger.",
+        "ReleaseNotes": "• Projekte koennen nach Faelligkeit sortieren und erledigte Aufgaben unter aktiver Arbeit gruppieren.\n• Auswahl, Anhaenge, Schliessverhalten und Checklisten-Suche sind zuverlaessiger.\n• Backup-Wiederherstellung, Bereichsloeschungen, Schnellhinzufuegen und Wiederholungen sind sicherer.",
         "Images": [],
         "RecommendedHardware": [],
         "MinimumHardware": [],
@@ -160,7 +160,7 @@
           "No requiere conexión a internet para funcionar",
           "Código abierto y transparente"
         ],
-        "ReleaseNotes": "• La configuracion inicial y la guia de primeros pasos son mas claras.\n• Reordenar listas, autocompletar metadatos y seleccion multiple agilizan el trabajo.\n• Limpieza de sync, avisos de fechas y solicitudes de IA son mas fiables.",
+        "ReleaseNotes": "• Los proyectos pueden ordenarse por fecha limite y agrupar tareas completadas debajo de las activas.\n• Seleccion, adjuntos, cierre y busqueda de listas son mas fiables.\n• Restauracion, borrado de areas, agregado rapido y recurrencias son mas seguros.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",

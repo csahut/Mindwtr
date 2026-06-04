@@ -1,3 +1,3 @@
-- Added first-run setup and fuller Getting Started guidance.
-- Focus opens more consistently and task editing is faster.
-- Cleared project fields, sync cleanup, date warnings, and AI requests are more reliable.
+- Added optional app lock with device authentication.
+- Shared text is captured as task notes, and quick capture is smoother.
+- Project rows, scheduled times, checklist sync, editing, and search are more reliable.

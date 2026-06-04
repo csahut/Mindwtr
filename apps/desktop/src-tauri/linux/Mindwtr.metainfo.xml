@@ -88,6 +88,25 @@
   <url type="bugtracker">https://github.com/dongdongbh/Mindwtr/issues</url>
   <url type="vcs-browser">https://github.com/dongdongbh/Mindwtr</url>
   <releases>
+    <release version="0.9.8" date="2026-06-04">
+      <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v0.9.8</url>
+      <description>
+        <p>Mindwtr 0.9.8 improves project planning, desktop selection, attachment handling, search, restore safety, and Linux Flatpak reminders.</p>
+        <p xml:lang="de">Mindwtr 0.9.8 verbessert Projektplanung, Desktop-Auswahl, Umgang mit Anhaengen, Suche, Wiederherstellungssicherheit und Linux-Flatpak-Erinnerungen.</p>
+        <ul>
+          <li>Added due-date sorting in projects and grouped completed tasks below active work.</li>
+          <li xml:lang="de">Faelligkeitssortierung in Projekten hinzugefuegt und erledigte Aufgaben unter aktiver Arbeit gruppiert.</li>
+          <li>Added project task select mode, range selection, and aligned Contexts filters.</li>
+          <li xml:lang="de">Projektauswahlmodus, Bereichsauswahl und angeglichene Kontextfilter hinzugefuegt.</li>
+          <li>Made checklist item text searchable and improved editor and checklist stability.</li>
+          <li xml:lang="de">Checklistenpunkte durchsuchbar gemacht und Editor- sowie Checklisten-Stabilitaet verbessert.</li>
+          <li>Opened external, link, and portal attachments more reliably.</li>
+          <li xml:lang="de">Externe, Link- und Portal-Anhaenge zuverlaessiger geoeffnet.</li>
+          <li>Sent Flatpak reminders through the desktop notification portal and made close behavior more predictable.</li>
+          <li xml:lang="de">Flatpak-Erinnerungen ueber das Desktop-Benachrichtigungsportal gesendet und Schliessverhalten berechenbarer gemacht.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.9.7" date="2026-06-01">
       <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v0.9.7</url>
       <description>
