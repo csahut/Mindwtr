@@ -154,6 +154,7 @@ describe('buildProjectListRows', () => {
       laterNext,
       buildTask('done-1', 'project-1', 'done'),
       buildTask('reference-1', 'project-1', 'reference'),
+      buildTask('archived-1', 'project-1', 'archived'),
       { ...buildTask('deleted-1', 'project-1', 'waiting'), deletedAt: now },
       buildTask('waiting-1', 'project-2', 'waiting'),
       buildTask('no-project', undefined, 'next'),

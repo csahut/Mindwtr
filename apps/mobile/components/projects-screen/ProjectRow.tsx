@@ -54,7 +54,9 @@ export function ProjectRow({
     onToggleProjectFocus,
 }: ProjectRowProps) {
     const nextAction = taskSummary?.nextAction;
-    const showFocusedWarning = project.isFocused && !nextAction && (taskSummary?.activeTaskCount ?? 0) > 0;
+    const taskCount = taskSummary?.activeTaskCount ?? 0;
+    const taskCountLabel = `${taskCount} ${t('common.tasks')}`;
+    const showFocusedWarning = project.isFocused && !nextAction && taskCount > 0;
     const projectColor = project.areaId ? areaById.get(project.areaId)?.color : undefined;
     const swipeableRef = useRef<Swipeable>(null);
 
@@ -146,7 +148,9 @@ export function ProjectRow({
                 <View style={[styles.projectColor, { backgroundColor: projectColor || '#6B7280' }]} />
                 <View style={styles.projectContent}>
                     <View style={styles.projectTitleRow}>
-                        <Text style={[styles.projectTitle, { color: tc.text }]}>{project.title}</Text>
+                        <Text style={[styles.projectTitle, { color: tc.text }]} numberOfLines={1}>
+                            {project.title}
+                        </Text>
                         {project.tagIds?.length ? (
                             <View style={styles.projectTagDots}>
                                 {project.tagIds.slice(0, 4).map((tag) => (
@@ -157,6 +161,21 @@ export function ProjectRow({
                                 ))}
                             </View>
                         ) : null}
+                        <View
+                            accessible
+                            accessibilityLabel={taskCountLabel}
+                            style={[
+                                styles.projectTaskCountBadge,
+                                {
+                                    backgroundColor: `${tc.secondaryText}20`,
+                                    borderColor: `${tc.secondaryText}40`,
+                                },
+                            ]}
+                        >
+                            <Text style={[styles.projectTaskCountText, { color: tc.secondaryText }]}>
+                                {taskCount}
+                            </Text>
+                        </View>
                     </View>
                     {nextAction ? (
                         <Text style={[styles.projectMeta, { color: tc.secondaryText }]} numberOfLines={1}>

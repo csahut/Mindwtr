@@ -26,7 +26,13 @@ export function buildProjectTaskSummaryById(tasks: readonly Task[]): Map<string,
   const summaries = new Map<string, ProjectTaskSummary>();
 
   tasks.forEach((task) => {
-    if (!task.projectId || task.deletedAt || task.status === 'done' || task.status === 'reference') return;
+    if (
+      !task.projectId
+      || task.deletedAt
+      || task.status === 'done'
+      || task.status === 'reference'
+      || task.status === 'archived'
+    ) return;
 
     const existing = summaries.get(task.projectId);
     if (existing) {

@@ -1,6 +1,6 @@
 import React from 'react';
 import renderer from 'react-test-renderer';
-import { Alert } from 'react-native';
+import { Alert, Text } from 'react-native';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProjectRow } from './ProjectRow';
@@ -97,6 +97,31 @@ describe('ProjectRow', () => {
 
     expect(hapticsMocks.selectionAsync).toHaveBeenCalledTimes(1);
     expect(onToggleProjectFocus).toHaveBeenCalledWith('project-1');
+  });
+
+  it('shows the project task count from the precomputed summary', () => {
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <ProjectRow
+          project={project}
+          taskSummary={{ activeTaskCount: 7 }}
+          areaById={new Map()}
+          tc={tc}
+          focusedCount={0}
+          statusPalette={statusPalette as any}
+          t={(key) => ({ 'common.tasks': 'tasks' }[key] ?? key)}
+          onDeleteProject={vi.fn()}
+          onDuplicateProject={vi.fn()}
+          onOpenProject={vi.fn()}
+          onToggleProjectFocus={vi.fn()}
+        />,
+      );
+    });
+
+    const countBadge = tree.root.find((node) => node.props.accessibilityLabel === '7 tasks');
+
+    expect(countBadge.findByType(Text).props.children).toBe(7);
   });
 
   it('uses warning haptics for confirmed project deletion from the swipe action', () => {

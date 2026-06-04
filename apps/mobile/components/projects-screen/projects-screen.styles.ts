@@ -197,6 +197,7 @@ export const projectsScreenStyles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
+        marginBottom: 4,
     },
     projectTagDots: {
         flexDirection: 'row',
@@ -210,9 +211,23 @@ export const projectsScreenStyles = StyleSheet.create({
         opacity: 0.7,
     },
     projectTitle: {
+        flexShrink: 1,
         fontSize: 16,
         fontWeight: '500',
-        marginBottom: 4,
+    },
+    projectTaskCountBadge: {
+        minWidth: 22,
+        minHeight: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 999,
+        borderWidth: 1,
+        paddingHorizontal: 6,
+    },
+    projectTaskCountText: {
+        fontSize: 11,
+        fontWeight: '700',
+        lineHeight: 14,
     },
     projectMeta: {
         fontSize: 12,
