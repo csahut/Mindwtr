@@ -852,6 +852,7 @@ export function ProjectDetailModal({
                                     enableProjectReorder={taskListOptions.enableProjectReorder}
                                     includeArchived={taskListOptions.includeArchived}
                                     includeDone={taskListOptions.includeDone}
+                                    groupCompletedTasksLast={taskListOptions.groupCompletedTasksLast}
                                     onQuickAddInputFocus={scrollProjectInputIntoView}
                                     projectReorderMode={projectTaskReorderMode}
                                     onProjectReorderModeChange={setProjectTaskReorderMode}
@@ -897,5 +898,6 @@ export function getProjectDetailTaskListOptions(selectedProject: Project | null,
         enableProjectReorder: !isArchived,
         includeArchived: isArchived,
         includeDone: isArchived || showCompletedTasks,
+        groupCompletedTasksLast: !isArchived && showCompletedTasks,
     };
 }

@@ -219,6 +219,7 @@ export {
     getTaskStaleness,
     getTaskUrgency,
     getWaitingPerson,
+    groupCompletedTasksLast,
     isFocusSequentialCandidate,
     isTaskFutureStart,
     rescheduleTask,
@@ -227,6 +228,7 @@ export {
     sortTasks,
     sortTasksBy,
     sortTasksBySavedPreference,
+    splitCompletedTasks,
     STATUS_COLORS,
 } from './task-utils';
 export type {

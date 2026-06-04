@@ -370,6 +370,7 @@ describe('ProjectDetailModal archived projects', () => {
         expect(getProjectDetailTaskListOptions(project('archived'))).toEqual({
             allowAdd: false,
             enableProjectReorder: false,
+            groupCompletedTasksLast: false,
             includeArchived: true,
             includeDone: true,
         });
@@ -379,6 +380,7 @@ describe('ProjectDetailModal archived projects', () => {
         expect(getProjectDetailTaskListOptions(project('active'))).toEqual({
             allowAdd: true,
             enableProjectReorder: true,
+            groupCompletedTasksLast: false,
             includeArchived: false,
             includeDone: false,
         });
@@ -388,6 +390,7 @@ describe('ProjectDetailModal archived projects', () => {
         expect(getProjectDetailTaskListOptions(project('active'), true)).toEqual({
             allowAdd: true,
             enableProjectReorder: true,
+            groupCompletedTasksLast: true,
             includeArchived: false,
             includeDone: true,
         });

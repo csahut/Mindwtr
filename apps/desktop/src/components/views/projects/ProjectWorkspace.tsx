@@ -12,6 +12,7 @@ import {
     type TaskStatus,
     generateUUID,
     parseQuickAdd,
+    splitCompletedTasks,
     updateRangeSelection,
 } from '@mindwtr/core';
 import { DndContext, PointerSensor, MeasuringStrategy, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -203,8 +204,10 @@ export function ProjectWorkspace({
     const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
     const [bulkTokenPicker, setBulkTokenPicker] = useState<BulkTokenPickerState>(null);
     const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+    const [completedTasksCollapsed, setCompletedTasksCollapsed] = useState(true);
     const multiSelectAnchorIdRef = useRef<string | null>(null);
     const isArchivedProject = selectedProject?.status === 'archived';
+    const shouldGroupCompletedTasks = Boolean(selectedProject && !isArchivedProject && showCompletedTasks);
     const resolveText = useCallback((key: string, fallback: string) => {
         const value = t(key);
         return value && value !== key ? value : fallback;
@@ -261,6 +264,10 @@ export function ProjectWorkspace({
     }, [selectedProject?.id]);
 
     useEffect(() => {
+        setCompletedTasksCollapsed(true);
+    }, [selectedProject?.id, showCompletedTasks]);
+
+    useEffect(() => {
         setSectionNotesOpen({});
         setShowSectionTaskPrompt(false);
         setSectionTaskTargetId(null);
@@ -302,10 +309,17 @@ export function ProjectWorkspace({
         return sorted;
     }, []);
 
-    const orderedProjectTasks = useMemo(() => {
+    const sortedProjectTasks = useMemo(() => {
         if (!selectedProject) return projectTasks;
         return sortProjectTasks(projectTasks);
     }, [projectTasks, selectedProject, sortProjectTasks]);
+
+    const { activeTasks: orderedProjectTasks, completedTasks: completedProjectTasks } = useMemo(() => {
+        if (!shouldGroupCompletedTasks) {
+            return { activeTasks: sortedProjectTasks, completedTasks: [] as Task[] };
+        }
+        return splitCompletedTasks(sortedProjectTasks);
+    }, [shouldGroupCompletedTasks, sortedProjectTasks]);
 
     const projectSections = useMemo(() => {
         if (!selectedProjectId) return [];
@@ -343,7 +357,7 @@ export function ProjectWorkspace({
         const tasksBySection = new Map<string, Task[]>();
         const unsectioned: Task[] = [];
 
-        projectTasks.forEach((task) => {
+        orderedProjectTasks.forEach((task) => {
             const sectionId = task.sectionId && sectionIds.has(task.sectionId) ? task.sectionId : null;
             if (sectionId) {
                 const list = tasksBySection.get(sectionId) ?? [];
@@ -361,10 +375,10 @@ export function ProjectWorkspace({
             })),
             unsectioned: sortProjectTasks(unsectioned),
         };
-    }, [orderedProjectTasks, projectSections, projectTasks, selectedProjectId, sortProjectTasks]);
+    }, [orderedProjectTasks, projectSections, selectedProjectId, sortProjectTasks]);
 
     const orderedProjectTaskList = useMemo(() => {
-        if (projectSections.length === 0) return orderedProjectTasks;
+        if (projectSections.length === 0) return [...orderedProjectTasks, ...completedProjectTasks];
         const combined: Task[] = [];
         sectionTaskGroups.sections.forEach((group) => {
             combined.push(...group.tasks);
@@ -372,10 +386,17 @@ export function ProjectWorkspace({
         if (sectionTaskGroups.unsectioned.length > 0) {
             combined.push(...sectionTaskGroups.unsectioned);
         }
+        if (completedProjectTasks.length > 0) {
+            combined.push(...completedProjectTasks);
+        }
         return combined;
-    }, [orderedProjectTasks, projectSections.length, sectionTaskGroups.sections, sectionTaskGroups.unsectioned]);
+    }, [completedProjectTasks, orderedProjectTasks, projectSections.length, sectionTaskGroups.sections, sectionTaskGroups.unsectioned]);
     const visibleProjectTaskList = useMemo(() => {
-        if (projectSections.length === 0) return orderedProjectTasks;
+        if (projectSections.length === 0) {
+            return completedTasksCollapsed
+                ? orderedProjectTasks
+                : [...orderedProjectTasks, ...completedProjectTasks];
+        }
         const combined: Task[] = [];
         sectionTaskGroups.sections.forEach((group) => {
             if (!group.section.isCollapsed) {
@@ -383,8 +404,11 @@ export function ProjectWorkspace({
             }
         });
         combined.push(...sectionTaskGroups.unsectioned);
+        if (!completedTasksCollapsed) {
+            combined.push(...completedProjectTasks);
+        }
         return combined;
-    }, [orderedProjectTasks, projectSections.length, sectionTaskGroups.sections, sectionTaskGroups.unsectioned]);
+    }, [completedProjectTasks, completedTasksCollapsed, orderedProjectTasks, projectSections.length, sectionTaskGroups.sections, sectionTaskGroups.unsectioned]);
     const visibleProjectTaskIds = useMemo(
         () => visibleProjectTaskList.map((task) => task.id),
         [visibleProjectTaskList],
@@ -654,21 +678,71 @@ export function ProjectWorkspace({
         </div>
     );
 
+    const renderStaticTasks = (list: Task[]) => (
+        <div className="divide-y divide-border/30">
+            {list.map((task) => (
+                <TaskItem
+                    key={task.id}
+                    task={task}
+                    project={selectedProject}
+                    enableDoubleClickEdit
+                    showProjectBadgeInActions={false}
+                />
+            ))}
+        </div>
+    );
+
+    const renderCompletedTaskGroup = () => {
+        if (completedProjectTasks.length === 0) return null;
+        const completedLabel = resolveText('list.done', resolveText('status.done', 'Completed'));
+        const renderCompletedTasks = selectionMode ? renderSelectableTasks : renderStaticTasks;
+
+        return (
+            <div className="rounded-lg border border-border/60 bg-muted/10">
+                <button
+                    type="button"
+                    onClick={() => setCompletedTasksCollapsed((value) => !value)}
+                    aria-expanded={!completedTasksCollapsed}
+                    className="flex w-full items-center justify-between border-b border-border/50 px-3 py-2 text-left text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                >
+                    <span className="flex items-center gap-2">
+                        {completedTasksCollapsed ? (
+                            <ChevronRight className="h-4 w-4" />
+                        ) : (
+                            <ChevronDown className="h-4 w-4" />
+                        )}
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>{completedLabel}</span>
+                    </span>
+                    <span className="text-xs">{completedProjectTasks.length}</span>
+                </button>
+                {!completedTasksCollapsed && (
+                    <div className="p-3">
+                        {renderCompletedTasks(completedProjectTasks)}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const renderProjectSections = (renderTasks: (list: Task[]) => ReactNode) => {
         if (projectSections.length === 0) {
             return (
-                <SectionDropZone
-                    id={NO_SECTION_CONTAINER}
-                    className="min-h-[120px] rounded-lg border border-dashed border-border/70 p-4"
-                >
-                    {orderedProjectTasks.length > 0 ? (
-                        renderTasks(orderedProjectTasks)
-                    ) : (
-                        <div className="py-12 text-center text-muted-foreground">
-                            {t('projects.noActiveTasks')}
-                        </div>
-                    )}
-                </SectionDropZone>
+                <div className="space-y-3">
+                    <SectionDropZone
+                        id={NO_SECTION_CONTAINER}
+                        className="min-h-[120px] rounded-lg border border-dashed border-border/70 p-4"
+                    >
+                        {orderedProjectTasks.length > 0 ? (
+                            renderTasks(orderedProjectTasks)
+                        ) : (
+                            <div className="py-12 text-center text-muted-foreground">
+                                {t('projects.noActiveTasks')}
+                            </div>
+                        )}
+                    </SectionDropZone>
+                    {renderCompletedTaskGroup()}
+                </div>
             );
         }
 
@@ -826,6 +900,7 @@ export function ProjectWorkspace({
                         {t('projects.noActiveTasks')}
                     </div>
                 )}
+                {renderCompletedTaskGroup()}
             </div>
         );
     };

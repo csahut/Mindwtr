@@ -403,6 +403,29 @@ export function sortTasksBy(tasks: Task[], sortBy: TaskSortBy = 'default'): Task
     }
 }
 
+export function splitCompletedTasks<T extends Pick<Task, 'status'>>(tasks: T[]): {
+    activeTasks: T[];
+    completedTasks: T[];
+} {
+    const activeTasks: T[] = [];
+    const completedTasks: T[] = [];
+
+    tasks.forEach((task) => {
+        if (task.status === 'done') {
+            completedTasks.push(task);
+        } else {
+            activeTasks.push(task);
+        }
+    });
+
+    return { activeTasks, completedTasks };
+}
+
+export function groupCompletedTasksLast<T extends Pick<Task, 'status'>>(tasks: T[]): T[] {
+    const { activeTasks, completedTasks } = splitCompletedTasks(tasks);
+    return [...activeTasks, ...completedTasks];
+}
+
 export function sortTasksBySavedPreference<T extends Task>(
     tasks: T[],
     sortBy: SortField | undefined,

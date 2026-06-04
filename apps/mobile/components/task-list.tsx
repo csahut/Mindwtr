@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, FlatList, Text, RefreshControl, Keyboard, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowDown, ArrowUp, GripVertical, MoveVertical } from 'lucide-react-native';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, GripVertical, MoveVertical } from 'lucide-react-native';
 import { NestableDraggableFlatList, ScaleDecorator, type DragEndParams, type RenderItemParams } from 'react-native-draggable-flatlist';
 import {
   useTaskStore,
@@ -11,6 +11,7 @@ import {
   TaskPriority,
   TimeEstimate,
   sortTasksBy,
+  splitCompletedTasks,
   parseQuickAdd,
   getUsedTaskTokens,
   createAIProvider,
@@ -99,6 +100,7 @@ export interface TaskListProps {
   onProjectReorderModeChange?: (active: boolean) => void;
   includeArchived?: boolean;
   includeDone?: boolean;
+  groupCompletedTasksLast?: boolean;
 }
 
 // ... inside TaskList component
@@ -127,6 +129,7 @@ function TaskListComponent({
   onProjectReorderModeChange,
   includeArchived = false,
   includeDone = true,
+  groupCompletedTasksLast = false,
 }: TaskListProps) {
   const { isDark } = useTheme();
   const { t, language } = useLanguage();
@@ -186,6 +189,7 @@ function TaskListComponent({
   const [sortModalVisible, setSortModalVisible] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [internalProjectReorderMode, setInternalProjectReorderMode] = useState(false);
+  const [completedTasksCollapsed, setCompletedTasksCollapsed] = useState(true);
   const [taskSearchQuery, setTaskSearchQuery] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
@@ -288,6 +292,7 @@ function TaskListComponent({
 
   const sortBy = (settings?.taskSortBy ?? 'default') as TaskSortBy;
   const canUseProjectReorder = Boolean(enableProjectReorder && projectId);
+  const shouldGroupCompletedTasks = Boolean(groupCompletedTasksLast && projectId && statusFilter === 'all');
   const projectReorderMode = projectReorderModeProp ?? internalProjectReorderMode;
   const quickAddAvailable = allowAdd && !projectReorderMode;
   const aiEnabled = settings?.ai?.enabled === true;
@@ -325,6 +330,10 @@ function TaskListComponent({
     lastProjectIdRef.current = projectId;
     setProjectReorderMode(false);
   }, [projectId, setProjectReorderMode]);
+
+  useEffect(() => {
+    setCompletedTasksCollapsed(true);
+  }, [groupCompletedTasksLast, projectId]);
 
   useEffect(() => {
     if (!canUseProjectReorder && projectReorderMode) {
@@ -503,7 +512,12 @@ function TaskListComponent({
     }
     return sortTasksBy(filteredTasks, sortBy);
   }, [enableProjectReorder, filteredTasks, projectId, sortBy]);
-  const orderedTaskIds = useMemo(() => orderedTasks.map((task) => task.id), [orderedTasks]);
+  const { activeTasks: orderedActiveTasks, completedTasks: orderedCompletedTasks } = useMemo(() => {
+    if (!shouldGroupCompletedTasks) {
+      return { activeTasks: orderedTasks, completedTasks: [] as Task[] };
+    }
+    return splitCompletedTasks(orderedTasks);
+  }, [orderedTasks, shouldGroupCompletedTasks]);
 
   const projectSections = useMemo(() => {
     if (!projectId) return [];
@@ -518,7 +532,7 @@ function TaskListComponent({
   }, [projectId, sections]);
 
   type ListItem =
-    | { type: 'section'; id: string; title: string; count: number; muted?: boolean }
+    | { type: 'section'; id: string; title: string; count: number; muted?: boolean; collapsible?: boolean; collapsed?: boolean }
     | { type: 'task'; task: Task; reorderSectionId?: string | null };
 
   const LIST_CONTENT_VERTICAL_PADDING = 12;
@@ -535,7 +549,7 @@ function TaskListComponent({
       const grouped = new Map<string, Task[]>();
       const generalTasks: Task[] = [];
 
-      orderedTasks.forEach((task) => {
+      orderedActiveTasks.forEach((task) => {
         const projectAreaId = task.projectId ? projectById.get(task.projectId)?.areaId : undefined;
         const resolvedAreaId = task.areaId || projectAreaId;
         if (resolvedAreaId && areaIds.has(resolvedAreaId)) {
@@ -568,14 +582,31 @@ function TaskListComponent({
       return items;
     }
 
-    const shouldGroup = Boolean(projectId) && (projectSections.length > 0 || orderedTasks.some((task) => task.sectionId));
+    const appendCompletedTasks = (items: ListItem[]) => {
+      if (!shouldGroupCompletedTasks || orderedCompletedTasks.length === 0) return items;
+      items.push({
+        type: 'section',
+        id: 'project-completed-tasks',
+        title: tFallback(t, 'list.done', tFallback(t, 'status.done', 'Completed')),
+        count: orderedCompletedTasks.length,
+        muted: true,
+        collapsible: true,
+        collapsed: completedTasksCollapsed,
+      });
+      if (!completedTasksCollapsed) {
+        orderedCompletedTasks.forEach((task) => items.push({ type: 'task', task }));
+      }
+      return items;
+    };
+
+    const shouldGroup = Boolean(projectId) && (projectSections.length > 0 || orderedActiveTasks.some((task) => task.sectionId));
     if (!shouldGroup) {
-      return orderedTasks.map((task) => ({ type: 'task', task, reorderSectionId: projectId ? undefined : task.sectionId }));
+      return appendCompletedTasks(orderedActiveTasks.map((task) => ({ type: 'task', task, reorderSectionId: projectId ? undefined : task.sectionId })));
     }
     const sectionIds = new Set(projectSections.map((section) => section.id));
     const tasksBySection = new Map<string, Task[]>();
     const unsectioned: Task[] = [];
-    orderedTasks.forEach((task) => {
+    orderedActiveTasks.forEach((task) => {
       const sectionId = task.sectionId && sectionIds.has(task.sectionId) ? task.sectionId : null;
       if (sectionId) {
         const list = tasksBySection.get(sectionId) ?? [];
@@ -603,8 +634,12 @@ function TaskListComponent({
       });
       unsectioned.forEach((task) => items.push({ type: 'task', task, reorderSectionId }));
     }
-    return items;
-  }, [areas, orderedTasks, projectById, projectId, projectReorderMode, projectSections, statusFilter, t]);
+    return appendCompletedTasks(items);
+  }, [areas, completedTasksCollapsed, orderedActiveTasks, orderedCompletedTasks, projectById, projectId, projectReorderMode, projectSections, shouldGroupCompletedTasks, statusFilter, t]);
+  const orderedTaskIds = useMemo(
+    () => listItems.flatMap((item) => (item.type === 'task' ? [item.task.id] : [])),
+    [listItems],
+  );
   const itemHeightsRef = useRef<Record<string, number>>({});
   const [itemLayoutVersion, setItemLayoutVersion] = useState(0);
   const getListItemKey = useCallback((item: ListItem) => (
@@ -646,8 +681,11 @@ function TaskListComponent({
 
   const projectReorderGroups = useMemo<ProjectTaskReorderGroup<Task>[]>(() => {
     if (!canUseProjectReorder) return [];
-    return buildProjectTaskReorderGroups<Task>(listItems, { includeEmptySections: projectSections.length > 0 });
-  }, [canUseProjectReorder, listItems, projectSections.length]);
+    const reorderItems = shouldGroupCompletedTasks
+      ? listItems.filter((item) => (item.type === 'section' ? item.id !== 'project-completed-tasks' : item.task.status !== 'done'))
+      : listItems;
+    return buildProjectTaskReorderGroups<Task>(reorderItems, { includeEmptySections: projectSections.length > 0 });
+  }, [canUseProjectReorder, listItems, projectSections.length, shouldGroupCompletedTasks]);
   const projectSectionIds = useMemo(() => projectSections.map((section) => section.id), [projectSections]);
   const hasProjectReorderItems = projectReorderGroups.some((group) => group.tasks.length > 0) || projectSections.length > 1;
   // Keep the draggable pan handler on the handle strip so vertical scrolling still works.
@@ -1057,6 +1095,7 @@ function TaskListComponent({
     hideChecklistProgressForList,
     highlightTaskId,
     isDark,
+    projectId,
     t,
     themeColorsMemo,
     updateTask,
@@ -1065,6 +1104,32 @@ function TaskListComponent({
   const renderListItem = useCallback(({ item }: { item: ListItem }) => {
     const itemKey = getListItemKey(item);
     if (item.type === 'section') {
+      if (item.collapsible) {
+        return (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ expanded: item.collapsed !== true }}
+            onPress={() => setCompletedTasksCollapsed((value) => !value)}
+            style={styles.sectionHeader}
+            onLayout={(event) => registerItemHeight(itemKey, event.nativeEvent.layout.height)}
+          >
+            <View style={styles.sectionHeaderTitleBlock}>
+              {item.collapsed ? (
+                <ChevronRight size={15} color={themeColorsMemo.secondaryText} />
+              ) : (
+                <ChevronDown size={15} color={themeColorsMemo.secondaryText} />
+              )}
+              <Text style={[styles.sectionTitle, { color: item.muted ? themeColorsMemo.secondaryText : themeColorsMemo.text }]}>
+                {item.title}
+              </Text>
+            </View>
+            <Text style={[styles.sectionCount, { color: themeColorsMemo.secondaryText }]}>
+              {item.count}
+            </Text>
+          </TouchableOpacity>
+        );
+      }
+
       return (
         <View
           style={styles.sectionHeader}

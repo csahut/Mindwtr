@@ -10,8 +10,10 @@ import {
     getFocusSequentialFirstTaskIds,
     getSequentialFirstTaskIds,
     getWaitingPerson,
+    groupCompletedTasksLast,
     isTaskFutureStart,
     shouldShowTaskForStart,
+    splitCompletedTasks,
 } from './task-utils';
 import { Task } from './types';
 
@@ -158,6 +160,32 @@ describe('task-utils', () => {
             ] as Task[], 'start', { prioritizeByPriority: true });
 
             expect(sorted.map((task) => task.id)).toEqual(['high-same-start', 'low-earlier', 'high-later']);
+        });
+    });
+
+    describe('completed task grouping', () => {
+        it('splits done tasks from active tasks without changing order inside either group', () => {
+            const tasks = [
+                { id: 'done-1', status: 'done', title: 'Done first', createdAt: '2026-01-01' },
+                { id: 'next-1', status: 'next', title: 'Next', createdAt: '2026-01-02' },
+                { id: 'waiting-1', status: 'waiting', title: 'Waiting', createdAt: '2026-01-03' },
+                { id: 'done-2', status: 'done', title: 'Done second', createdAt: '2026-01-04' },
+            ] as Task[];
+
+            expect(splitCompletedTasks(tasks)).toEqual({
+                activeTasks: [tasks[1], tasks[2]],
+                completedTasks: [tasks[0], tasks[3]],
+            });
+        });
+
+        it('moves completed tasks after active tasks', () => {
+            const tasks = [
+                { id: 'done-1', status: 'done', title: 'Done first', createdAt: '2026-01-01' },
+                { id: 'next-1', status: 'next', title: 'Next', createdAt: '2026-01-02' },
+                { id: 'done-2', status: 'done', title: 'Done second', createdAt: '2026-01-03' },
+            ] as Task[];
+
+            expect(groupCompletedTasksLast(tasks).map((task) => task.id)).toEqual(['next-1', 'done-1', 'done-2']);
         });
     });
 
