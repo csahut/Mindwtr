@@ -8,6 +8,7 @@ import {
     hasTimeComponent,
     resolveTaskTextDirection,
     safeFormatDate,
+    safeParseDate,
     safeParseDueDate,
     tFallback,
 } from '@mindwtr/core';
@@ -119,6 +120,13 @@ export function SwipeableTaskItemContent({
         const hasTime = hasTimeComponent(task.dueDate);
         return safeFormatDate(due, hasTime ? 'Pp' : 'P');
     })();
+    const startLabel = (() => {
+        const start = safeParseDate(task.startTime);
+        if (!start) return null;
+        const hasTime = hasTimeComponent(task.startTime);
+        return safeFormatDate(start, hasTime ? 'Pp' : 'P');
+    })();
+    const startDateLabel = tFallback(t, 'taskEdit.startDateLabel', 'Start');
     const dateIssueLabel = getTaskDateCoherenceIssues(task).some((issue) => issue.code === 'start_after_due')
         ? tFallback(t, 'task.dateIssue.startAfterDue', 'Starts after due date')
         : null;
@@ -269,6 +277,15 @@ export function SwipeableTaskItemContent({
                 {dueLabel}
             </Text>,
             'due'
+        );
+    }
+
+    if (startLabel) {
+        addMetaPart(
+            <Text key="start" style={[styles.metaText, { color: tc.secondaryText }]}>
+                {`${startDateLabel}: ${startLabel}`}
+            </Text>,
+            'start'
         );
     }
 

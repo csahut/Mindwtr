@@ -7,6 +7,7 @@ import {
     hasTimeComponent,
     normalizeFocusTaskLimit,
     safeFormatDate,
+    safeParseDate,
     safeParseDueDate,
     shallow,
     tFallback,
@@ -347,6 +348,12 @@ export function SwipeableTaskItem({
     const accessibilityLabel = [
         task.title,
         `Status: ${t(`status.${task.status}`)}`,
+        (() => {
+            const start = safeParseDate(task.startTime);
+            if (!start) return null;
+            const hasTime = hasTimeComponent(task.startTime);
+            return `${tFallback(t, 'taskEdit.startDateLabel', 'Start')}: ${safeFormatDate(start, hasTime ? 'Pp' : 'P')}`;
+        })(),
         (() => {
             const due = safeParseDueDate(task.dueDate);
             if (!due) return null;

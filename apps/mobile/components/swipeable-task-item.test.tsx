@@ -5,7 +5,7 @@ import { Alert } from 'react-native';
 
 import { SwipeableTaskItem } from './swipeable-task-item';
 
-const { addTask, updateTask, restoreTask, showToast, getChecklistProgress, getTaskAgeLabel, getTaskStaleness, safeFormatDate, storeState } = vi.hoisted(() => ({
+const { addTask, updateTask, restoreTask, showToast, getChecklistProgress, getTaskAgeLabel, getTaskStaleness, safeFormatDate, safeParseDate, storeState } = vi.hoisted(() => ({
   addTask: vi.fn(),
   updateTask: vi.fn(),
   restoreTask: vi.fn(),
@@ -16,6 +16,7 @@ const { addTask, updateTask, restoreTask, showToast, getChecklistProgress, getTa
   safeFormatDate: vi.fn((_value: unknown, formatStr: string) => (
     formatStr === 'Pp' ? 'May 12, 2026, 8:30 AM' : ''
   )),
+  safeParseDate: vi.fn((value?: string | null) => (value ? new Date(value) : null)),
   storeState: {
     addTask: vi.fn(),
     updateTask: vi.fn(),
@@ -59,6 +60,7 @@ const translate = vi.hoisted(() => {
     'projects.nextActionPromptAddButton': 'Add next action',
     'task.aria.delete': 'Delete task',
     'task.deleteConfirmBody': 'Move this task to Trash?',
+    'taskEdit.startDateLabel': 'Start',
   };
   return (key: string) => labels[key] ?? key;
 });
@@ -112,7 +114,7 @@ vi.mock('@mindwtr/core', () => {
     ),
     getTaskStaleness,
     getStatusColor: () => ({ bg: '#111111', border: '#222222', text: '#333333' }),
-    hasTimeComponent: () => false,
+    hasTimeComponent: (value?: string | null) => Boolean(value && /[T\s]\d{2}:\d{2}/.test(value)),
     normalizeFocusTaskLimit: (value?: number) => value ?? 3,
     getInlineMarkdownPreview: (text: string) => {
       const line = text.replace(/\r\n/g, '\n').split('\n').find((candidate) => candidate.trim()) ?? '';
@@ -143,6 +145,7 @@ vi.mock('@mindwtr/core', () => {
     },
     parseMarkdownReferenceHref: () => null,
     safeFormatDate,
+    safeParseDate,
     safeParseDueDate: () => null,
     tFallback: (t: (key: string) => string, key: string, fallback: string) => {
       const value = t(key);
@@ -243,6 +246,7 @@ describe('SwipeableTaskItem', () => {
     safeFormatDate.mockImplementation((_value: unknown, formatStr: string) => (
       formatStr === 'Pp' ? 'May 12, 2026, 8:30 AM' : ''
     ));
+    safeParseDate.mockImplementation((value?: string | null) => (value ? new Date(value) : null));
   });
 
   it('confirms deletion before invoking onDelete', async () => {
@@ -392,6 +396,45 @@ describe('SwipeableTaskItem', () => {
     });
 
     expect(hasText(tree, 'Starts after due date')).toBe(true);
+  });
+
+  it('shows scheduled date and time metadata for tasks with a start time', () => {
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <SwipeableTaskItem
+          task={{
+            id: 'task-1',
+            title: 'Client call',
+            status: 'next',
+            startTime: '2026-05-12T08:30:00.000Z',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          } as any}
+          isDark={false}
+          tc={{
+            taskItemBg: '#111111',
+            border: '#222222',
+            text: '#ffffff',
+            secondaryText: '#999999',
+            tint: '#3b82f6',
+            warning: '#f59e0b',
+          } as any}
+          onPress={vi.fn()}
+          onStatusChange={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      );
+    });
+
+    expect(hasText(tree, 'Start: May 12, 2026, 8:30 AM')).toBe(true);
+
+    const row = tree.root.find((node) => (
+      node.props.accessibilityRole === 'button'
+      && node.props.accessibilityLabel === 'Client call. Status: Next. Start: May 12, 2026, 8:30 AM'
+    ));
+    expect(row).toBeTruthy();
+    expect(safeFormatDate).toHaveBeenCalledWith(expect.any(Date), 'Pp');
   });
 
   it('navigates from project, context, and tag meta labels', () => {
