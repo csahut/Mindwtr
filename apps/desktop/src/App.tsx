@@ -52,6 +52,7 @@ import {
 import { saveStoredFullscreen } from './lib/window-state';
 import { installWebviewZoomShortcuts } from './lib/webview-zoom';
 import { resolveCloseBehavior } from './lib/window-behavior';
+import { handleDesktopCloseRequest } from './lib/close-request-handler';
 import { subscribeNavigateEvent } from './lib/navigation-events';
 import { shouldOpenDesktopFirstRunOnboarding, subscribeDesktopOnboardingEvent } from './lib/desktop-onboarding-events';
 import { QUICK_ADD_SAVED_EVENT } from './lib/quick-add-saved-event';
@@ -130,6 +131,7 @@ function App() {
     const [resolvingExternalSync, setResolvingExternalSync] = useState(false);
     const [hasHydratedSettings, setHasHydratedSettings] = useState(false);
     const closePromptRememberRef = useRef(false);
+    const closePromptOpenRef = useRef(false);
     const lastViewBreadcrumbRef = useRef<string | null>(null);
     const isObsidianEnabled = useObsidianStore((state) => state.config.enabled);
     const obsidianVaultPath = useObsidianStore((state) => state.config.vaultPath);
@@ -139,6 +141,11 @@ function App() {
     const setClosePromptRememberValue = useCallback((next: boolean) => {
         closePromptRememberRef.current = next;
         setClosePromptRemember(next);
+    }, []);
+
+    const setClosePromptOpenValue = useCallback((next: boolean) => {
+        closePromptOpenRef.current = next;
+        setClosePromptOpen(next);
     }, []);
 
     const resolveExternalSync = useCallback(async (resolution: ExternalSyncChangeResolution) => {
@@ -440,6 +447,7 @@ function App() {
 
     useEffect(() => {
         if (!isTauriRuntime()) return;
+        let disposed = false;
         let unlisten: (() => void) | undefined;
         const reportQuickAddRefreshError = (error: unknown) => {
             const message = error instanceof Error ? error.message : String(error);
@@ -449,20 +457,27 @@ function App() {
 
         const setup = async () => {
             const { listen } = await import('@tauri-apps/api/event');
-            unlisten = await listen(QUICK_ADD_SAVED_EVENT, async () => {
+            const nextUnlisten = await listen(QUICK_ADD_SAVED_EVENT, async () => {
                 await LocalDataWatcher.refreshFromDiskNow().catch(reportQuickAddRefreshError);
             });
+            if (disposed) {
+                nextUnlisten();
+                return;
+            }
+            unlisten = nextUnlisten;
         };
 
         setup().catch(reportQuickAddRefreshError);
 
         return () => {
+            disposed = true;
             if (unlisten) unlisten();
         };
     }, [setError]);
 
     useEffect(() => {
         if (!isTauriRuntime()) return;
+        let disposed = false;
         let unlisten: (() => void) | undefined;
         const reportCloseError = (label: string, error: unknown) => {
             const message = error instanceof Error ? error.message : String(error);
@@ -473,36 +488,35 @@ function App() {
         const setup = async () => {
             const { listen } = await import('@tauri-apps/api/event');
             const { invoke } = await import('@tauri-apps/api/core');
-            unlisten = await listen('close-requested', async () => {
+            const nextUnlisten = await listen('close-requested', async () => {
                 await invoke('acknowledge_close_request').catch((error) => {
                     void logError(error, { scope: 'app', step: 'acknowledgeCloseRequest' });
                 });
-                if (closeBehavior === 'quit') {
-                    await quitApp().catch((error) => reportCloseError('Quit failed', error));
-                    return;
-                }
-                if (closeBehavior === 'tray') {
-                    // If tray is hidden, quit instead of trying to hide to an invisible tray
-                    if (showTray === false) {
-                        await quitApp().catch((error) => reportCloseError('Quit failed', error));
-                        return;
-                    }
-                    await hideToTray().catch((error) => reportCloseError('Hide failed', error));
-                    return;
-                }
-                if (!closePromptOpen) {
-                    setClosePromptRememberValue(false);
-                    setClosePromptOpen(true);
-                }
+                await handleDesktopCloseRequest({
+                    getWindowSettings: () => useTaskStore.getState().settings?.window,
+                    hideToTray,
+                    isFlatpak,
+                    promptOpenRef: closePromptOpenRef,
+                    quitApp,
+                    reportCloseError,
+                    setPromptOpen: setClosePromptOpenValue,
+                    setPromptRemember: setClosePromptRememberValue,
+                });
             });
+            if (disposed) {
+                nextUnlisten();
+                return;
+            }
+            unlisten = nextUnlisten;
         };
 
         setup().catch((error) => reportCloseError('Close listener failed', error));
 
         return () => {
+            disposed = true;
             if (unlisten) unlisten();
         };
-    }, [closeBehavior, closePromptOpen, hideToTray, quitApp, setClosePromptRememberValue, setError, showTray]);
+    }, [hideToTray, isFlatpak, quitApp, setClosePromptOpenValue, setClosePromptRememberValue, setError]);
 
     useEffect(() => {
         if (!isTauriRuntime()) return;
@@ -837,17 +851,17 @@ function App() {
                         cancelLabel={translateOrFallback('common.cancel', 'Cancel')}
                         remember={closePromptRemember}
                         onRememberChange={setClosePromptRememberValue}
-                        onCancel={() => setClosePromptOpen(false)}
+                        onCancel={() => setClosePromptOpenValue(false)}
                         onStay={() => {
                             const apply = async () => {
                                 if (closePromptRememberRef.current) {
                                     await persistCloseBehavior('tray');
                                 }
-                                setClosePromptOpen(false);
+                                setClosePromptOpenValue(false);
                                 await hideToTray();
                             };
                             apply().catch((error) => {
-                                setClosePromptOpen(false);
+                                setClosePromptOpenValue(false);
                                 void logError(error, { scope: 'app', step: 'close-tray' });
                             });
                         }}
@@ -856,11 +870,11 @@ function App() {
                                 if (closePromptRememberRef.current) {
                                     await persistCloseBehavior('quit');
                                 }
-                                setClosePromptOpen(false);
+                                setClosePromptOpenValue(false);
                                 await quitApp();
                             };
                             apply().catch((error) => {
-                                setClosePromptOpen(false);
+                                setClosePromptOpenValue(false);
                                 void logError(error, { scope: 'app', step: 'close-quit' });
                             });
                         }}
