@@ -195,13 +195,20 @@ export const projectsScreenStyles = StyleSheet.create({
     projectTitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        justifyContent: 'space-between',
+        gap: 8,
         marginBottom: 4,
+    },
+    projectTitleContent: {
+        flex: 1,
+        minWidth: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
     },
     projectTagDots: {
         flexDirection: 'row',
         gap: 4,
-        marginLeft: 6,
     },
     projectTagDot: {
         width: 6,

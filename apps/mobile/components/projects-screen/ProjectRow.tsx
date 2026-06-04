@@ -144,19 +144,21 @@ export function ProjectRow({
             >
                 <View style={styles.projectContent}>
                     <View style={styles.projectTitleRow}>
-                        <Text style={[styles.projectTitle, { color: tc.text }]} numberOfLines={1}>
-                            {project.title}
-                        </Text>
-                        {project.tagIds?.length ? (
-                            <View style={styles.projectTagDots}>
-                                {project.tagIds.slice(0, 4).map((tag) => (
-                                    <View
-                                        key={tag}
-                                        style={[styles.projectTagDot, { backgroundColor: tc.secondaryText }]}
-                                    />
-                                ))}
-                            </View>
-                        ) : null}
+                        <View style={styles.projectTitleContent}>
+                            <Text style={[styles.projectTitle, { color: tc.text }]} numberOfLines={1}>
+                                {project.title}
+                            </Text>
+                            {project.tagIds?.length ? (
+                                <View style={styles.projectTagDots}>
+                                    {project.tagIds.slice(0, 4).map((tag) => (
+                                        <View
+                                            key={tag}
+                                            style={[styles.projectTagDot, { backgroundColor: tc.secondaryText }]}
+                                        />
+                                    ))}
+                                </View>
+                            ) : null}
+                        </View>
                         <View
                             accessible
                             accessibilityLabel={taskCountLabel}
