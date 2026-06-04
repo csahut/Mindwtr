@@ -95,6 +95,10 @@ fn path_is_under_allowed_root(path: &Path, allowed_roots: &[PathBuf]) -> bool {
     allowed_roots.iter().any(|root| path == root || path.starts_with(root))
 }
 
+fn path_is_openable(path: &Path, allowed_roots: &[PathBuf]) -> bool {
+    path_is_under_allowed_root(path, allowed_roots) || path.is_file()
+}
+
 #[cfg(target_os = "macos")]
 fn parse_macos_eventkit_json(raw: *mut c_char) -> Result<Value, String> {
     if raw.is_null() {
@@ -512,7 +516,7 @@ pub(crate) fn cloudkit_register_for_notifications() -> Result<bool, String> {
 pub(crate) fn open_path(app: tauri::AppHandle, path: String) -> Result<bool, String> {
     let normalized = normalize_open_path(&path)?;
     let allowed_roots = allowed_open_roots(&app);
-    if !path_is_under_allowed_root(&normalized, &allowed_roots) {
+    if !path_is_openable(&normalized, &allowed_roots) {
         return Err("Path is outside Mindwtr-managed locations.".to_string());
     }
     open::that(normalized).map_err(|e| e.to_string())?;
@@ -543,6 +547,22 @@ mod tests {
             Path::new("/run/user/1000/doc/abc123/notes.pdf"),
             &[portal_root]
         ));
+    }
+
+    #[test]
+    fn path_is_openable_allows_existing_user_selected_files() {
+        let temp = tempfile::tempdir().expect("should create temp dir");
+        let attachment_path = temp.path().join("notes.md");
+        fs::write(&attachment_path, "notes").expect("should write attachment");
+
+        assert!(path_is_openable(&attachment_path, &[]));
+    }
+
+    #[test]
+    fn path_is_openable_rejects_unmanaged_directories() {
+        let temp = tempfile::tempdir().expect("should create temp dir");
+
+        assert!(!path_is_openable(temp.path(), &[]));
     }
 }
 
