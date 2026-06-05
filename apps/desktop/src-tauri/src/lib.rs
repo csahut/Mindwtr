@@ -1066,7 +1066,6 @@ pub fn run() {
             }
 
             let diagnostics_enabled = diagnostics_enabled();
-            let is_windows_store = is_windows_store_install();
             let is_flatpak_install = cfg!(target_os = "linux") && is_flatpak();
             if let Some(window) = app.get_webview_window("main") {
                 enable_desktop_spellcheck(&window);
@@ -1097,87 +1096,81 @@ pub fn run() {
             if let Err(error) = create_quick_add_window(&handle) {
                 log::warn!("{error}");
             }
-            if !is_windows_store {
-                let tray_init_result: tauri::Result<()> = (|| {
-                    let quick_add_item =
-                        MenuItem::with_id(handle, "quick_add", "Quick Add", true, None::<&str>)?;
-                    let show_item =
-                        MenuItem::with_id(handle, "show", "Show Mindwtr", true, None::<&str>)?;
-                    let quit_item = MenuItem::with_id(handle, "quit", "Quit", true, None::<&str>)?;
-                    let tray_menu =
-                        Menu::with_items(handle, &[&quick_add_item, &show_item, &quit_item])?;
+            let tray_init_result: tauri::Result<()> = (|| {
+                let quick_add_item =
+                    MenuItem::with_id(handle, "quick_add", "Quick Add", true, None::<&str>)?;
+                let show_item =
+                    MenuItem::with_id(handle, "show", "Show Mindwtr", true, None::<&str>)?;
+                let quit_item = MenuItem::with_id(handle, "quit", "Quit", true, None::<&str>)?;
+                let tray_menu =
+                    Menu::with_items(handle, &[&quick_add_item, &show_item, &quit_item])?;
 
-                    let tray_icon = Image::from_bytes(include_bytes!("../icons/tray.png"))
-                        .ok()
-                        .or_else(|| handle.default_window_icon().cloned());
+                let tray_icon = Image::from_bytes(include_bytes!("../icons/tray.png"))
+                    .ok()
+                    .or_else(|| handle.default_window_icon().cloned());
 
-                    if let Some(tray_icon) = tray_icon {
-                        let mut tray_builder = TrayIconBuilder::with_id("main")
-                            .icon(tray_icon)
-                            .menu(&tray_menu)
-                            .show_menu_on_left_click(false);
-                        #[cfg(target_os = "linux")]
-                        if is_flatpak_install {
-                            match handle.path().app_cache_dir() {
-                                Ok(app_cache_dir) => {
-                                    let tray_icon_temp_dir =
-                                        flatpak_tray_icon_temp_dir(&app_cache_dir);
-                                    if let Err(error) = fs::create_dir_all(&tray_icon_temp_dir) {
-                                        log::warn!(
-                                            "Failed to prepare Flatpak tray icon directory: {error}"
-                                        );
-                                    } else {
-                                        tray_builder =
-                                            tray_builder.temp_dir_path(tray_icon_temp_dir);
-                                    }
-                                }
-                                Err(error) => {
+                if let Some(tray_icon) = tray_icon {
+                    let mut tray_builder = TrayIconBuilder::with_id("main")
+                        .icon(tray_icon)
+                        .menu(&tray_menu)
+                        .show_menu_on_left_click(false);
+                    #[cfg(target_os = "linux")]
+                    if is_flatpak_install {
+                        match handle.path().app_cache_dir() {
+                            Ok(app_cache_dir) => {
+                                let tray_icon_temp_dir = flatpak_tray_icon_temp_dir(&app_cache_dir);
+                                if let Err(error) = fs::create_dir_all(&tray_icon_temp_dir) {
                                     log::warn!(
-                                        "Failed to resolve Flatpak tray icon cache directory: {error}"
+                                        "Failed to prepare Flatpak tray icon directory: {error}"
                                     );
+                                } else {
+                                    tray_builder = tray_builder.temp_dir_path(tray_icon_temp_dir);
                                 }
                             }
+                            Err(error) => {
+                                log::warn!(
+                                    "Failed to resolve Flatpak tray icon cache directory: {error}"
+                                );
+                            }
                         }
-                        let _ = tray_builder
-                            .on_menu_event(move |app, event| match event.id().as_ref() {
-                                "quick_add" => {
-                                    show_quick_add_window(app);
-                                }
-                                "show" => {
-                                    show_main(app);
-                                }
-                                "quit" => {
-                                    app.exit(0);
-                                }
-                                _ => {}
-                            })
-                            .on_tray_icon_event(|tray, event| {
-                                if let TrayIconEvent::Click {
-                                    button,
-                                    button_state,
-                                    ..
-                                } = event
-                                {
-                                    if button == MouseButton::Left
-                                        && button_state == MouseButtonState::Up
-                                    {
-                                        show_main(tray.app_handle());
-                                    }
-                                }
-                            })
-                            .build(handle)?;
-                    } else {
-                        log::warn!("No tray icon available; skipping tray initialization.");
                     }
-
-                    Ok(())
-                })();
-
-                if let Err(error) = tray_init_result {
-                    log::warn!("Failed to initialize tray support: {error}");
+                    let _ = tray_builder
+                        .on_menu_event(move |app, event| match event.id().as_ref() {
+                            "quick_add" => {
+                                show_quick_add_window(app);
+                            }
+                            "show" => {
+                                show_main(app);
+                            }
+                            "quit" => {
+                                app.exit(0);
+                            }
+                            _ => {}
+                        })
+                        .on_tray_icon_event(|tray, event| {
+                            if let TrayIconEvent::Click {
+                                button,
+                                button_state,
+                                ..
+                            } = event
+                            {
+                                if button == MouseButton::Left
+                                    && button_state == MouseButtonState::Up
+                                {
+                                    show_main(tray.app_handle());
+                                }
+                            }
+                        })
+                        .build(handle)?;
+                } else {
+                    log::warn!("No tray icon available; skipping tray initialization.");
                 }
-            } else if is_windows_store {
-                log::info!("Tray disabled for Microsoft Store install.");
+
+                Ok(())
+            })();
+
+            if let Err(error) = tray_init_result {
+                log::warn!("Failed to initialize tray support: {error}");
             }
 
             let shortcut_state = app.state::<GlobalQuickAddShortcutState>();
