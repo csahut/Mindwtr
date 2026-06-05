@@ -16,6 +16,7 @@ const {
   mockEnsureReminderNotificationChannel,
   mockGetNextScheduledAt,
   mockHasTimeComponent,
+  mockLogInfo,
   mockPlatform,
   mockPermissionsAndroidCheck,
   mockPermissionsAndroidRequest,
@@ -26,7 +27,14 @@ const {
   mockStoreSubscribe: vi.fn(() => () => undefined),
   mockStoreState: {
     settings: {} as Record<string, unknown>,
-    tasks: [] as Array<{ id: string; title: string; description?: string; reviewAt?: string }>,
+    tasks: [] as Array<{
+      id: string;
+      title: string;
+      description?: string;
+      dueDate?: string;
+      reviewAt?: string;
+      startTime?: string;
+    }>,
     projects: [] as Array<Record<string, unknown>>,
   },
   mockAlarmDeleteAlarm: vi.fn(),
@@ -39,6 +47,7 @@ const {
   mockEnsureReminderNotificationChannel: vi.fn(async () => undefined),
   mockGetNextScheduledAt: vi.fn<(...args: unknown[]) => Date | null>(() => null),
   mockHasTimeComponent: vi.fn(() => false),
+  mockLogInfo: vi.fn(async () => undefined),
   mockPlatform: {
     OS: 'android',
     Version: 34,
@@ -114,6 +123,7 @@ vi.mock('@mindwtr/core', () => ({
 }));
 
 vi.mock('./app-log', () => ({
+  logInfo: mockLogInfo,
   logWarn: vi.fn(async () => undefined),
 }));
 
@@ -155,6 +165,7 @@ describe('notification-service-local', () => {
     mockGetNextScheduledAt.mockReturnValue(null);
     mockHasTimeComponent.mockReset();
     mockHasTimeComponent.mockReturnValue(false);
+    mockLogInfo.mockClear();
     mockPermissionsAndroidCheck.mockReset();
     mockPermissionsAndroidRequest.mockReset();
     mockPermissionsAndroidCheck.mockResolvedValue(true);
@@ -260,6 +271,39 @@ describe('notification-service-local', () => {
         }),
       })
     );
+  });
+
+  it('logs reminder scheduling diagnostics without task title or description content', async () => {
+    const fireAt = new Date(Date.now() + 5 * 60 * 1000);
+    mockStoreState.tasks = [
+      {
+        id: 'task-1',
+        title: 'Private task title',
+        description: 'Private task details',
+        dueDate: fireAt.toISOString(),
+      },
+    ];
+    mockHasTimeComponent.mockImplementation((value?: string) => Boolean(value?.includes('T')));
+    mockGetNextScheduledAt.mockReturnValue(fireAt);
+
+    await startLocalMobileNotifications();
+
+    expect(mockLogInfo).toHaveBeenCalledWith(
+      '[Local Notifications] Reschedule cycle complete',
+      expect.objectContaining({
+        scope: 'notifications',
+        extra: expect.objectContaining({
+          futureDueDateReminderCount: 1,
+          oneShotReminderCount: 1,
+          scheduledOneShotReminderCount: 1,
+          taskReminderCount: 1,
+        }),
+      })
+    );
+
+    const logPayload = JSON.stringify(mockLogInfo.mock.calls);
+    expect(logPayload).not.toContain('Private task title');
+    expect(logPayload).not.toContain('Private task details');
   });
 
   it('only schedules the next 60 upcoming task reminders on iOS', async () => {
