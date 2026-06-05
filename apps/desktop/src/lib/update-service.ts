@@ -23,6 +23,8 @@ const AUR_SOURCE_PACKAGE_URL = "https://aur.archlinux.org/packages/mindwtr";
 const AUR_BIN_RPC_API =
   "https://aur.archlinux.org/rpc/?v=5&type=info&arg%5B%5D=mindwtr-bin";
 const AUR_BIN_PACKAGE_URL = "https://aur.archlinux.org/packages/mindwtr-bin";
+const FLATHUB_PACKAGE_URL = "https://flathub.org/apps/tech.dongdongbh.mindwtr";
+const SNAPCRAFT_PACKAGE_URL = "https://snapcraft.io/mindwtr";
 const APP_STORE_BUNDLE_ID = "tech.dongdongbh.mindwtr";
 const APP_STORE_LOOKUP_URL = `https://itunes.apple.com/lookup?bundleId=${encodeURIComponent(APP_STORE_BUNDLE_ID)}&country=US`;
 const APP_STORE_LOOKUP_FALLBACK_URL = `https://itunes.apple.com/lookup?bundleId=${encodeURIComponent(APP_STORE_BUNDLE_ID)}`;
@@ -638,8 +640,12 @@ export async function verifyDownloadChecksum(
 
 export {
   APP_STORE_LISTING_URL,
+  AUR_BIN_PACKAGE_URL,
+  AUR_SOURCE_PACKAGE_URL,
+  FLATHUB_PACKAGE_URL,
   GITHUB_RELEASES_URL,
   HOMEBREW_CASK_URL,
   MS_STORE_URL,
+  SNAPCRAFT_PACKAGE_URL,
   WINGET_PACKAGE_URL,
 };

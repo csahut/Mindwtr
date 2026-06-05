@@ -147,6 +147,8 @@ const UPDATE_REMINDER_RELEASES_URL = 'https://github.com/dongdongbh/Mindwtr/rele
 const APP_STORE_APP_ID = '6758597144';
 const APP_STORE_REVIEW_URL = `itms-apps://itunes.apple.com/app/id${APP_STORE_APP_ID}?action=write-review`;
 const APP_STORE_LISTING_URL = `https://apps.apple.com/app/mindwtr/id${APP_STORE_APP_ID}`;
+const UPDATE_NOW_ACTION_LABEL = 'Update now';
+const VIEW_RELEASE_ACTION_LABEL = 'View release';
 
 type MobileUpdateReminderInfo = {
   currentVersion: string;
@@ -196,6 +198,7 @@ const fetchMobileUpdateReminderInfo = async (currentVersion: string): Promise<Mo
     releaseUrl: typeof release.html_url === 'string' && release.html_url.trim()
       ? release.html_url.trim()
       : UPDATE_REMINDER_RELEASES_URL,
+    actionLabel: UPDATE_NOW_ACTION_LABEL,
   };
 };
 
@@ -205,7 +208,7 @@ const buildUpdateReminderAnnouncement = (info: MobileUpdateReminderInfo): AppAnn
   body: `Mindwtr ${info.latestVersion} is available. You are using ${info.currentVersion}. Update when you have a minute to keep fixes and improvements current.`,
   action: {
     type: 'url',
-    label: info.actionLabel ?? 'View release',
+    label: info.actionLabel ?? VIEW_RELEASE_ACTION_LABEL,
     url: info.releaseUrl,
   },
 });
@@ -214,11 +217,15 @@ const getAndroidPackageName = (): string => (
   Constants.expoConfig?.android?.package || Application.applicationId || 'tech.dongdongbh.mindwtr'
 );
 
+const getGooglePlayListingUrl = (): string => (
+  `https://play.google.com/store/apps/details?id=${getAndroidPackageName()}`
+);
+
 const openMobileStoreReviewDestination = async (): Promise<boolean> => {
   if (Platform.OS === 'android') {
     const packageName = getAndroidPackageName();
     const marketUrl = `market://details?id=${packageName}`;
-    const webUrl = `https://play.google.com/store/apps/details?id=${packageName}`;
+    const webUrl = getGooglePlayListingUrl();
     try {
       await Linking.openURL(marketUrl);
       return true;
@@ -247,15 +254,18 @@ const getMobileUpdateTestTarget = (options: {
 }): { label: string; url: string } | null => {
   if (options.isFossBuild) return null;
   if (Platform.OS === 'ios') {
-    return { label: 'Open App Store', url: APP_STORE_LISTING_URL };
+    return { label: UPDATE_NOW_ACTION_LABEL, url: APP_STORE_LISTING_URL };
   }
-  if (Platform.OS === 'android' && options.androidInstallerSource !== 'sideload') {
+  if (Platform.OS === 'android' && options.androidInstallerSource === 'play-store') {
     return {
-      label: 'Open Google Play',
-      url: `https://play.google.com/store/apps/details?id=${getAndroidPackageName()}`,
+      label: UPDATE_NOW_ACTION_LABEL,
+      url: getGooglePlayListingUrl(),
     };
   }
-  return { label: 'View release', url: UPDATE_REMINDER_RELEASES_URL };
+  if (Platform.OS === 'android' && options.androidInstallerSource === 'sideload') {
+    return { label: UPDATE_NOW_ACTION_LABEL, url: UPDATE_REMINDER_RELEASES_URL };
+  }
+  return { label: VIEW_RELEASE_ACTION_LABEL, url: UPDATE_REMINDER_RELEASES_URL };
 };
 
 const PROMPT_TEST_ANNOUNCEMENT: AppAnnouncement = {

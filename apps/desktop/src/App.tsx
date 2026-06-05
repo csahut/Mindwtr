@@ -85,11 +85,15 @@ import {
 } from './lib/user-prompt-state';
 import {
     APP_STORE_LISTING_URL,
+    AUR_BIN_PACKAGE_URL,
+    AUR_SOURCE_PACKAGE_URL,
     checkForUpdates,
+    FLATHUB_PACKAGE_URL,
     GITHUB_RELEASES_URL,
     HOMEBREW_CASK_URL,
     MS_STORE_URL,
     normalizeInstallSource,
+    SNAPCRAFT_PACKAGE_URL,
     WINGET_PACKAGE_URL,
     type InstallSource,
 } from './lib/update-service';
@@ -125,6 +129,8 @@ const UPDATE_REMINDER_DESKTOP_INSTALL_SOURCES = new Set<InstallSource>([
 ]);
 const MS_STORE_REVIEW_URL = 'ms-windows-store://review/?ProductId=9N0V5B0B6FRX';
 const MAC_APP_STORE_REVIEW_URL = 'macappstore://itunes.apple.com/app/id6758597144?action=write-review';
+const UPDATE_NOW_ACTION_LABEL = 'Update now';
+const VIEW_RELEASE_ACTION_LABEL = 'View release';
 
 type DesktopUpdateReminderInfo = {
     currentVersion: string;
@@ -202,19 +208,34 @@ const getDesktopReviewTarget = (installSource: InstallSource | null): { label: s
 };
 
 const getDesktopUpdateTarget = (installSource: InstallSource | null): { label: string; url: string } => {
-    if (installSource === 'microsoft-store') {
-        return { label: 'Open Microsoft Store', url: MS_STORE_URL };
+    switch (installSource) {
+        case 'microsoft-store':
+            return { label: UPDATE_NOW_ACTION_LABEL, url: MS_STORE_URL };
+        case 'mac-app-store':
+            return { label: UPDATE_NOW_ACTION_LABEL, url: APP_STORE_LISTING_URL };
+        case 'homebrew':
+            return { label: UPDATE_NOW_ACTION_LABEL, url: HOMEBREW_CASK_URL };
+        case 'winget':
+            return { label: UPDATE_NOW_ACTION_LABEL, url: WINGET_PACKAGE_URL };
+        case 'flatpak':
+            return { label: UPDATE_NOW_ACTION_LABEL, url: FLATHUB_PACKAGE_URL };
+        case 'snap':
+            return { label: UPDATE_NOW_ACTION_LABEL, url: SNAPCRAFT_PACKAGE_URL };
+        case 'aur':
+        case 'aur-source':
+            return { label: UPDATE_NOW_ACTION_LABEL, url: AUR_SOURCE_PACKAGE_URL };
+        case 'aur-bin':
+            return { label: UPDATE_NOW_ACTION_LABEL, url: AUR_BIN_PACKAGE_URL };
+        case 'direct':
+        case 'portable':
+        case 'github-release':
+        case 'appimage':
+        case 'apt':
+        case 'rpm':
+            return { label: UPDATE_NOW_ACTION_LABEL, url: GITHUB_RELEASES_URL };
+        default:
+            return { label: VIEW_RELEASE_ACTION_LABEL, url: GITHUB_RELEASES_URL };
     }
-    if (installSource === 'mac-app-store') {
-        return { label: 'Open App Store', url: APP_STORE_LISTING_URL };
-    }
-    if (installSource === 'homebrew') {
-        return { label: 'Open Homebrew', url: HOMEBREW_CASK_URL };
-    }
-    if (installSource === 'winget') {
-        return { label: 'Open winget', url: WINGET_PACKAGE_URL };
-    }
-    return { label: 'View release', url: GITHUB_RELEASES_URL };
 };
 
 const buildPromptTestReviewAnnouncement = (installSource: InstallSource | null): AppAnnouncement | null => {
