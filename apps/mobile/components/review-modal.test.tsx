@@ -121,6 +121,10 @@ vi.mock('../lib/external-calendar', () => ({
     fetchExternalCalendarEvents: vi.fn().mockResolvedValue({ events: [] }),
 }));
 
+vi.mock('../lib/store-review-prompt', () => ({
+    maybeRequestStoreReviewAfterPositiveMoment: vi.fn().mockResolvedValue(false),
+}));
+
 vi.mock('@react-native-async-storage/async-storage', () => ({
     default: {
         setItem: vi.fn().mockResolvedValue(undefined),

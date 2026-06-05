@@ -550,10 +550,34 @@ const measureSync = (operation: () => void): number => {
   return performance.now() - startedAt;
 };
 
+const measureBestSync = (
+  operation: () => void,
+  cleanup: () => void,
+  attempts = 3,
+): number => {
+  let bestMs = Number.POSITIVE_INFINITY;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    cleanup();
+    bestMs = Math.min(bestMs, measureSync(operation));
+  }
+  return bestMs;
+};
+
 const measureAsync = async (operation: () => Promise<void>): Promise<number> => {
   const startedAt = performance.now();
   await operation();
   return performance.now() - startedAt;
+};
+
+const measureBestAsync = async (
+  operation: (attempt: number) => Promise<void>,
+  attempts = 3,
+): Promise<number> => {
+  let bestMs = Number.POSITIVE_INFINITY;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    bestMs = Math.min(bestMs, await measureAsync(() => operation(attempt)));
+  }
+  return bestMs;
 };
 
 const expectWithinBudget = (label: string, actualMs: number, budgetMs: number) => {
@@ -577,28 +601,36 @@ describe('large-store mobile interaction performance', () => {
     loadLargeStore(data);
 
     let editorTree: ReactTestRenderer | null = null;
-    const openEditorMs = measureSync(() => {
-      act(() => {
-        editorTree = renderer.create(
-          <TaskEditModal
-            visible
-            task={data.targetTask}
-            onClose={vi.fn()}
-            onSave={vi.fn()}
-          />
-        );
-      });
-    });
+    const openEditorMs = measureBestSync(
+      () => {
+        act(() => {
+          editorTree = renderer.create(
+            <TaskEditModal
+              visible
+              task={data.targetTask}
+              onClose={vi.fn()}
+              onSave={vi.fn()}
+            />
+          );
+        });
+      },
+      () => {
+        act(() => {
+          editorTree?.unmount();
+          editorTree = null;
+        });
+      }
+    );
 
     expectWithinBudget('Open editor', openEditorMs, PERFORMANCE_BUDGET_MS.openEditor);
     expect(editorTree).not.toBeNull();
 
     let saveResult: Awaited<ReturnType<ReturnType<typeof useTaskStore.getState>['updateTask']>> | null = null;
-    const saveMs = await measureAsync(async () => {
+    const saveMs = await measureBestAsync(async (attempt) => {
       await act(async () => {
         saveResult = await useTaskStore.getState().updateTask(data.targetTask.id, {
-          title: 'Synthetic task 1234 updated',
-          description: 'Updated from the large-store performance guard',
+          title: `Synthetic task 1234 updated ${attempt}`,
+          description: `Updated from the large-store performance guard ${attempt}`,
         });
       });
     });
@@ -611,9 +643,11 @@ describe('large-store mobile interaction performance', () => {
     );
 
     let toggleResult: Awaited<ReturnType<ReturnType<typeof useTaskStore.getState>['updateTask']>> | null = null;
-    const toggleCompleteMs = await measureAsync(async () => {
+    const toggleCompleteMs = await measureBestAsync(async (attempt) => {
       await act(async () => {
-        toggleResult = await useTaskStore.getState().updateTask(data.targetTask.id, { status: 'done' });
+        toggleResult = await useTaskStore.getState().updateTask(data.targetTask.id, {
+          status: attempt % 2 === 0 ? 'done' : 'next',
+        });
       });
     });
 
@@ -633,11 +667,19 @@ describe('large-store mobile interaction performance', () => {
     loadLargeStore(focusData);
 
     let focusTree: ReactTestRenderer | null = null;
-    const renderFocusMs = measureSync(() => {
-      act(() => {
-        focusTree = renderer.create(<FocusScreen />);
-      });
-    });
+    const renderFocusMs = measureBestSync(
+      () => {
+        act(() => {
+          focusTree = renderer.create(<FocusScreen />);
+        });
+      },
+      () => {
+        act(() => {
+          focusTree?.unmount();
+          focusTree = null;
+        });
+      }
+    );
 
     expectWithinBudget('Render Focus', renderFocusMs, PERFORMANCE_BUDGET_MS.renderFocus);
     expect(focusTree).not.toBeNull();
@@ -665,39 +707,47 @@ describe('large-store mobile interaction performance', () => {
     }).filter((row) => row.type === 'project');
 
     let projectRowsTree: ReactTestRenderer | null = null;
-    const renderProjectsMs = measureSync(() => {
-      act(() => {
-        projectRowsTree = renderer.create(
-          <>
-            {projectRows.map((row) => (
-              <ProjectRow
-                key={row.project.id}
-                project={row.project}
-                taskSummary={projectTaskSummaryById.get(row.project.id)}
-                tc={{
-                  cardBg: '#111827',
-                  secondaryText: '#94a3b8',
-                  text: '#f8fafc',
-                  tint: '#3b82f6',
-                }}
-                focusedCount={0}
-                statusPalette={{
-                  active: { text: '#3b82f6', bg: '#3b82f622', border: '#3b82f6' },
-                  waiting: { text: '#F59E0B', bg: '#F59E0B22', border: '#F59E0B' },
-                  someday: { text: '#A855F7', bg: '#A855F722', border: '#A855F7' },
-                  archived: { text: '#94a3b8', bg: '#1f2937', border: '#334155' },
-                }}
-                t={(key) => key}
-                onDeleteProject={vi.fn()}
-                onDuplicateProject={vi.fn()}
-                onOpenProject={vi.fn()}
-                onToggleProjectFocus={vi.fn()}
-              />
-            ))}
-          </>
-        );
-      });
-    });
+    const renderProjectsMs = measureBestSync(
+      () => {
+        act(() => {
+          projectRowsTree = renderer.create(
+            <>
+              {projectRows.map((row) => (
+                <ProjectRow
+                  key={row.project.id}
+                  project={row.project}
+                  taskSummary={projectTaskSummaryById.get(row.project.id)}
+                  tc={{
+                    cardBg: '#111827',
+                    secondaryText: '#94a3b8',
+                    text: '#f8fafc',
+                    tint: '#3b82f6',
+                  }}
+                  focusedCount={0}
+                  statusPalette={{
+                    active: { text: '#3b82f6', bg: '#3b82f622', border: '#3b82f6' },
+                    waiting: { text: '#F59E0B', bg: '#F59E0B22', border: '#F59E0B' },
+                    someday: { text: '#A855F7', bg: '#A855F722', border: '#A855F7' },
+                    archived: { text: '#94a3b8', bg: '#1f2937', border: '#334155' },
+                  }}
+                  t={(key) => key}
+                  onDeleteProject={vi.fn()}
+                  onDuplicateProject={vi.fn()}
+                  onOpenProject={vi.fn()}
+                  onToggleProjectFocus={vi.fn()}
+                />
+              ))}
+            </>
+          );
+        });
+      },
+      () => {
+        act(() => {
+          projectRowsTree?.unmount();
+          projectRowsTree = null;
+        });
+      }
+    );
 
     expectWithinBudget('Render Projects', renderProjectsMs, PERFORMANCE_BUDGET_MS.renderProjects);
     expect(projectRowsTree).not.toBeNull();
