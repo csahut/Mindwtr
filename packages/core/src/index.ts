@@ -86,6 +86,7 @@ export type {
 export {
     ACTIVE_APP_ANNOUNCEMENT,
     APP_ANNOUNCEMENT_DISMISSED_VALUE,
+    DONATION_PROMPT_ANNOUNCEMENT,
     getAnnouncementDismissalStorageKey,
     shouldShowAppAnnouncement,
 } from './announcements';
@@ -95,16 +96,21 @@ export type {
 } from './announcements';
 
 export {
+    DONATION_PROMPT_MIN_ACTIVE_DAYS,
+    DONATION_PROMPT_MIN_DAYS_SINCE_FIRST_SEEN,
     PROMPT_COORDINATOR_COOLDOWN_MS,
     STORE_REVIEW_ATTEMPT_COOLDOWN_MS,
     STORE_REVIEW_MIN_ACTIVE_DAYS,
     STORE_REVIEW_MIN_DAYS_SINCE_FIRST_SEEN,
     getPromptLocalDayKey,
+    recordDonationPromptShown,
     recordPromptActivity,
     recordStoreReviewPromptAttempt,
+    shouldShowDonationPrompt,
     shouldAttemptStoreReviewPrompt,
 } from './user-prompts';
 export type {
+    DonationPromptInput,
     StoreReviewPromptInput,
     UserPromptPlatform,
     UserPromptState,

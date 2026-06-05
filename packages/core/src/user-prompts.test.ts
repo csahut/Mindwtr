@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    recordDonationPromptShown,
     getPromptLocalDayKey,
     recordPromptActivity,
     recordStoreReviewPromptAttempt,
+    shouldShowDonationPrompt,
     shouldAttemptStoreReviewPrompt,
     type UserPromptState,
 } from './user-prompts';
@@ -16,6 +18,16 @@ const buildEligibleState = (): UserPromptState => {
         firstSeenAt: new Date(baseMs - 30 * dayMs).toISOString(),
     };
     for (let index = 0; index < 7; index += 1) {
+        state = recordPromptActivity(state, baseMs - index * dayMs);
+    }
+    return state;
+};
+
+const buildDonationEligibleState = (): UserPromptState => {
+    let state: UserPromptState = {
+        firstSeenAt: new Date(baseMs - 45 * dayMs).toISOString(),
+    };
+    for (let index = 0; index < 21; index += 1) {
         state = recordPromptActivity(state, baseMs - index * dayMs);
     }
     return state;
@@ -99,5 +111,53 @@ describe('user prompt state', () => {
             recentNegativeSignal: true,
             storeReviewAvailable: true,
         })).toBe(false);
+    });
+
+    it('allows donation prompt once after sustained usage on allowed channels', () => {
+        expect(shouldShowDonationPrompt({
+            nowMs: baseMs,
+            promptState: buildDonationEligibleState(),
+            donationAllowed: true,
+        })).toBe(true);
+    });
+
+    it('blocks donation prompt before engagement thresholds or on disallowed channels', () => {
+        const newInstall = recordPromptActivity(null, baseMs);
+        expect(shouldShowDonationPrompt({
+            nowMs: baseMs + 31 * dayMs,
+            promptState: newInstall,
+            donationAllowed: true,
+        })).toBe(false);
+        expect(shouldShowDonationPrompt({
+            nowMs: baseMs,
+            promptState: buildDonationEligibleState(),
+            donationAllowed: false,
+        })).toBe(false);
+    });
+
+    it('blocks donation prompt after it was shown or another prompt was recent', () => {
+        const shown = recordDonationPromptShown(buildDonationEligibleState(), baseMs - 20 * dayMs);
+        expect(shouldShowDonationPrompt({
+            nowMs: baseMs,
+            promptState: shown,
+            donationAllowed: true,
+        })).toBe(false);
+
+        const otherPrompt: UserPromptState = {
+            ...buildDonationEligibleState(),
+            lastInterruptivePromptAt: new Date(baseMs - 2 * dayMs).toISOString(),
+        };
+        expect(shouldShowDonationPrompt({
+            nowMs: baseMs,
+            promptState: otherPrompt,
+            donationAllowed: true,
+        })).toBe(false);
+    });
+
+    it('records donation prompt as a lifetime ask when shown', () => {
+        const state = recordDonationPromptShown(buildDonationEligibleState(), baseMs);
+        expect(state.donation?.askedEver).toBe(true);
+        expect(state.donation?.lastShownAt).toBe(new Date(baseMs).toISOString());
+        expect(state.lastInterruptivePromptAt).toBe(new Date(baseMs).toISOString());
     });
 });

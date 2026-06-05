@@ -14,12 +14,15 @@ import { SearchView } from './components/views/SearchView';
 import {
     ACTIVE_APP_ANNOUNCEMENT,
     APP_ANNOUNCEMENT_DISMISSED_VALUE,
+    DONATION_PROMPT_ANNOUNCEMENT,
     addBreadcrumb,
     configureDateFormatting,
     flushPendingSave,
     getAnnouncementDismissalStorageKey,
     isSupportedLanguage,
+    recordDonationPromptShown,
     shouldShowAppAnnouncement,
+    shouldShowDonationPrompt,
     translateWithFallback,
     useTaskStore,
     type AppAnnouncementAction,
@@ -41,7 +44,7 @@ import {
 import { SyncService } from './lib/sync-service';
 import type { ExternalSyncChange, ExternalSyncChangeResolution } from './lib/sync-service';
 import * as LocalDataWatcher from './lib/local-data-watcher';
-import { isFlatpakRuntime, isTauriRuntime } from './lib/runtime';
+import { getInstallSourceOrFallback, isFlatpakRuntime, isTauriRuntime } from './lib/runtime';
 import { logError } from './lib/app-log';
 import { createDesktopAutoSyncController } from './lib/auto-sync-controller';
 import { canDesktopAutoSync } from './lib/desktop-auto-sync-eligibility';
@@ -69,6 +72,11 @@ import { handleDesktopCloseRequest } from './lib/close-request-handler';
 import { subscribeNavigateEvent } from './lib/navigation-events';
 import { shouldOpenDesktopFirstRunOnboarding, subscribeDesktopOnboardingEvent } from './lib/desktop-onboarding-events';
 import { QUICK_ADD_SAVED_EVENT } from './lib/quick-add-saved-event';
+import {
+    readLocalUserPromptState,
+    recordLocalPromptActivity,
+    updateLocalUserPromptState,
+} from './lib/user-prompt-state';
 import { useUiStore } from './store/ui-store';
 import { useObsidianStore } from './store/obsidian-store';
 import type { SettingsOnboardingHintPage, SettingsPage } from './components/views/SettingsView';
@@ -83,6 +91,17 @@ const SettingsView = lazy(wrapSettingsOpenImport(
 
 const DEFAULT_DESKTOP_VIEW = 'agenda';
 const DESKTOP_ONBOARDING_STORAGE_KEY = 'mindwtr:desktop:first-run-onboarding:v1';
+const DONATION_PROMPT_DESKTOP_INSTALL_SOURCES = new Set(['direct', 'portable', 'github-release']);
+
+const normalizeInstallSourceForDonation = (value: string | null | undefined): string => {
+    const normalized = String(value ?? '').trim().toLowerCase();
+    if (normalized.startsWith('flatpak:')) return 'flatpak';
+    return normalized;
+};
+
+const isDesktopDonationPromptAllowed = (installSource: string | null | undefined): boolean => (
+    DONATION_PROMPT_DESKTOP_INSTALL_SOURCES.has(normalizeInstallSourceForDonation(installSource))
+);
 
 const readDesktopOnboardingDismissed = () => {
     if (typeof window === 'undefined') return true;
@@ -116,6 +135,9 @@ function App() {
     const [desktopOnboardingGateSettled, setDesktopOnboardingGateSettled] = useState(false);
     const [announcementOpen, setAnnouncementOpen] = useState(false);
     const [announcementDismissedInSession, setAnnouncementDismissedInSession] = useState(false);
+    const [donationPromptOpen, setDonationPromptOpen] = useState(false);
+    const [donationDismissedInSession, setDonationDismissedInSession] = useState(false);
+    const [donationPromptAllowed, setDonationPromptAllowed] = useState<boolean | null>(null);
     const [, startTransition] = useTransition();
     const fetchData = useTaskStore((state) => state.fetchData);
     const seedGettingStarted = useTaskStore((state) => state.seedGettingStarted);
@@ -148,6 +170,7 @@ function App() {
     const [hasHydratedSettings, setHasHydratedSettings] = useState(false);
     const closePromptRememberRef = useRef(false);
     const closePromptOpenRef = useRef(false);
+    const localPromptActivityRecordedRef = useRef(false);
     const lastViewBreadcrumbRef = useRef<string | null>(null);
     const isObsidianEnabled = useObsidianStore((state) => state.config.enabled);
     const obsidianVaultPath = useObsidianStore((state) => state.config.vaultPath);
@@ -868,6 +891,22 @@ function App() {
         void openAnnouncementUrl(action.url);
     }, [dismissAppAnnouncement, handleViewChange, openAnnouncementUrl]);
 
+    const dismissDonationPrompt = useCallback(() => {
+        setDonationDismissedInSession(true);
+        setDonationPromptOpen(false);
+    }, []);
+
+    const handleDonationPromptAction = useCallback((action: AppAnnouncementAction) => {
+        dismissDonationPrompt();
+        if (action.type === 'feedback') {
+            setSettingsInitialPage('about');
+            setSettingsOnboardingHintPage(undefined);
+            handleViewChange('settings');
+            return;
+        }
+        void openAnnouncementUrl(action.url);
+    }, [dismissDonationPrompt, handleViewChange, openAnnouncementUrl]);
+
     useEffect(() => {
         if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return;
         if (
@@ -900,6 +939,86 @@ function App() {
         closePromptOpen,
         desktopOnboardingGateSettled,
         desktopOnboardingOpen,
+        externalSyncChange,
+        hasHydratedSettings,
+        isLoading,
+    ]);
+
+    useEffect(() => {
+        if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return;
+        if (localPromptActivityRecordedRef.current || !hasHydratedSettings || isLoading) return;
+        localPromptActivityRecordedRef.current = true;
+        try {
+            recordLocalPromptActivity();
+        } catch (error) {
+            void logError(error, { scope: 'prompt-state', step: 'recordActivity' });
+        }
+    }, [hasHydratedSettings, isLoading]);
+
+    useEffect(() => {
+        if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return;
+        let cancelled = false;
+        getInstallSourceOrFallback('unknown')
+            .then((installSource) => {
+                if (!cancelled) setDonationPromptAllowed(isDesktopDonationPromptAllowed(installSource));
+            })
+            .catch((error) => {
+                if (!cancelled) setDonationPromptAllowed(false);
+                void logError(error, { scope: 'prompt-state', step: 'resolveDonationInstallSource' });
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (import.meta.env.MODE === 'test' || import.meta.env.VITEST || process.env.NODE_ENV === 'test') return;
+        if (
+            donationDismissedInSession
+            || donationPromptOpen
+            || donationPromptAllowed !== true
+            || ACTIVE_APP_ANNOUNCEMENT
+            || announcementOpen
+            || !hasHydratedSettings
+            || isLoading
+            || !desktopOnboardingGateSettled
+            || desktopOnboardingOpen
+            || closePromptOpen
+            || externalSyncChange
+        ) {
+            return;
+        }
+
+        const nowMs = Date.now();
+        let promptState: ReturnType<typeof readLocalUserPromptState>;
+        try {
+            promptState = readLocalUserPromptState();
+        } catch (error) {
+            setDonationDismissedInSession(true);
+            void logError(error, { scope: 'prompt-state', step: 'readDonationPromptState' });
+            return;
+        }
+        if (!shouldShowDonationPrompt({ nowMs, promptState, donationAllowed: true })) return;
+
+        const timer = window.setTimeout(() => {
+            try {
+                updateLocalUserPromptState((state) => recordDonationPromptShown(state, nowMs));
+            } catch (error) {
+                setDonationDismissedInSession(true);
+                void logError(error, { scope: 'prompt-state', step: 'recordDonationShown' });
+                return;
+            }
+            setDonationPromptOpen(true);
+        }, 250);
+        return () => window.clearTimeout(timer);
+    }, [
+        announcementOpen,
+        closePromptOpen,
+        desktopOnboardingGateSettled,
+        desktopOnboardingOpen,
+        donationDismissedInSession,
+        donationPromptAllowed,
+        donationPromptOpen,
         externalSyncChange,
         hasHydratedSettings,
         isLoading,
@@ -1011,6 +1130,18 @@ function App() {
                         }
                         onAction={handleAppAnnouncementAction}
                         onDismiss={dismissAppAnnouncement}
+                    />
+                    <AppAnnouncementModal
+                        announcement={DONATION_PROMPT_ANNOUNCEMENT}
+                        isOpen={
+                            donationPromptOpen
+                            && !announcementOpen
+                            && !desktopOnboardingOpen
+                            && !closePromptOpen
+                            && !externalSyncChange
+                        }
+                        onAction={handleDonationPromptAction}
+                        onDismiss={dismissDonationPrompt}
                     />
                     {externalSyncChange && (
                         <div

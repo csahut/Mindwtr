@@ -18,6 +18,17 @@ export type AppAnnouncement = {
 
 export const APP_ANNOUNCEMENT_DISMISSED_VALUE = 'dismissed';
 
+export const DONATION_PROMPT_ANNOUNCEMENT: AppAnnouncement = {
+    id: 'support-mindwtr-one-time-v1',
+    title: 'Support Mindwtr',
+    body: 'Mindwtr is free and local-first. If it has become useful to you, a voluntary one-time contribution helps keep development sustainable.',
+    action: {
+        type: 'url',
+        label: 'Support Mindwtr',
+        url: 'https://ko-fi.com/dongdongbh',
+    },
+};
+
 // Maintainers can replace null with one active announcement for a specific release.
 export const ACTIVE_APP_ANNOUNCEMENT: AppAnnouncement | null = null;
 

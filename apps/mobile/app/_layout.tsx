@@ -1,6 +1,7 @@
 import '../polyfills';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import { Stack, usePathname, useRouter } from 'expo-router';
@@ -18,14 +19,17 @@ import { LanguageProvider, useLanguage } from '../contexts/language-context';
 import {
   ACTIVE_APP_ANNOUNCEMENT,
   APP_ANNOUNCEMENT_DISMISSED_VALUE,
+  DONATION_PROMPT_ANNOUNCEMENT,
   addBreadcrumb,
   consoleLogger,
   configureDateFormatting,
   getAnnouncementDismissalStorageKey,
   isSupportedLanguage,
+  recordDonationPromptShown,
   setStorageAdapter,
   setLogger,
   shouldShowAppAnnouncement,
+  shouldShowDonationPrompt,
   translateWithFallback,
   useTaskStore,
   type AppAnnouncementAction,
@@ -48,7 +52,11 @@ import { MobileOnboardingFlow } from '@/components/MobileOnboardingFlow';
 import { MobileAppLockGate } from '@/components/mobile-app-lock-gate';
 import { applyAndroidSystemBars } from '@/lib/android-system-bars';
 import { isCloudKitAvailable } from '@/lib/cloudkit-sync';
-import { recordLocalPromptActivity } from '@/lib/user-prompt-state';
+import {
+  readLocalUserPromptState,
+  recordLocalPromptActivity,
+  updateLocalUserPromptState,
+} from '@/lib/user-prompt-state';
 import {
   readMobileOnboardingDismissed,
   shouldOpenMobileFirstRunOnboarding,
@@ -114,6 +122,21 @@ type MobileExtraConfig = {
 
 const parseBool = (value: unknown): boolean =>
   value === true || value === 1 || value === '1' || value === 'true';
+
+const resolveMobileDonationPromptAllowed = async (options: {
+  isExpoGo: boolean;
+  isFossBuild: boolean;
+}): Promise<boolean> => {
+  if (options.isExpoGo) return false;
+  if (Platform.OS !== 'android') return false;
+  if (options.isFossBuild) return true;
+  try {
+    const referrer = await Application.getInstallReferrerAsync();
+    return !(referrer || '').trim();
+  } catch {
+    return false;
+  }
+};
 
 const getDeviceLocale = (): string => {
   try {
@@ -198,6 +221,10 @@ function RootLayoutContentInner() {
   const [mobileOnboardingGateSettled, setMobileOnboardingGateSettled] = useState(false);
   const [announcementOpen, setAnnouncementOpen] = useState(false);
   const [announcementDismissedInSession, setAnnouncementDismissedInSession] = useState(false);
+  const [donationPromptOpen, setDonationPromptOpen] = useState(false);
+  const [donationDismissedInSession, setDonationDismissedInSession] = useState(false);
+  const [donationPromptAllowed, setDonationPromptAllowed] = useState<boolean | null>(null);
+  const [promptActivitySettled, setPromptActivitySettled] = useState(false);
 
   const resolveText = useCallback((key: string, fallback: string) => (
     translateWithFallback(t, key, fallback)
@@ -481,6 +508,20 @@ function RootLayoutContentInner() {
     openAnnouncementUrl(action.url);
   }, [dismissAppAnnouncement, openAnnouncementUrl, router]);
 
+  const dismissDonationPrompt = useCallback(() => {
+    setDonationDismissedInSession(true);
+    setDonationPromptOpen(false);
+  }, []);
+
+  const handleDonationPromptAction = useCallback((action: AppAnnouncementAction) => {
+    dismissDonationPrompt();
+    if (action.type === 'feedback') {
+      router.push({ pathname: '/settings', params: { settingsScreen: 'about' } } as never);
+      return;
+    }
+    openAnnouncementUrl(action.url);
+  }, [dismissDonationPrompt, openAnnouncementUrl, router]);
+
   useEffect(() => {
     if (
       announcementDismissedInSession
@@ -546,8 +587,88 @@ function RootLayoutContentInner() {
         scope: 'prompt-state',
         extra: { error: error instanceof Error ? error.message : String(error) },
       });
+    }).finally(() => {
+      setPromptActivitySettled(true);
     });
   }, [isFirstPaintReady]);
+
+  useEffect(() => {
+    let cancelled = false;
+    resolveMobileDonationPromptAllowed({ isExpoGo, isFossBuild })
+      .then((allowed) => {
+        if (!cancelled) setDonationPromptAllowed(allowed);
+      })
+      .catch((error) => {
+        if (!cancelled) setDonationPromptAllowed(false);
+        void logWarn('Failed to resolve donation prompt channel', {
+          scope: 'prompt-state',
+          extra: { error: error instanceof Error ? error.message : String(error) },
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isExpoGo, isFossBuild]);
+
+  useEffect(() => {
+    if (
+      donationDismissedInSession
+      || donationPromptOpen
+      || donationPromptAllowed !== true
+      || ACTIVE_APP_ANNOUNCEMENT
+      || announcementOpen
+      || !isFirstPaintReady
+      || !promptActivitySettled
+      || !mobileOnboardingGateSettled
+      || mobileOnboardingOpen
+    ) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const nowMs = Date.now();
+
+    readLocalUserPromptState()
+      .then((promptState) => {
+        if (cancelled) return;
+        if (!shouldShowDonationPrompt({ nowMs, promptState, donationAllowed: true })) return;
+        timer = setTimeout(() => {
+          updateLocalUserPromptState((state) => recordDonationPromptShown(state, nowMs))
+            .then(() => {
+              if (!cancelled) setDonationPromptOpen(true);
+            })
+            .catch((error) => {
+              if (!cancelled) setDonationDismissedInSession(true);
+              void logWarn('Failed to record donation prompt state', {
+                scope: 'prompt-state',
+                extra: { error: error instanceof Error ? error.message : String(error) },
+              });
+            });
+        }, 250);
+      })
+      .catch((error) => {
+        if (!cancelled) setDonationDismissedInSession(true);
+        void logWarn('Failed to read donation prompt state', {
+          scope: 'prompt-state',
+          extra: { error: error instanceof Error ? error.message : String(error) },
+        });
+      });
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [
+    announcementOpen,
+    donationDismissedInSession,
+    donationPromptAllowed,
+    donationPromptOpen,
+    isFirstPaintReady,
+    mobileOnboardingGateSettled,
+    mobileOnboardingOpen,
+    promptActivitySettled,
+  ]);
 
   if (storageInitError) {
     return (
@@ -643,6 +764,12 @@ function RootLayoutContentInner() {
             visible={announcementOpen && !mobileOnboardingOpen}
             onAction={handleAppAnnouncementAction}
             onDismiss={dismissAppAnnouncement}
+          />
+          <AppAnnouncementModal
+            announcement={DONATION_PROMPT_ANNOUNCEMENT}
+            visible={donationPromptOpen && !announcementOpen && !mobileOnboardingOpen}
+            onAction={handleDonationPromptAction}
+            onDismiss={dismissDonationPrompt}
           />
         </MobileAppLockGate>
         <StatusBar

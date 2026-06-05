@@ -4,6 +4,8 @@ export const PROMPT_COORDINATOR_COOLDOWN_MS = 7 * DAY_MS;
 export const STORE_REVIEW_MIN_DAYS_SINCE_FIRST_SEEN = 14;
 export const STORE_REVIEW_MIN_ACTIVE_DAYS = 7;
 export const STORE_REVIEW_ATTEMPT_COOLDOWN_MS = 90 * DAY_MS;
+export const DONATION_PROMPT_MIN_DAYS_SINCE_FIRST_SEEN = 30;
+export const DONATION_PROMPT_MIN_ACTIVE_DAYS = 21;
 
 export type UserPromptPlatform = 'ios' | 'android' | 'desktop' | 'web' | 'unknown';
 
@@ -31,6 +33,12 @@ export type StoreReviewPromptInput = {
     promptState: UserPromptState | null | undefined;
     recentNegativeSignal?: boolean;
     storeReviewAvailable: boolean;
+};
+
+export type DonationPromptInput = {
+    nowMs: number;
+    promptState: UserPromptState | null | undefined;
+    donationAllowed: boolean;
 };
 
 export function getPromptLocalDayKey(nowMs: number): string {
@@ -122,6 +130,45 @@ export function recordStoreReviewPromptAttempt(
         storeReview: {
             ...(promptState?.storeReview ?? {}),
             lastAttemptAt: nowIso,
+        },
+    };
+}
+
+export function shouldShowDonationPrompt({
+    nowMs,
+    promptState,
+    donationAllowed,
+}: DonationPromptInput): boolean {
+    if (!donationAllowed) return false;
+    if (promptState?.donation?.askedEver === true) return false;
+
+    const daysSinceFirstSeen = daysSince(promptState?.firstSeenAt, nowMs);
+    if (daysSinceFirstSeen === null || daysSinceFirstSeen < DONATION_PROMPT_MIN_DAYS_SINCE_FIRST_SEEN) {
+        return false;
+    }
+
+    const activeDayCount = new Set(promptState?.activeDayKeys ?? []).size;
+    if (activeDayCount < DONATION_PROMPT_MIN_ACTIVE_DAYS) return false;
+
+    return isCooldownElapsed(
+        promptState?.lastInterruptivePromptAt,
+        nowMs,
+        PROMPT_COORDINATOR_COOLDOWN_MS,
+    );
+}
+
+export function recordDonationPromptShown(
+    promptState: UserPromptState | null | undefined,
+    nowMs: number,
+): UserPromptState {
+    const nowIso = new Date(nowMs).toISOString();
+    return {
+        ...(promptState ?? {}),
+        lastInterruptivePromptAt: nowIso,
+        donation: {
+            ...(promptState?.donation ?? {}),
+            askedEver: true,
+            lastShownAt: nowIso,
         },
     };
 }
