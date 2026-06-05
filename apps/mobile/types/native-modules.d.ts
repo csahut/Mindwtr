@@ -215,6 +215,7 @@ declare module 'expo-calendar' {
 
   // Write APIs
   export function createCalendarAsync(details?: Partial<Calendar>): Promise<string>;
+  export function updateCalendarAsync(id: string, details?: Partial<Calendar>): Promise<string>;
   export function deleteCalendarAsync(id: string): Promise<void>;
   export function createEventAsync(calendarId: string, eventData?: Partial<Omit<Event, 'id'>>): Promise<string>;
   export function updateEventAsync(id: string, details?: Partial<Omit<Event, 'id'>>): Promise<string>;

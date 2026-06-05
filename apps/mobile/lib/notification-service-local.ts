@@ -700,13 +700,20 @@ async function runRescheduleCycle(api: AlarmNotificationsApi): Promise<void> {
   let pastStartTimeReminderCount = 0;
   let futureTaskReviewReminderCount = 0;
   let pastTaskReviewReminderCount = 0;
+  let suppressedTaskReminderCount = 0;
   let taskReminderCount = 0;
   let taskReviewReminderCount = 0;
   let projectReviewReminderCount = 0;
 
   if (taskRemindersEnabled) {
     for (const task of tasks) {
-      if (includeDueDate && task.dueDate) {
+      const suppressTaskReminders = task.suppressMindwtrReminders === true;
+      const hasSuppressedTaskReminder = (includeDueDate && hasTimeComponent(task.dueDate))
+        || (includeStartTime && hasTimeComponent(task.startTime));
+      if (suppressTaskReminders && hasSuppressedTaskReminder) {
+        suppressedTaskReminderCount += 1;
+      }
+      if (!suppressTaskReminders && includeDueDate && task.dueDate) {
         if (hasTimeComponent(task.dueDate)) {
           const dueAt = safeParseDate(task.dueDate);
           const dueAtMs = dueAt?.getTime() ?? NaN;
@@ -719,7 +726,7 @@ async function runRescheduleCycle(api: AlarmNotificationsApi): Promise<void> {
           dateOnlyDueDateCount += 1;
         }
       }
-      if (includeStartTime && task.startTime) {
+      if (!suppressTaskReminders && includeStartTime && task.startTime) {
         if (hasTimeComponent(task.startTime)) {
           const startAt = safeParseDate(task.startTime);
           const startAtMs = startAt?.getTime() ?? NaN;
@@ -831,6 +838,7 @@ async function runRescheduleCycle(api: AlarmNotificationsApi): Promise<void> {
     pastStartTimeReminderCount,
     futureTaskReviewReminderCount,
     pastTaskReviewReminderCount,
+    suppressedTaskReminderCount,
   });
 }
 

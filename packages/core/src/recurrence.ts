@@ -1019,6 +1019,7 @@ export function createNextRecurringTask(
         dueDate: nextDueDate,
         recurrence: nextRecurrence,
         showFutureRecurrence: task.showFutureRecurrence ? true : undefined,
+        suppressMindwtrReminders: task.suppressMindwtrReminders ? true : undefined,
         tags: [...(task.tags || [])],
         contexts: [...(task.contexts || [])],
         checklist: resetChecklist(task.checklist),

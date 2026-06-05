@@ -95,6 +95,7 @@ pub(crate) fn open_sqlite(app: &tauri::AppHandle) -> Result<Connection, String> 
     ensure_column(&conn, "tasks", "energyLevel", "TEXT")?;
     ensure_column(&conn, "tasks", "assignedTo", "TEXT")?;
     ensure_column(&conn, "tasks", "showFutureRecurrence", "INTEGER")?;
+    ensure_column(&conn, "tasks", "suppressMindwtrReminders", "INTEGER")?;
     ensure_tasks_purged_at_column(&conn)?;
     ensure_tasks_order_column(&conn)?;
     ensure_tasks_area_column(&conn)?;
@@ -759,6 +760,11 @@ fn row_to_task_value(row: &rusqlite::Row<'_>) -> Result<Value, rusqlite::Error> 
             map.insert("timeEstimate".to_string(), Value::String(v));
         }
     }
+    if let Ok(val) = row.get::<_, i64>("suppressMindwtrReminders") {
+        if val != 0 {
+            map.insert("suppressMindwtrReminders".to_string(), Value::Bool(true));
+        }
+    }
     if let Ok(val) = row.get::<_, Option<String>>("reviewAt") {
         if let Some(v) = val {
             map.insert("reviewAt".to_string(), Value::String(v));
@@ -970,7 +976,7 @@ fn migrate_json_to_sqlite(conn: &mut Connection, data: &Value) -> Result<(), Str
         let checklist_json = json_str(task.get("checklist"));
         let attachments_json = json_str(task.get("attachments"));
         tx.execute(
-            "INSERT OR REPLACE INTO tasks (id, title, status, priority, energyLevel, assignedTo, taskMode, startTime, dueDate, recurrence, showFutureRecurrence, pushCount, tags, contexts, checklist, description, attachments, location, projectId, sectionId, areaId, orderNum, isFocusedToday, timeEstimate, reviewAt, completedAt, rev, revBy, createdAt, updatedAt, deletedAt, purgedAt) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32)",
+            "INSERT OR REPLACE INTO tasks (id, title, status, priority, energyLevel, assignedTo, taskMode, startTime, dueDate, recurrence, showFutureRecurrence, pushCount, tags, contexts, checklist, description, attachments, location, projectId, sectionId, areaId, orderNum, isFocusedToday, timeEstimate, suppressMindwtrReminders, reviewAt, completedAt, rev, revBy, createdAt, updatedAt, deletedAt, purgedAt) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33)",
             params![
                 task.get("id").and_then(|v| v.as_str()).unwrap_or_default(),
                 task.get("title").and_then(|v| v.as_str()).unwrap_or_default(),
@@ -996,6 +1002,7 @@ fn migrate_json_to_sqlite(conn: &mut Connection, data: &Value) -> Result<(), Str
                 task.get("orderNum").and_then(|v| v.as_i64()),
                 task.get("isFocusedToday").and_then(|v| v.as_bool()).unwrap_or(false) as i32,
                 task.get("timeEstimate").and_then(|v| v.as_str()),
+                task.get("suppressMindwtrReminders").and_then(|v| v.as_bool()).unwrap_or(false) as i32,
                 task.get("reviewAt").and_then(|v| v.as_str()),
                 task.get("completedAt").and_then(|v| v.as_str()),
                 task.get("rev").and_then(|v| v.as_i64()),

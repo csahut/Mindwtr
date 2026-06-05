@@ -30,7 +30,7 @@ import {
 } from './task-edit-modal.utils';
 import type { PickerOption } from './TaskEditFieldRenderer.types';
 
-const DEFAULT_TIME_ESTIMATE_PRESETS: TimeEstimate[] = ['10min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
+const DEFAULT_TIME_ESTIMATE_PRESETS: TimeEstimate[] = ['5min', '10min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
 const ALL_TIME_ESTIMATES: TimeEstimate[] = ['5min', '10min', '15min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
 const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 const ENERGY_LEVEL_OPTIONS: Array<NonNullable<Task['energyLevel']>> = ['low', 'medium', 'high'];

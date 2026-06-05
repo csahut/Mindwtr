@@ -73,7 +73,7 @@ import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigatio
 const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 const ENERGY_LEVEL_OPTIONS: TaskEnergyLevel[] = ['low', 'medium', 'high'];
 const ALL_TIME_ESTIMATE_OPTIONS: TimeEstimate[] = ['5min', '10min', '15min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
-const DEFAULT_TIME_ESTIMATE_PRESETS: TimeEstimate[] = ['10min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
+const DEFAULT_TIME_ESTIMATE_PRESETS: TimeEstimate[] = ['5min', '10min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
 const FOCUS_GROUP_BY_OPTIONS: FocusGroupBy[] = ['none', 'context', 'project', 'area', 'energy', 'priority'];
 const FOCUS_SORT_OPTIONS: SortField[] = ['default', 'due', 'start', 'priority', 'created', 'created-desc'];
 const NO_PROJECT_FILTER_ID = SAVED_FILTER_NO_PROJECT_ID;

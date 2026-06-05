@@ -25,6 +25,7 @@ const {
     mockGetCalendarsAsync,
     mockGetSourcesAsync,
     mockCreateCalendarAsync,
+    mockUpdateCalendarAsync,
     mockDeleteCalendarAsync,
     mockCreateEventAsync,
     mockUpdateEventAsync,
@@ -41,7 +42,7 @@ const {
     mockLogError,
     mockPlatform,
 } = vi.hoisted(() => ({
-    mockGetItem: vi.fn(async () => null as string | null),
+    mockGetItem: vi.fn<(key: string) => Promise<string | null>>(async () => null),
     mockSetItem: vi.fn(async () => {}),
     mockRemoveItem: vi.fn(async () => {}),
     mockGetCalendarsAsync: vi.fn(async () => [] as Array<{
@@ -59,6 +60,7 @@ const {
     }>),
     mockGetSourcesAsync: vi.fn(async () => [{ id: 'src1', type: 'local', name: 'Local' }]),
     mockCreateCalendarAsync: vi.fn(async () => 'cal-1'),
+    mockUpdateCalendarAsync: vi.fn(async () => 'cal-1'),
     mockDeleteCalendarAsync: vi.fn(async () => {}),
     mockCreateEventAsync: vi.fn(async () => 'evt-1'),
     mockUpdateEventAsync: vi.fn(async () => 'evt-1'),
@@ -105,6 +107,7 @@ vi.mock('expo-calendar', () => ({
     getCalendarsAsync: mockGetCalendarsAsync,
     getSourcesAsync: mockGetSourcesAsync,
     createCalendarAsync: mockCreateCalendarAsync,
+    updateCalendarAsync: mockUpdateCalendarAsync,
     deleteCalendarAsync: mockDeleteCalendarAsync,
     createEventAsync: mockCreateEventAsync,
     updateEventAsync: mockUpdateEventAsync,
@@ -166,10 +169,12 @@ vi.mock('@/lib/app-log', () => ({
 import {
     deleteMindwtrCalendar,
     ensureMindwtrCalendar,
+    getCalendarPushColor,
     getCalendarPushTargetCalendars,
     runFullCalendarSync,
     startCalendarPushSync,
     stopCalendarPushSync,
+    updateMindwtrCalendarColor,
 } from '@/lib/calendar-push-sync';
 
 // ---------------------------------------------------------------------------
@@ -265,6 +270,23 @@ describe('ensureMindwtrCalendar', () => {
         expect(mockSetItem).toHaveBeenCalledWith('mindwtr:calendar-push-sync:calendar-id', 'cal-2');
     });
 
+    it('uses the saved Mindwtr calendar color when creating the calendar', async () => {
+        mockGetItem.mockImplementation(async (key: string) => {
+            if (key === 'mindwtr:calendar-push-sync:calendar-id') return null;
+            if (key === 'mindwtr:calendar-push-sync:color') return '#DB2777';
+            return null;
+        });
+        mockGetCalendarsAsync.mockResolvedValue([]);
+        mockCreateCalendarAsync.mockResolvedValue('cal-pink');
+
+        const id = await ensureMindwtrCalendar();
+
+        expect(id).toBe('cal-pink');
+        expect(mockCreateCalendarAsync).toHaveBeenCalledWith(expect.objectContaining({
+            color: '#DB2777',
+        }));
+    });
+
     it('creates an Android managed calendar using an existing owned calendar source', async () => {
         mockPlatform.OS = 'android';
         mockGetItem.mockResolvedValueOnce(null);
@@ -311,6 +333,24 @@ describe('ensureMindwtrCalendar', () => {
         expect(id).toBeNull();
         expect(mockCreateCalendarAsync).not.toHaveBeenCalled();
         expect(mockLogWarn).toHaveBeenCalled();
+    });
+});
+
+describe('calendar push color', () => {
+    it('normalizes saved colors and updates the managed Mindwtr calendar when supported', async () => {
+        mockGetItem.mockImplementation(async (key: string) => {
+            if (key === 'mindwtr:calendar-push-sync:calendar-id') return 'cal-1';
+            if (key === 'mindwtr:calendar-push-sync:color') return '#db2777';
+            return null;
+        });
+        mockGetCalendarsAsync.mockResolvedValue([{ id: 'cal-1', title: 'Mindwtr', allowsModifications: true }]);
+
+        await expect(getCalendarPushColor()).resolves.toBe('#DB2777');
+        const updated = await updateMindwtrCalendarColor('#059669');
+
+        expect(updated).toBe(true);
+        expect(mockSetItem).toHaveBeenCalledWith('mindwtr:calendar-push-sync:color', '#059669');
+        expect(mockUpdateCalendarAsync).toHaveBeenCalledWith('cal-1', { color: '#059669' });
     });
 });
 

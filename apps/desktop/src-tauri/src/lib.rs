@@ -247,6 +247,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   orderNum INTEGER,
   isFocusedToday INTEGER,
   timeEstimate TEXT,
+  suppressMindwtrReminders INTEGER,
   reviewAt TEXT,
   completedAt TEXT,
   rev INTEGER,

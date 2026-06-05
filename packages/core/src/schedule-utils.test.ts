@@ -65,4 +65,31 @@ describe('schedule-utils', () => {
 
         expect(next?.toISOString()).toBe('2026-03-17T14:30:00.000Z');
     });
+
+    it('suppresses task start and due reminders when calendar handoff is enabled', () => {
+        const task = buildTask({
+            startTime: '2026-03-17T14:30:00.000Z',
+            dueDate: '2026-03-18T09:00:00.000Z',
+            suppressMindwtrReminders: true,
+        });
+        const now = new Date('2026-03-16T12:00:00.000Z');
+
+        const next = getNextScheduledAt(task, now);
+
+        expect(next).toBeNull();
+    });
+
+    it('keeps review reminders when task reminders are handed off to calendar', () => {
+        const task = buildTask({
+            startTime: '2026-03-17T14:30:00.000Z',
+            dueDate: '2026-03-18T09:00:00.000Z',
+            reviewAt: '2026-03-19T10:00:00.000Z',
+            suppressMindwtrReminders: true,
+        });
+        const now = new Date('2026-03-16T12:00:00.000Z');
+
+        const next = getNextScheduledAt(task, now, { includeReviewAt: true });
+
+        expect(next?.toISOString()).toBe('2026-03-19T10:00:00.000Z');
+    });
 });

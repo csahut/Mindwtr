@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { CheckSquare, Square } from 'lucide-react-native';
-import { getAttachmentDisplayTitle, getRecurrenceCountValue, getRecurrenceUntilValue, parseRRuleString } from '@mindwtr/core';
+import { getAttachmentDisplayTitle, getRecurrenceCountValue, getRecurrenceUntilValue, hasTimeComponent, parseRRuleString, tFallback } from '@mindwtr/core';
 import type {
   Attachment,
   Area,
@@ -164,6 +164,7 @@ function TaskEditViewTabComponent({
       ].filter(Boolean)
     : [];
   const recurrenceLabel = recurrenceParts.length > 0 ? recurrenceParts.join(' · ') : undefined;
+  const hasReminderHandoffSchedule = hasTimeComponent(mergedTask.startTime) || hasTimeComponent(mergedTask.dueDate);
 
   return (
     <ScrollView
@@ -195,6 +196,12 @@ function TaskEditViewTabComponent({
       {!project?.id ? renderViewRow(t('taskEdit.areaLabel'), area?.name) : null}
       {!isReference ? renderViewRow(t('taskEdit.startDateLabel'), mergedTask.startTime ? formatDate(mergedTask.startTime) : undefined) : null}
       {!isReference ? renderViewRow(t('taskEdit.dueDateLabel'), mergedTask.dueDate ? formatDueDate(mergedTask.dueDate) : undefined) : null}
+      {!isReference && hasReminderHandoffSchedule && mergedTask.suppressMindwtrReminders === true
+        ? renderViewRow(
+            tFallback(t, 'taskEdit.suppressMindwtrReminders', 'Use calendar reminder'),
+            tFallback(t, 'taskEdit.suppressMindwtrRemindersViewValue', 'Mindwtr reminders off')
+          )
+        : null}
       {!isReference ? renderViewRow(t('taskEdit.reviewDateLabel'), mergedTask.reviewAt ? formatDate(mergedTask.reviewAt) : undefined) : null}
       {!isReference && timeEstimatesEnabled ? renderViewRow(t('taskEdit.timeEstimateLabel'), timeEstimateLabel) : null}
       {mergedTask.contexts?.length ? (

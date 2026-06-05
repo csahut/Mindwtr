@@ -33,11 +33,24 @@ import {
 const CALENDAR_PUSH_ENABLED_KEY = 'mindwtr:calendar-push-sync:enabled';
 const CALENDAR_ID_KEY = 'mindwtr:calendar-push-sync:calendar-id';
 const CALENDAR_TARGET_ID_KEY = 'mindwtr:calendar-push-sync:target-calendar-id';
+const CALENDAR_COLOR_KEY = 'mindwtr:calendar-push-sync:color';
 const PLATFORM = Platform.OS;
 const SYNC_DEBOUNCE_MS = 2500;
 const CALENDAR_SYNC_CONCURRENCY = 4;
 const MANAGED_CALENDAR_TITLE = 'Mindwtr';
 const MANAGED_CALENDAR_NAME = 'mindwtr';
+const DEFAULT_MANAGED_CALENDAR_COLOR = '#3B82F6';
+
+export const CALENDAR_PUSH_COLOR_OPTIONS = [
+    '#3B82F6',
+    '#2563EB',
+    '#7C3AED',
+    '#DB2777',
+    '#EA580C',
+    '#059669',
+    '#0891B2',
+    '#65A30D',
+] as const;
 
 export type CalendarPushTargetCalendar = {
     id: string;
@@ -52,6 +65,13 @@ export type CalendarPushTargetCalendar = {
 type CalendarPushTarget = {
     id: string;
 };
+
+function normalizeCalendarColor(value: string | null | undefined): string {
+    const trimmed = value?.trim().toUpperCase() ?? '';
+    return CALENDAR_PUSH_COLOR_OPTIONS.includes(trimmed as typeof CALENDAR_PUSH_COLOR_OPTIONS[number])
+        ? trimmed
+        : DEFAULT_MANAGED_CALENDAR_COLOR;
+}
 
 function isReadableAccountName(value: string): boolean {
     const normalized = value.trim().toLowerCase();
@@ -124,6 +144,17 @@ export const setCalendarPushTargetCalendarId = async (calendarId: string | null)
         return;
     }
     await AsyncStorage.setItem(CALENDAR_TARGET_ID_KEY, trimmed);
+};
+
+export const getCalendarPushColor = async (): Promise<string> => {
+    const value = await AsyncStorage.getItem(CALENDAR_COLOR_KEY);
+    return normalizeCalendarColor(value);
+};
+
+export const setCalendarPushColor = async (color: string): Promise<string> => {
+    const normalized = normalizeCalendarColor(color);
+    await AsyncStorage.setItem(CALENDAR_COLOR_KEY, normalized);
+    return normalized;
 };
 
 // MARK: - Permission
@@ -232,7 +263,8 @@ export const getCalendarPushTargetCalendars = async (): Promise<CalendarPushTarg
 };
 
 function getAndroidManagedCalendarSeed(
-    calendars: Awaited<ReturnType<typeof Calendar.getCalendarsAsync>>
+    calendars: Awaited<ReturnType<typeof Calendar.getCalendarsAsync>>,
+    color: string
 ): Parameters<typeof Calendar.createCalendarAsync>[0] | null {
     const ownedCalendar = calendars.find((calendar) =>
         calendar.accessLevel === Calendar.CalendarAccessLevel.OWNER
@@ -254,7 +286,7 @@ function getAndroidManagedCalendarSeed(
 
     return {
         title: MANAGED_CALENDAR_TITLE,
-        color: '#3B82F6',
+        color,
         entityType: Calendar.EntityTypes.EVENT,
         name: MANAGED_CALENDAR_NAME,
         ownerAccount: ownedCalendar.ownerAccount,
@@ -284,12 +316,13 @@ export const ensureMindwtrCalendar = async (): Promise<string | null> => {
             // Calendar was deleted externally — fall through to recreate
         }
 
+        const color = await getCalendarPushColor();
         let calendarDetails: Parameters<typeof Calendar.createCalendarAsync>[0];
 
         if (Platform.OS === 'android') {
             // Android calendars need to be attached to a real device account/source
             // or some calendar providers will keep them hidden from the OS calendar app.
-            const androidSeed = getAndroidManagedCalendarSeed(allCalendars);
+            const androidSeed = getAndroidManagedCalendarSeed(allCalendars, color);
             if (!androidSeed) {
                 void logWarn('No owned Android calendar source available; cannot create Mindwtr calendar', {
                     scope: 'calendar-push',
@@ -315,7 +348,7 @@ export const ensureMindwtrCalendar = async (): Promise<string | null> => {
 
             calendarDetails = {
                 title: MANAGED_CALENDAR_TITLE,
-                color: '#3B82F6',
+                color,
                 entityType: Calendar.EntityTypes.EVENT,
                 sourceId: source.id,
                 source,
@@ -333,6 +366,26 @@ export const ensureMindwtrCalendar = async (): Promise<string | null> => {
     } catch (error) {
         void logError(error, { scope: 'calendar-push', extra: { operation: 'ensureMindwtrCalendar' } });
         return null;
+    }
+};
+
+export const updateMindwtrCalendarColor = async (color: string): Promise<boolean> => {
+    const normalized = await setCalendarPushColor(color);
+    try {
+        if (typeof Calendar.updateCalendarAsync !== 'function') return false;
+        const storedCalendarId = await getStoredCalendarId();
+        const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+        const target = calendars.find((calendar) => storedCalendarId && calendar.id === storedCalendarId)
+            ?? calendars.find(isAppCreatedMindwtrCalendar);
+        if (!target || !isWritableCalendar(target)) return false;
+        await Calendar.updateCalendarAsync(target.id, { color: normalized });
+        return true;
+    } catch (error) {
+        void logWarn('Failed to update Mindwtr calendar color', {
+            scope: 'calendar-push',
+            extra: { error: getCalendarErrorMessage(error) },
+        });
+        return false;
     }
 };
 
@@ -757,6 +810,7 @@ export const startCalendarPushSync = (): (() => void) => {
                     prev.description !== task.description ||
                     prev.location !== task.location ||
                     prev.timeEstimate !== task.timeEstimate ||
+                    prev.suppressMindwtrReminders !== task.suppressMindwtrReminders ||
                     prev.recurrence !== task.recurrence ||
                     prev.showFutureRecurrence !== task.showFutureRecurrence
                 ) {

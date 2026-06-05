@@ -24,8 +24,9 @@ export function getNextScheduledAt(task: Task, now: Date = new Date(), options: 
     if (task.status === 'done' || task.status === 'archived' || task.status === 'reference') return null;
 
     const candidates: Date[] = [];
-    const includeStartTime = options.includeStartTime !== false;
-    const includeDueDate = options.includeDueDate !== false;
+    const includeTaskReminders = task.suppressMindwtrReminders !== true;
+    const includeStartTime = includeTaskReminders && options.includeStartTime !== false;
+    const includeDueDate = includeTaskReminders && options.includeDueDate !== false;
     const start = includeStartTime ? parseExplicitReminderDate(task.startTime) : null;
     const due = includeDueDate ? parseExplicitReminderDate(task.dueDate) : null;
     const review = options.includeReviewAt ? parseExplicitReminderDate(task.reviewAt) : null;

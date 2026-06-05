@@ -194,6 +194,36 @@ export function TaskEditScheduleField({
         const parsed = safeParseDate(value);
         return parsed ? safeFormatDate(parsed, 'yyyy-MM-dd') : undefined;
     };
+    const hasReminderHandoffSchedule = hasTimeComponent(editedTask.startTime) || hasTimeComponent(editedTask.dueDate);
+    const renderReminderHandoffControl = () => {
+        if (fieldId !== 'dueDate' || !hasReminderHandoffSchedule) return null;
+        const enabled = editedTask.suppressMindwtrReminders === true;
+        return (
+            <TouchableOpacity
+                accessibilityRole="switch"
+                accessibilityState={{ checked: enabled }}
+                style={[
+                    styles.dateBtn,
+                    {
+                        marginTop: 8,
+                        backgroundColor: enabled ? tc.filterBg : tc.cardBg,
+                        borderColor: enabled ? tc.tint : tc.border,
+                    },
+                ]}
+                onPress={() => setEditedTask((prev) => ({
+                    ...prev,
+                    suppressMindwtrReminders: prev.suppressMindwtrReminders ? undefined : true,
+                }))}
+            >
+                <Text style={[styles.modalLabel, { color: tc.text }]}>
+                    {tFallback(t, 'taskEdit.suppressMindwtrReminders', 'Use calendar reminder')}
+                </Text>
+                <Text style={{ marginTop: 4, color: tc.secondaryText, fontSize: 12, lineHeight: 16 }}>
+                    {tFallback(t, 'taskEdit.suppressMindwtrRemindersHint', 'Skip Mindwtr start/due reminders for this task when your device calendar already reminds you.')}
+                </Text>
+            </TouchableOpacity>
+        );
+    };
 
     switch (fieldId) {
         case 'recurrence':
@@ -622,6 +652,7 @@ export function TaskEditScheduleField({
                         </TouchableOpacity>
                         {renderQuickDateChips('due', parsed)}
                         {renderInlineIOSDatePicker(['due'])}
+                        {renderReminderHandoffControl()}
                     </View>
                 );
             }
@@ -666,6 +697,7 @@ export function TaskEditScheduleField({
                         {renderQuickDateChips('due', parsed)}
                         {renderDateIssue()}
                         {renderInlineIOSDatePicker(['due', 'due-time'])}
+                        {renderReminderHandoffControl()}
                     </View>
                 </View>
             );

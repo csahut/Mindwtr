@@ -77,7 +77,7 @@ export function GtdSettingsScreen({
     });
     const [taskEditorSelectedField, setTaskEditorSelectedField] = useState<TaskEditorFieldId | null>(null);
 
-    const defaultTimeEstimatePresets: TimeEstimate[] = ['10min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
+    const defaultTimeEstimatePresets: TimeEstimate[] = ['5min', '10min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
     const timeEstimateOptions: TimeEstimate[] = ['5min', '10min', '15min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
     const timeEstimatePresets: TimeEstimate[] = (settings.gtd?.timeEstimatePresets?.length
         ? settings.gtd.timeEstimatePresets

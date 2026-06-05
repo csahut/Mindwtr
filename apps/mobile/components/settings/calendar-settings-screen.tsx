@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, ScrollView, Switch, Text, TextInput, Touchabl
 import * as DocumentPicker from 'expo-document-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { generateUUID, type ExternalCalendarSubscription, useTaskStore } from '@mindwtr/core';
+import { generateUUID, tFallback, type ExternalCalendarSubscription, useTaskStore } from '@mindwtr/core';
 
 import {
     fetchExternalCalendarEvents,
@@ -19,7 +19,9 @@ import {
     type SystemCalendarPermissionStatus,
 } from '@/lib/external-calendar';
 import {
+    CALENDAR_PUSH_COLOR_OPTIONS,
     deleteMindwtrCalendar,
+    getCalendarPushColor,
     getCalendarPushEnabled,
     getCalendarPushTargetCalendarId,
     getCalendarPushTargetCalendars,
@@ -30,6 +32,7 @@ import {
     setCalendarPushTargetCalendarId,
     startCalendarPushSync,
     stopCalendarPushSync,
+    updateMindwtrCalendarColor,
     type CalendarPushTargetCalendar,
 } from '@/lib/calendar-push-sync';
 import { useToast } from '@/contexts/toast-context';
@@ -101,6 +104,7 @@ export function CalendarSettingsScreen() {
     const [calendarPushPermission, setCalendarPushPermission] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
     const [calendarPushTargetCalendarId, setCalendarPushTargetCalendarIdState] = useState<string | null>(null);
     const [calendarPushTargets, setCalendarPushTargets] = useState<CalendarPushTargetCalendar[]>([]);
+    const [calendarPushColor, setCalendarPushColorState] = useState('#3B82F6');
     const [isCalendarPushTargetLoading, setIsCalendarPushTargetLoading] = useState(false);
     const [isDeletingMindwtrCalendar, setIsDeletingMindwtrCalendar] = useState(false);
     const [calendarPushOpen, setCalendarPushOpen] = useState(false);
@@ -108,12 +112,14 @@ export function CalendarSettingsScreen() {
     const loadCalendarPushTargetState = useCallback(async () => {
         setIsCalendarPushTargetLoading(true);
         try {
-            const [targetId, targets] = await Promise.all([
+            const [targetId, targets, color] = await Promise.all([
                 getCalendarPushTargetCalendarId(),
                 getCalendarPushTargetCalendars(),
+                getCalendarPushColor(),
             ]);
             setCalendarPushTargetCalendarIdState(targetId);
             setCalendarPushTargets(targets);
+            setCalendarPushColorState(color);
         } catch (error) {
             console.error(error);
             showToast({
@@ -190,6 +196,20 @@ export function CalendarSettingsScreen() {
             message: tr('settings.calendarMobile.dueDateTasksWillBeWrittenToTheSelectedCalendar'),
             tone: 'success',
             durationMs: 3200,
+        });
+    };
+
+    const handleSelectCalendarPushColor = async (color: string) => {
+        const updated = await updateMindwtrCalendarColor(color);
+        setCalendarPushColorState(color);
+        await loadCalendarPushTargetState();
+        showToast({
+            title: tFallback(t, 'settings.calendarMobile.calendarColorUpdated', 'Calendar color updated'),
+            message: updated
+                ? tFallback(t, 'settings.calendarMobile.calendarColorUpdatedMessage', 'Mindwtr calendar color was updated.')
+                : tFallback(t, 'settings.calendarMobile.calendarColorSavedMessage', 'Mindwtr will use this color when it creates the calendar.'),
+            tone: 'success',
+            durationMs: 3000,
         });
     };
 
@@ -467,6 +487,8 @@ export function CalendarSettingsScreen() {
         && !selectedCalendarPushTarget.isLocalOnly
     );
     const selectedLocalCalendarForPush = calendarPushTargetCalendarId === null || Boolean(selectedCalendarPushTarget?.isLocalOnly);
+    const selectedManagedMindwtrCalendarForPush = calendarPushTargetCalendarId === null
+        || selectedCalendarPushTarget?.isMindwtrManaged === true;
     const hasDedicatedAccountCalendarForPush = calendarPushTargets.some((calendar) =>
         calendar.isMindwtrDedicated && !calendar.isLocalOnly
     );
@@ -484,7 +506,7 @@ export function CalendarSettingsScreen() {
         id: null as string | null,
         name: tr('settings.calendarMobile.mindwtrCalendar'),
         description: tr('settings.calendarMobile.dedicatedLocalCalendar'),
-        color: '#3B82F6',
+        color: calendarPushColor,
     };
     const calendarPushTargetOptions: Array<{
         id: string | null;
@@ -552,20 +574,20 @@ export function CalendarSettingsScreen() {
                                 <Text style={[styles.settingLabel, { color: tc.text }]}>
                                     {tr('settings.calendarMobile.syncTarget')}
                                 </Text>
-                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
-                                {tr('settings.calendarMobile.chooseAnAccountCalendarIfYourCalendarAppHidesLocal')}
-                            </Text>
-                            {selectedLocalCalendarForPush && (
-                                <Text style={[styles.settingDescription, { color: tc.secondaryText, marginTop: 8 }]}>
-                                    {tr('settings.calendarMobile.localCalendarTargetsStayOnThisDeviceUseAGoogle')}
+                                <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                    {tr('settings.calendarMobile.chooseAnAccountCalendarIfYourCalendarAppHidesLocal')}
                                 </Text>
-                            )}
-                            {selectedSharedAccountCalendarForPush && (
-                                <Text style={[styles.settingDescription, { color: tc.secondaryText, marginTop: 8 }]}>
-                                    {tr('settings.calendarMobile.forASeparateColorInGoogleCalendarSelectADedicated')}
-                                </Text>
-                            )}
-                        </View>
+                                {selectedLocalCalendarForPush && (
+                                    <Text style={[styles.settingDescription, { color: tc.secondaryText, marginTop: 8 }]}>
+                                        {tr('settings.calendarMobile.localCalendarTargetsStayOnThisDeviceUseAGoogle')}
+                                    </Text>
+                                )}
+                                {selectedSharedAccountCalendarForPush && (
+                                    <Text style={[styles.settingDescription, { color: tc.secondaryText, marginTop: 8 }]}>
+                                        {tr('settings.calendarMobile.forASeparateColorInGoogleCalendarSelectADedicated')}
+                                    </Text>
+                                )}
+                            </View>
 
                             {isCalendarPushTargetLoading ? (
                                 <View style={{ paddingBottom: 16 }}>
@@ -610,6 +632,39 @@ export function CalendarSettingsScreen() {
                                         </TouchableOpacity>
                                     );
                                 })
+                            )}
+
+                            {selectedManagedMindwtrCalendarForPush && (
+                                <View style={[styles.settingRowColumn, { borderTopWidth: 1, borderTopColor: tc.border }]}>
+                                    <Text style={[styles.settingLabel, { color: tc.text }]}>
+                                        {tFallback(t, 'settings.calendarMobile.mindwtrCalendarColor', 'Mindwtr calendar color')}
+                                    </Text>
+                                    <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                        {tFallback(t, 'settings.calendarMobile.mindwtrCalendarColorDesc', 'Applies to the Mindwtr-created calendar; shared account calendars keep their own color.')}
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+                                        {CALENDAR_PUSH_COLOR_OPTIONS.map((color) => {
+                                            const selected = color.toUpperCase() === calendarPushColor.toUpperCase();
+                                            return (
+                                                <TouchableOpacity
+                                                    key={color}
+                                                    accessibilityRole="button"
+                                                    accessibilityLabel={`${tFallback(t, 'settings.calendarMobile.mindwtrCalendarColor', 'Mindwtr calendar color')} ${color}`}
+                                                    accessibilityState={{ selected }}
+                                                    onPress={() => void handleSelectCalendarPushColor(color)}
+                                                    style={{
+                                                        width: 34,
+                                                        height: 34,
+                                                        borderRadius: 17,
+                                                        borderWidth: selected ? 3 : 1,
+                                                        borderColor: selected ? tc.text : tc.border,
+                                                        backgroundColor: color,
+                                                    }}
+                                                />
+                                            );
+                                        })}
+                                    </View>
+                                </View>
                             )}
 
                             <TouchableOpacity
