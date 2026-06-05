@@ -68,6 +68,7 @@ export function SettingsFeedbackModal({
     const messageRef = useRef<HTMLTextAreaElement>(null);
     const titleId = useId();
     const descriptionId = useId();
+    const diagnosticsDescriptionId = useId();
 
     const categoryLabels: Record<FeedbackCategory, string> = {
         bug: t.feedbackCategoryBug,
@@ -234,20 +235,36 @@ export function SettingsFeedbackModal({
                         </label>
 
                         {category === 'bug' && (
-                            <label className="flex items-start gap-3 rounded-lg border border-border bg-card px-3 py-3">
-                                <input
-                                    type="checkbox"
-                                    checked={includeDiagnostics}
-                                    onChange={(event) => setIncludeDiagnostics(event.target.checked)}
-                                    className="mt-1 h-4 w-4"
-                                />
-                                <span>
+                            <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-card px-3 py-3">
+                                <div>
                                     <span className="block text-sm font-medium">{t.feedbackIncludeDiagnostics}</span>
-                                    <span className="block text-xs leading-5 text-muted-foreground">
+                                    <span
+                                        id={diagnosticsDescriptionId}
+                                        className="block text-xs leading-5 text-muted-foreground"
+                                    >
                                         {t.feedbackIncludeDiagnosticsDesc}
                                     </span>
-                                </span>
-                            </label>
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-label={t.feedbackIncludeDiagnostics}
+                                    aria-describedby={diagnosticsDescriptionId}
+                                    aria-checked={includeDiagnostics}
+                                    onClick={() => setIncludeDiagnostics((next) => !next)}
+                                    className={cn(
+                                        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
+                                        includeDiagnostics ? 'bg-primary border-primary' : 'bg-muted/50 border-border',
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+                                            includeDiagnostics ? 'translate-x-4' : 'translate-x-1',
+                                        )}
+                                    />
+                                </button>
+                            </div>
                         )}
 
                         <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs leading-5 text-muted-foreground">

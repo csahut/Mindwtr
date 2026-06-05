@@ -6,6 +6,7 @@ import {
     Platform,
     Pressable,
     ScrollView,
+    type ScrollViewProps,
     Switch,
     Text,
     TextInput,
@@ -53,6 +54,9 @@ export function FeedbackSettingsModal({
     const [includeDiagnostics, setIncludeDiagnostics] = useState(false);
     const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
     const [error, setError] = useState<string | null>(null);
+    const androidScrollViewFocusProps: Partial<ScrollViewProps> & { scrollsChildToFocus?: boolean } = (
+        Platform.OS === 'android' ? { scrollsChildToFocus: false } : {}
+    );
 
     useEffect(() => {
         if (!visible) return;
@@ -110,13 +114,13 @@ export function FeedbackSettingsModal({
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.feedbackModalOverlay}
             >
-                <Pressable style={styles.feedbackModalBackdrop} onPress={onClose}>
-                    <Pressable
+                <View style={styles.feedbackModalBackdrop}>
+                    <Pressable style={styles.feedbackModalBackdropPressable} onPress={onClose} />
+                    <View
                         style={[styles.feedbackModalCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
-                        onPress={(event) => event.stopPropagation()}
                     >
                         <View style={[styles.feedbackModalHeader, { borderBottomColor: tc.border }]}>
                             <View style={styles.feedbackModalTitleBlock}>
@@ -156,8 +160,11 @@ export function FeedbackSettingsModal({
                             <ScrollView
                                 style={styles.feedbackModalScroll}
                                 contentContainerStyle={styles.feedbackModalBody}
+                                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                                 keyboardShouldPersistTaps="handled"
+                                nestedScrollEnabled
                                 showsVerticalScrollIndicator
+                                {...androidScrollViewFocusProps}
                             >
                                 <Text style={[styles.feedbackFieldLabel, { color: tc.secondaryText }]}>
                                     {tr('settings.feedbackCategory')}
@@ -303,8 +310,8 @@ export function FeedbackSettingsModal({
                                 </TouchableOpacity>
                             </View>
                         ) : null}
-                    </Pressable>
-                </Pressable>
+                    </View>
+                </View>
             </KeyboardAvoidingView>
         </Modal>
     );

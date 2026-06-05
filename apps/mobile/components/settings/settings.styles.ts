@@ -367,6 +367,9 @@ export const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.42)',
         padding: 18,
     },
+    feedbackModalBackdropPressable: {
+        ...StyleSheet.absoluteFillObject,
+    },
     feedbackModalCard: {
         width: '100%',
         maxHeight: '88%',
@@ -405,6 +408,7 @@ export const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     feedbackModalScroll: {
+        flexGrow: 0,
         flexShrink: 1,
     },
     feedbackModalBody: {
