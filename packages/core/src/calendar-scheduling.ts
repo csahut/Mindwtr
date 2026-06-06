@@ -3,12 +3,14 @@ import type { ExternalCalendarEvent } from './ics';
 import { parseQuickAdd } from './quick-add';
 import { isSelectableProjectForTaskAssignment } from './project-utils';
 import { getTaskDateCoherenceIssues, type TaskDateCoherenceIssue } from './task-date-coherence';
-import type { Area, Project, Task, TimeEstimate } from './types';
+import type { Area, CustomTimeEstimate, Project, Task, TimeEstimate, TimeEstimatePreset } from './types';
 
 export const DEFAULT_CALENDAR_DAY_START_HOUR = 8;
 export const DEFAULT_CALENDAR_DAY_END_HOUR = 23;
 export const DEFAULT_CALENDAR_SNAP_MINUTES = 5;
-export const CALENDAR_TIME_ESTIMATE_OPTIONS: Array<{ estimate: TimeEstimate; minutes: number }> = [
+export const CUSTOM_TIME_ESTIMATE_PREFIX = 'custom:';
+
+export const CALENDAR_TIME_ESTIMATE_OPTIONS: Array<{ estimate: TimeEstimatePreset; minutes: number }> = [
     { estimate: '5min', minutes: 5 },
     { estimate: '10min', minutes: 10 },
     { estimate: '15min', minutes: 15 },
@@ -18,6 +20,8 @@ export const CALENDAR_TIME_ESTIMATE_OPTIONS: Array<{ estimate: TimeEstimate; min
     { estimate: '3hr', minutes: 180 },
     { estimate: '4hr', minutes: 240 },
 ];
+
+const normalizeExactTimeEstimateMinutes = (minutes: number): number => Math.max(1, Math.round(minutes));
 
 type SchedulingTask = Pick<Task, 'deletedAt' | 'id' | 'startTime' | 'status' | 'timeEstimate'>;
 type SchedulingEvent = Pick<ExternalCalendarEvent, 'allDay' | 'end' | 'start'>;
@@ -75,8 +79,26 @@ type IsSlotFreeOptions = CalendarSchedulingOptions & {
 
 type Interval = { end: number; start: number };
 
+export function createCustomTimeEstimate(minutes: number): CustomTimeEstimate {
+    return `${CUSTOM_TIME_ESTIMATE_PREFIX}${normalizeExactTimeEstimateMinutes(minutes)}` as CustomTimeEstimate;
+}
+
+export function customTimeEstimateToMinutes(estimate: TimeEstimate | undefined): number | null {
+    if (!estimate?.startsWith(CUSTOM_TIME_ESTIMATE_PREFIX)) return null;
+    const minutes = Number(estimate.slice(CUSTOM_TIME_ESTIMATE_PREFIX.length));
+    if (!Number.isFinite(minutes) || minutes < 1) return null;
+    return normalizeExactTimeEstimateMinutes(minutes);
+}
+
+export function isCustomTimeEstimate(estimate: TimeEstimate | undefined): estimate is CustomTimeEstimate {
+    return customTimeEstimateToMinutes(estimate) !== null;
+}
+
 export function timeEstimateToMinutes(estimate: TimeEstimate | undefined, options?: { enabled?: boolean }): number {
     if (options?.enabled === false) return 30;
+    const customMinutes = customTimeEstimateToMinutes(estimate);
+    if (customMinutes !== null) return customMinutes;
+
     switch (estimate) {
         case '5min': return 5;
         case '10min': return 10;
@@ -94,12 +116,70 @@ export function timeEstimateToMinutes(estimate: TimeEstimate | undefined, option
 }
 
 export function minutesToTimeEstimate(minutes: number): TimeEstimate {
-    const normalized = Math.max(1, Math.round(minutes));
+    const normalized = normalizeExactTimeEstimateMinutes(minutes);
+    const exact = CALENDAR_TIME_ESTIMATE_OPTIONS.find((option) => option.minutes === normalized);
+    if (exact) return exact.estimate;
+
+    return createCustomTimeEstimate(normalized);
+}
+
+export function minutesToTimeEstimateBucket(minutes: number): TimeEstimatePreset {
+    const normalized = normalizeExactTimeEstimateMinutes(minutes);
     const exact = CALENDAR_TIME_ESTIMATE_OPTIONS.find((option) => option.minutes === normalized);
     if (exact) return exact.estimate;
 
     const nextLargest = CALENDAR_TIME_ESTIMATE_OPTIONS.find((option) => option.minutes >= normalized);
     return nextLargest?.estimate ?? '4hr+';
+}
+
+export function timeEstimateToFilterBucket(estimate: TimeEstimate | undefined): TimeEstimatePreset | undefined {
+    if (!estimate) return undefined;
+    return minutesToTimeEstimateBucket(timeEstimateToMinutes(estimate));
+}
+
+export function formatTimeEstimateLabel(estimate: TimeEstimate): string {
+    switch (estimate) {
+        case '5min': return '5m';
+        case '10min': return '10m';
+        case '15min': return '15m';
+        case '30min': return '30m';
+        case '1hr': return '1h';
+        case '2hr': return '2h';
+        case '3hr': return '3h';
+        case '4hr': return '4h';
+        case '4hr+': return '4h+';
+        default: {
+            const minutes = timeEstimateToMinutes(estimate);
+            const hours = Math.floor(minutes / 60);
+            const remainder = minutes % 60;
+            if (hours <= 0) return `${minutes}m`;
+            if (remainder === 0) return `${hours}h`;
+            return `${hours}h ${remainder}m`;
+        }
+    }
+}
+
+export function parseTimeEstimateInput(value: string): number | null {
+    const normalized = value.trim().toLowerCase().replace(',', '.');
+    if (!normalized) return null;
+
+    const compact = normalized.replace(/\s+/g, '');
+    const hoursAndMinutes = /^(\d+(?:\.\d+)?)h(?:ours?)?(?:(\d+)(?:m(?:in(?:ute)?s?)?)?)?$/.exec(compact);
+    if (hoursAndMinutes) {
+        const hours = Number(hoursAndMinutes[1]);
+        const minutes = hoursAndMinutes[2] ? Number(hoursAndMinutes[2]) : 0;
+        if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+        return normalizeExactTimeEstimateMinutes(hours * 60 + minutes);
+    }
+
+    const minutesOnly = /^(\d+(?:\.\d+)?)(?:m|min|mins|minute|minutes)?$/.exec(compact);
+    if (minutesOnly) {
+        const minutes = Number(minutesOnly[1]);
+        if (!Number.isFinite(minutes)) return null;
+        return normalizeExactTimeEstimateMinutes(minutes);
+    }
+
+    return null;
 }
 
 export function buildCalendarQuickAddTaskDraft(
@@ -204,7 +284,7 @@ export function buildCalendarEventTaskDraft(
 }
 
 export function normalizeCalendarDurationMinutes(minutes: number): number {
-    const estimate = minutesToTimeEstimate(minutes);
+    const estimate = minutesToTimeEstimateBucket(minutes);
     return CALENDAR_TIME_ESTIMATE_OPTIONS.find((option) => option.estimate === estimate)?.minutes
         ?? timeEstimateToMinutes(estimate);
 }

@@ -10,7 +10,7 @@ import {
     startOfWeek,
 } from 'date-fns';
 
-import { timeEstimateToMinutes } from './calendar-scheduling';
+import { timeEstimateToFilterBucket, timeEstimateToMinutes } from './calendar-scheduling';
 import { safeParseDate, safeParseDueDate } from './date';
 import { matchesHierarchicalToken, normalizePrefixedToken } from './hierarchy-utils';
 import type {
@@ -328,7 +328,10 @@ export function taskMatchesFilterCriteria(
     if (!matchesDateRange(task.startTime, normalized.startDateRange, safeParseDate, { now, weekStartsOn })) return false;
     if (!matchesAssignedTo(normalized.assignedTo, task.assignedTo)) return false;
     if (!matchesLocation(normalized.locations, task.location)) return false;
-    if (normalized.timeEstimates?.length && (!task.timeEstimate || !normalized.timeEstimates.includes(task.timeEstimate))) return false;
+    if (normalized.timeEstimates?.length) {
+        const bucket = timeEstimateToFilterBucket(task.timeEstimate);
+        if (!bucket || !normalized.timeEstimates.includes(bucket)) return false;
+    }
     if (!matchesTimeEstimateRange(normalized.timeEstimateRange, task.timeEstimate)) return false;
     if (normalized.hasDescription !== undefined) {
         const hasDescription = Boolean(task.description?.trim());

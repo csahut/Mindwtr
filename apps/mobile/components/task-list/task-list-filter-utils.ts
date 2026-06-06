@@ -1,5 +1,5 @@
 import type { Task, TaskEnergyLevel, TaskPriority, TimeEstimate } from '@mindwtr/core';
-import { matchesHierarchicalToken } from '@mindwtr/core';
+import { matchesHierarchicalToken, timeEstimateToFilterBucket } from '@mindwtr/core';
 
 export type MobileTaskListFilters = {
   energyLevels: TaskEnergyLevel[];
@@ -47,8 +47,11 @@ export const taskMatchesMobileTaskFilters = (
     return false;
   }
 
-  if (filters.timeEstimates.length > 0 && (!task.timeEstimate || !filters.timeEstimates.includes(task.timeEstimate))) {
-    return false;
+  if (filters.timeEstimates.length > 0) {
+    const bucket = timeEstimateToFilterBucket(task.timeEstimate);
+    if (!bucket || !filters.timeEstimates.includes(bucket)) {
+      return false;
+    }
   }
 
   const locationQuery = normalize(filters.locationQuery);

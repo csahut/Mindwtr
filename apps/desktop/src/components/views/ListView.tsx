@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import {
     buildBulkOrganizeTaskUpdates,
     DEFAULT_AREA_COLOR,
+    formatTimeEstimateLabel,
     getQuickAddProjectInitialProps,
     getWaitingPerson,
     isTaskInActiveProject,
@@ -662,12 +663,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
     const isWaitingView = statusFilter === 'waiting';
     const priorityOptions: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
     const timeEstimateOptions: TimeEstimate[] = ['5min', '10min', '15min', '30min', '1hr', '2hr', '3hr', '4hr', '4hr+'];
-    const formatEstimate = (estimate: TimeEstimate) => {
-        if (estimate.endsWith('min')) return estimate.replace('min', 'm');
-        if (estimate.endsWith('hr+')) return estimate.replace('hr+', 'h+');
-        if (estimate.endsWith('hr')) return estimate.replace('hr', 'h');
-        return estimate;
-    };
+    const formatEstimate = formatTimeEstimateLabel;
     const filterSummary = [
         ...(normalizedSearchQuery ? [`${t('common.search')}: ${searchQuery.trim()}`] : []),
         ...selectedTokens,

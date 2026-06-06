@@ -4,6 +4,7 @@
 
 import { Task, TaskStatus, TaskSortBy, TaskPriority, Project, AppData, SortField } from './types';
 import { isDueForReview, safeParseDate, safeParseDueDate } from './date';
+import { timeEstimateToMinutes } from './calendar-scheduling';
 import { TASK_STATUS_ORDER } from './task-status';
 import type { Language } from './i18n/i18n-types';
 
@@ -37,16 +38,10 @@ const TASK_ENERGY_SORT_RANK: Record<NonNullable<Task['energyLevel']>, number> = 
     high: 3,
 };
 
-const TIME_ESTIMATE_SORT_RANK: Record<NonNullable<Task['timeEstimate']>, number> = {
-    '5min': 5,
-    '10min': 10,
-    '15min': 15,
-    '30min': 30,
-    '1hr': 60,
-    '2hr': 120,
-    '3hr': 180,
-    '4hr': 240,
-    '4hr+': 241,
+const timeEstimateSortRank = (estimate: Task['timeEstimate']): number => {
+    if (!estimate) return Number.POSITIVE_INFINITY;
+    if (estimate === '4hr+') return 241;
+    return timeEstimateToMinutes(estimate);
 };
 
 export const FOCUS_NEXT_DUE_SOON_WINDOW_DAYS = 30;
@@ -581,11 +576,7 @@ export function sortTasksBySavedPreference<T extends Task>(
             - (TASK_PRIORITY_SORT_RANK[a.priority as TaskPriority] || 0);
         const byEnergy = () => (TASK_ENERGY_SORT_RANK[b.energyLevel as NonNullable<Task['energyLevel']>] || 0)
             - (TASK_ENERGY_SORT_RANK[a.energyLevel as NonNullable<Task['energyLevel']>] || 0);
-        const byTimeEstimate = () => (
-            TIME_ESTIMATE_SORT_RANK[a.timeEstimate as NonNullable<Task['timeEstimate']>] ?? Number.POSITIVE_INFINITY
-        ) - (
-            TIME_ESTIMATE_SORT_RANK[b.timeEstimate as NonNullable<Task['timeEstimate']>] ?? Number.POSITIVE_INFINITY
-        );
+        const byTimeEstimate = () => timeEstimateSortRank(a.timeEstimate) - timeEstimateSortRank(b.timeEstimate);
         const byProject = () => {
             const orderA = a.projectId ? (projectOrder.get(a.projectId) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
             const orderB = b.projectId ? (projectOrder.get(b.projectId) ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;

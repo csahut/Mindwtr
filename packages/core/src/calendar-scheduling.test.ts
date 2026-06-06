@@ -4,13 +4,18 @@ import {
     addCalendarMinutes,
     buildCalendarEventTaskDraft,
     buildCalendarQuickAddTaskDraft,
+    createCustomTimeEstimate,
     findFreeSlotForDay,
     formatCalendarDurationLabel,
+    formatTimeEstimateLabel,
     formatCalendarTimeInputValue,
     isSlotFreeForDay,
     minutesToTimeEstimate,
+    minutesToTimeEstimateBucket,
     normalizeCalendarDurationMinutes,
+    parseTimeEstimateInput,
     parseCalendarTimeOnDate,
+    timeEstimateToFilterBucket,
     timeEstimateToMinutes,
 } from './calendar-scheduling';
 import type { Area, ExternalCalendarEvent, Project, Task } from './index';
@@ -62,14 +67,33 @@ describe('calendar scheduling helpers', () => {
         expect(timeEstimateToMinutes('5min')).toBe(5);
         expect(timeEstimateToMinutes('1hr')).toBe(60);
         expect(timeEstimateToMinutes('4hr+')).toBe(240);
+        expect(timeEstimateToMinutes(createCustomTimeEstimate(150))).toBe(150);
         expect(timeEstimateToMinutes(undefined)).toBe(30);
         expect(timeEstimateToMinutes('2hr', { enabled: false })).toBe(30);
     });
 
-    it('maps calendar minutes back to Mindwtr time estimates', () => {
+    it('maps calendar minutes back to exact Mindwtr time estimates', () => {
         expect(minutesToTimeEstimate(15)).toBe('15min');
-        expect(minutesToTimeEstimate(45)).toBe('1hr');
-        expect(minutesToTimeEstimate(241)).toBe('4hr+');
+        expect(minutesToTimeEstimate(45)).toBe('custom:45');
+        expect(minutesToTimeEstimate(241)).toBe('custom:241');
+    });
+
+    it('buckets exact custom estimates for coarse time filters', () => {
+        expect(minutesToTimeEstimateBucket(45)).toBe('1hr');
+        expect(minutesToTimeEstimateBucket(150)).toBe('3hr');
+        expect(minutesToTimeEstimateBucket(241)).toBe('4hr+');
+        expect(timeEstimateToFilterBucket(createCustomTimeEstimate(150))).toBe('3hr');
+        expect(timeEstimateToFilterBucket('2hr')).toBe('2hr');
+        expect(timeEstimateToFilterBucket(undefined)).toBeUndefined();
+    });
+
+    it('formats and parses custom time estimates', () => {
+        expect(formatTimeEstimateLabel(createCustomTimeEstimate(150))).toBe('2h 30m');
+        expect(parseTimeEstimateInput('150')).toBe(150);
+        expect(parseTimeEstimateInput('150m')).toBe(150);
+        expect(parseTimeEstimateInput('2h30')).toBe(150);
+        expect(parseTimeEstimateInput('2.5h')).toBe(150);
+        expect(parseTimeEstimateInput('')).toBeNull();
     });
 
     it('normalizes arbitrary calendar durations to supported estimate buckets', () => {

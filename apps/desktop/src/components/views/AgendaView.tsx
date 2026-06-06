@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ErrorBoundary } from '../ErrorBoundary';
-import { shallow, useTaskStore, TaskPriority, TimeEstimate, applyFilter, buildAdvancedFilterCriteriaChips, removeAdvancedFilterCriteriaChip, formatFocusTaskLimitText, generateUUID, getUsedTaskTokens, getFocusSequentialFirstTaskIds, getProjectDeadlineBoosts, hasActiveFilterCriteria, markSavedFilterDeleted, normalizeFocusTaskLimit, safeParseDate, safeParseDueDate, isDueForReview, isTaskInActiveProject, SAVED_FILTER_NO_PROJECT_ID, shouldShowTaskForStart, sortFocusNextActions, sortTasksBySavedPreference, translateWithFallback } from '@mindwtr/core';
+import { shallow, useTaskStore, TaskPriority, TimeEstimate, applyFilter, buildAdvancedFilterCriteriaChips, removeAdvancedFilterCriteriaChip, formatFocusTaskLimitText, formatTimeEstimateLabel, generateUUID, getUsedTaskTokens, getFocusSequentialFirstTaskIds, getProjectDeadlineBoosts, hasActiveFilterCriteria, markSavedFilterDeleted, normalizeFocusTaskLimit, safeParseDate, safeParseDueDate, isDueForReview, isTaskInActiveProject, SAVED_FILTER_NO_PROJECT_ID, shouldShowTaskForStart, sortFocusNextActions, sortTasksBySavedPreference, translateWithFallback } from '@mindwtr/core';
 import type { FilterCriteria, FocusGroupBy, ProjectDeadlineBoost, SavedFilter, SortField, Task, TaskEnergyLevel } from '@mindwtr/core';
 import { useLanguage } from '../../contexts/language-context';
 import { cn } from '../../lib/utils';
@@ -345,12 +345,7 @@ export function AgendaView() {
             }));
     }, [activeTasks, areaById, projects]);
     const showNoProjectOption = activeTasks.some((task) => !task.projectId);
-    const formatEstimate = (estimate: TimeEstimate) => {
-        if (estimate.endsWith('min')) return estimate.replace('min', 'm');
-        if (estimate.endsWith('hr+')) return estimate.replace('hr+', 'h+');
-        if (estimate.endsWith('hr')) return estimate.replace('hr', 'h');
-        return estimate;
-    };
+    const formatEstimate = formatTimeEstimateLabel;
     const savedFocusFilters = (settings?.savedFilters ?? []).filter((filter) => filter.view === 'focus' && !filter.deletedAt);
     const activeSavedFilter = savedFocusFilters.find((filter) => filter.id === activeSavedFilterId) ?? null;
     const effectiveFocusSortBy = activeSavedFilter?.sortBy ?? focusSortBy;

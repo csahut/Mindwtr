@@ -13,6 +13,7 @@ import {
     isProjectedRecurringTask,
     isProjectedRecurringTaskId,
     safeParseDate,
+    timeEstimateToMinutes,
     useTaskStore,
     type CalendarSyncEntry,
     type Task,
@@ -218,21 +219,6 @@ async function resolveCalendarPushTarget(): Promise<CalendarPushTarget | null> {
 
     const managed = await ensureDesktopMindwtrCalendar();
     return managed ? { id: managed.id, shouldPrefixTitles: false } : null;
-}
-
-function timeEstimateToMinutes(estimate: Task['timeEstimate']): number {
-    switch (estimate) {
-        case '5min': return 5;
-        case '10min': return 10;
-        case '15min': return 15;
-        case '30min': return 30;
-        case '1hr': return 60;
-        case '2hr': return 120;
-        case '3hr': return 180;
-        case '4hr':
-        case '4hr+': return 240;
-        default: return 30;
-    }
 }
 
 function buildAllDayBoundary(date: Date, dayOffset = 0): Date {

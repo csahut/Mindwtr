@@ -82,6 +82,17 @@ describe('saved filters', () => {
         expect(filtered.map((item) => item.id)).toEqual(['medium']);
     });
 
+    it('matches custom time estimates by preset bucket while preserving exact ranges', () => {
+        const tasks = [
+            task({ id: 'preset-2h', timeEstimate: '2hr' }),
+            task({ id: 'custom-150', timeEstimate: 'custom:150' }),
+            task({ id: 'preset-3h', timeEstimate: '3hr' }),
+        ];
+
+        expect(applyFilter(tasks, { timeEstimates: ['3hr'] }).map((item) => item.id)).toEqual(['custom-150', 'preset-3h']);
+        expect(applyFilter(tasks, { timeEstimateRange: { min: 130, max: 160 } }).map((item) => item.id)).toEqual(['custom-150']);
+    });
+
     it('matches location criteria by case-insensitive text', () => {
         const tasks = [
             task({ id: 'office', location: 'Main Office' }),

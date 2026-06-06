@@ -67,4 +67,10 @@ describe('task-list-filter-utils', () => {
     expect(taskMatchesMobileTaskFilters(task, { ...emptyFilters, timeEstimates: ['5min'] })).toBe(false);
     expect(taskMatchesMobileTaskFilters(task, { ...emptyFilters, locationQuery: 'home' })).toBe(false);
   });
+
+  it('matches custom time estimates by their coarse bucket', () => {
+    const customTask = { ...task, timeEstimate: 'custom:150' as const };
+    expect(taskMatchesMobileTaskFilters(customTask, { ...emptyFilters, timeEstimates: ['3hr'] })).toBe(true);
+    expect(taskMatchesMobileTaskFilters(customTask, { ...emptyFilters, timeEstimates: ['2hr'] })).toBe(false);
+  });
 });

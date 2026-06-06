@@ -1,6 +1,13 @@
 import React from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { translateWithFallback } from '@mindwtr/core';
+import {
+    createCustomTimeEstimate,
+    formatTimeEstimateLabel,
+    isCustomTimeEstimate,
+    parseTimeEstimateInput,
+    timeEstimateToMinutes,
+    translateWithFallback,
+} from '@mindwtr/core';
 
 import type { TaskEditFieldRendererProps } from './TaskEditFieldRenderer.types';
 import { getEditedTaskValue } from './task-edit-modal.utils';
@@ -44,6 +51,42 @@ export function TaskEditOrganizationField({
     timeEstimatesEnabled,
 }: TaskEditOrganizationFieldProps) {
     const inputStyle = { backgroundColor: tc.inputBg, borderColor: tc.border, color: tc.text };
+    const currentTimeEstimate = editedTask.timeEstimate;
+    const customTimeEstimateDraftSourceRef = React.useRef<string | undefined>(undefined);
+    const [customTimeEstimateDraft, setCustomTimeEstimateDraft] = React.useState('');
+    const isCustomTimeEstimateSelected = isCustomTimeEstimate(currentTimeEstimate);
+
+    React.useEffect(() => {
+        if (!isCustomTimeEstimateSelected) {
+            customTimeEstimateDraftSourceRef.current = currentTimeEstimate;
+            setCustomTimeEstimateDraft('');
+            return;
+        }
+
+        if (customTimeEstimateDraftSourceRef.current !== currentTimeEstimate) {
+            customTimeEstimateDraftSourceRef.current = currentTimeEstimate;
+            setCustomTimeEstimateDraft(formatTimeEstimateLabel(currentTimeEstimate));
+        }
+    }, [currentTimeEstimate, isCustomTimeEstimateSelected]);
+
+    const setCustomTimeEstimate = (minutes: number) => {
+        const next = createCustomTimeEstimate(minutes);
+        customTimeEstimateDraftSourceRef.current = next;
+        setEditedTask((prev) => ({ ...prev, timeEstimate: next }));
+        return next;
+    };
+
+    const beginCustomTimeEstimate = () => {
+        const next = setCustomTimeEstimate(timeEstimateToMinutes(currentTimeEstimate));
+        setCustomTimeEstimateDraft(formatTimeEstimateLabel(next));
+    };
+
+    const applyCustomTimeEstimateDraft = (draft: string): boolean => {
+        const minutes = parseTimeEstimateInput(draft);
+        if (minutes === null) return false;
+        setCustomTimeEstimate(minutes);
+        return true;
+    };
     const getStatusChipStyle = (active: boolean) => ([
         styles.statusChip,
         { backgroundColor: active ? tc.tint : tc.filterBg, borderColor: active ? tc.tint : tc.border },
@@ -284,8 +327,9 @@ export function TaskEditOrganizationField({
                     )}
                 </View>
             );
-        case 'timeEstimate':
+        case 'timeEstimate': {
             if (!timeEstimatesEnabled) return null;
+            const customTimeEstimateLabel = translateWithFallback(t, 'recurrence.custom', 'Custom…');
             return (
                 <View style={styles.formGroup}>
                     <Text style={[styles.label, { color: tc.secondaryText }]}>{t('taskEdit.timeEstimateLabel')}</Text>
@@ -305,9 +349,45 @@ export function TaskEditOrganizationField({
                                 </Text>
                             </TouchableOpacity>
                         ))}
+                        <TouchableOpacity
+                            key="custom"
+                            style={getStatusChipStyle(isCustomTimeEstimateSelected)}
+                            onPress={beginCustomTimeEstimate}
+                        >
+                            <Text style={getStatusTextStyle(isCustomTimeEstimateSelected)}>
+                                {customTimeEstimateLabel}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
+                    {isCustomTimeEstimateSelected && (
+                        <TextInput
+                            style={[styles.input, inputStyle]}
+                            value={customTimeEstimateDraft}
+                            onChangeText={(draft) => {
+                                setCustomTimeEstimateDraft(draft);
+                                const minutes = parseTimeEstimateInput(draft);
+                                if (minutes === null) return;
+                                setCustomTimeEstimate(minutes);
+                            }}
+                            onBlur={() => {
+                                if (!applyCustomTimeEstimateDraft(customTimeEstimateDraft) && currentTimeEstimate) {
+                                    setCustomTimeEstimateDraft(formatTimeEstimateLabel(currentTimeEstimate));
+                                }
+                            }}
+                            onSubmitEditing={() => {
+                                if (!applyCustomTimeEstimateDraft(customTimeEstimateDraft) && currentTimeEstimate) {
+                                    setCustomTimeEstimateDraft(formatTimeEstimateLabel(currentTimeEstimate));
+                                }
+                            }}
+                            onFocus={(event) => handleInputFocus(event.nativeEvent.target)}
+                            placeholder="2h30"
+                            placeholderTextColor={tc.secondaryText}
+                            accessibilityLabel={`${t('taskEdit.timeEstimateLabel')}: ${customTimeEstimateLabel}`}
+                        />
+                    )}
                 </View>
             );
+        }
         default:
             return null;
     }

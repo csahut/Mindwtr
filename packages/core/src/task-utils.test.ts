@@ -335,6 +335,43 @@ describe('task-utils', () => {
 
             expect(sorted.map((task) => task.id)).toEqual(['high-same-start', 'low-earlier', 'high-later']);
         });
+
+        it('sorts custom time estimates by exact minutes', () => {
+            const sorted = sortTasksBySavedPreference([
+                {
+                    id: 'custom-150',
+                    title: 'Custom 150',
+                    status: 'next',
+                    timeEstimate: 'custom:150',
+                    tags: [],
+                    contexts: [],
+                    createdAt: '2026-02-01T08:00:00.000Z',
+                    updatedAt: '2026-02-01T08:00:00.000Z',
+                },
+                {
+                    id: 'preset-2h',
+                    title: 'Preset 2h',
+                    status: 'next',
+                    timeEstimate: '2hr',
+                    tags: [],
+                    contexts: [],
+                    createdAt: '2026-02-01T07:00:00.000Z',
+                    updatedAt: '2026-02-01T07:00:00.000Z',
+                },
+                {
+                    id: 'preset-3h',
+                    title: 'Preset 3h',
+                    status: 'next',
+                    timeEstimate: '3hr',
+                    tags: [],
+                    contexts: [],
+                    createdAt: '2026-02-01T09:00:00.000Z',
+                    updatedAt: '2026-02-01T09:00:00.000Z',
+                },
+            ] as Task[], 'timeEstimate');
+
+            expect(sorted.map((task) => task.id)).toEqual(['preset-2h', 'custom-150', 'preset-3h']);
+        });
     });
 
     describe('completed task grouping', () => {

@@ -6,6 +6,7 @@ import {
     getTaskDateCoherenceIssues,
     getTaskUrgency,
     getStatusColor,
+    formatTimeEstimateLabel,
     hasTimeComponent,
     resolveTaskTextDirection,
     safeFormatDate,
@@ -107,15 +108,7 @@ export function SwipeableTaskItemContent({
     const textAlign = resolvedDirection === 'rtl' ? 'right' : 'left';
     const timeEstimateLabel = (() => {
         if (!task.timeEstimate) return null;
-        if (task.timeEstimate === '5min') return '5m';
-        if (task.timeEstimate === '10min') return '10m';
-        if (task.timeEstimate === '15min') return '15m';
-        if (task.timeEstimate === '30min') return '30m';
-        if (task.timeEstimate === '1hr') return '1h';
-        if (task.timeEstimate === '2hr') return '2h';
-        if (task.timeEstimate === '3hr') return '3h';
-        if (task.timeEstimate === '4hr') return '4h';
-        return '4h+';
+        return formatTimeEstimateLabel(task.timeEstimate);
     })();
     const dueLabel = (() => {
         const due = safeParseDueDate(task.dueDate);

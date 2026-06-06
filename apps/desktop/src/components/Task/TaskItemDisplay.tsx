@@ -1,6 +1,6 @@
 import { AlertTriangle, Calendar as CalendarIcon, Tag, Trash2, ArrowRight, Repeat, Check, Clock, Timer, Paperclip, RotateCcw, Copy, MapPin, Hourglass, Star, Zap, MoreHorizontal } from 'lucide-react';
 import type { Area, Attachment, Project, RangeSelectionOptions, Task, TaskStatus, RecurrenceRule, RecurrenceStrategy, Language } from '@mindwtr/core';
-import { DEFAULT_AREA_COLOR, getChecklistProgress, getRecurrenceCountValue, getRecurrenceUntilValue, getTaskAgeLabel, getTaskDateCoherenceIssues, getTaskStaleness, getTaskUrgency, hasTimeComponent, parseRRuleString, safeFormatDate, resolveTaskTextDirection, tFallback } from '@mindwtr/core';
+import { DEFAULT_AREA_COLOR, formatTimeEstimateLabel, getChecklistProgress, getRecurrenceCountValue, getRecurrenceUntilValue, getTaskAgeLabel, getTaskDateCoherenceIssues, getTaskStaleness, getTaskUrgency, hasTimeComponent, parseRRuleString, safeFormatDate, resolveTaskTextDirection, tFallback } from '@mindwtr/core';
 import { cn } from '../../lib/utils';
 import { getAttachmentDisplayTitle } from '../../lib/attachment-utils';
 import { getContextColor } from '../../lib/context-color';
@@ -75,13 +75,7 @@ const getUrgencyColor = (task: Task) => {
     }
 };
 
-const formatTimeEstimate = (estimate: string) => {
-    const value = String(estimate);
-    if (value.endsWith('min')) return value.replace('min', 'm');
-    if (value.endsWith('hr+')) return value.replace('hr+', 'h+');
-    if (value.endsWith('hr')) return value.replace('hr', 'h');
-    return value;
-};
+const formatTimeEstimate = formatTimeEstimateLabel;
 
 export const TaskItemDisplay = memo(function TaskItemDisplay({
     task,

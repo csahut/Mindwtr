@@ -16,6 +16,7 @@ import {
     isProjectedRecurringTask,
     isProjectedRecurringTaskId,
     safeParseDate,
+    timeEstimateToMinutes,
     useTaskStore,
     type Task,
 } from '@mindwtr/core';
@@ -486,21 +487,6 @@ export const deleteMindwtrCalendar = async (): Promise<void> => {
 };
 
 // MARK: - Per-task sync
-
-function timeEstimateToMinutes(estimate: Task['timeEstimate']): number {
-    switch (estimate) {
-        case '5min': return 5;
-        case '10min': return 10;
-        case '15min': return 15;
-        case '30min': return 30;
-        case '1hr': return 60;
-        case '2hr': return 120;
-        case '3hr': return 180;
-        case '4hr':
-        case '4hr+': return 240;
-        default: return 30;
-    }
-}
 
 function formatCalendarEventTitle(title: string): string {
     return title.trim() || 'Task';

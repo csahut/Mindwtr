@@ -1,6 +1,8 @@
 import { useCallback, useMemo } from 'react';
 import {
     filterProjectsBySelectedArea,
+    formatTimeEstimateLabel as formatCoreTimeEstimateLabel,
+    isCustomTimeEstimate,
     parseRRuleString,
     safeParseDate,
     type AppData,
@@ -121,17 +123,7 @@ export function useTaskEditDerivedState({
         return hasNth || hasLast || isCustomDay ? 'custom' : 'date';
     }, [monthlyAnchorDate, recurrenceRRuleValue, recurrenceRuleValue]);
 
-    const formatTimeEstimateLabel = useCallback((value: TimeEstimate) => {
-        if (value === '5min') return '5m';
-        if (value === '10min') return '10m';
-        if (value === '15min') return '15m';
-        if (value === '30min') return '30m';
-        if (value === '1hr') return '1h';
-        if (value === '2hr') return '2h';
-        if (value === '3hr') return '3h';
-        if (value === '4hr') return '4h';
-        return '4h+';
-    }, []);
+    const formatTimeEstimateLabel = useCallback((value: TimeEstimate) => formatCoreTimeEstimateLabel(value), []);
 
     const savedPresetsKey = settings.gtd?.timeEstimatePresets?.join('|') ?? '';
     const currentEstimate = editedTask.timeEstimate as TimeEstimate | undefined;
@@ -140,7 +132,7 @@ export function useTaskEditDerivedState({
             const savedPresets = settings.gtd?.timeEstimatePresets;
             const basePresets = savedPresets?.length ? savedPresets : DEFAULT_TIME_ESTIMATE_PRESETS;
             const normalizedPresets = ALL_TIME_ESTIMATES.filter((value) => basePresets.includes(value));
-            const effectivePresets = currentEstimate && !normalizedPresets.includes(currentEstimate)
+            const effectivePresets = currentEstimate && !isCustomTimeEstimate(currentEstimate) && !normalizedPresets.includes(currentEstimate)
                 ? [...normalizedPresets, currentEstimate]
                 : normalizedPresets;
             return [

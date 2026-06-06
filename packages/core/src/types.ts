@@ -5,7 +5,9 @@ export type TaskStatus = 'inbox' | 'next' | 'waiting' | 'someday' | 'reference' 
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TaskEnergyLevel = 'low' | 'medium' | 'high';
 
-export type TimeEstimate = '5min' | '10min' | '15min' | '30min' | '1hr' | '2hr' | '3hr' | '4hr' | '4hr+';
+export type TimeEstimatePreset = '5min' | '10min' | '15min' | '30min' | '1hr' | '2hr' | '3hr' | '4hr' | '4hr+';
+export type CustomTimeEstimate = `custom:${number}`;
+export type TimeEstimate = TimeEstimatePreset | CustomTimeEstimate;
 
 export type TaskSortBy = 'default' | 'due' | 'start' | 'review' | 'title' | 'created' | 'created-desc';
 

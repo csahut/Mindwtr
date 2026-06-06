@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import type { TaskEnergyLevel, TaskPriority, TaskStatus, TimeEstimate } from '@mindwtr/core';
+import {
+    createCustomTimeEstimate,
+    formatTimeEstimateLabel,
+    isCustomTimeEstimate,
+    parseTimeEstimateInput,
+    timeEstimateToMinutes,
+    type TaskEnergyLevel,
+    type TaskPriority,
+    type TaskStatus,
+    type TimeEstimate,
+} from '@mindwtr/core';
 
 import { cn } from '../../../lib/utils';
 import { taskEditorLabelClassName } from '../task-editor-label';
@@ -12,6 +22,7 @@ type PillOption<TValue extends string> = {
 const selectedPillClassName = 'border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90';
 
 const simplePrefixedTokenPattern = /^[@#][^\s,]+$/u;
+const customTimeEstimateOptionValue = '__custom';
 
 const canonicalToken = (value: string): string =>
     value.trim().replace(/^[@#]/, '').toLowerCase();
@@ -564,13 +575,55 @@ export function TimeEstimateField({
     value: TimeEstimate | '';
     onChange: (value: TimeEstimate | '') => void;
 }) {
+    const customDraftSourceRef = useRef<TimeEstimate | ''>('');
+    const [customDraft, setCustomDraft] = useState('');
+    const isCustom = isCustomTimeEstimate(value || undefined);
+
+    useEffect(() => {
+        if (!isCustom) {
+            customDraftSourceRef.current = value;
+            setCustomDraft('');
+            return;
+        }
+
+        if (customDraftSourceRef.current !== value) {
+            customDraftSourceRef.current = value;
+            setCustomDraft(formatTimeEstimateLabel(value as TimeEstimate));
+        }
+    }, [isCustom, value]);
+
+    const applyCustomDraft = (draft: string): boolean => {
+        const minutes = parseTimeEstimateInput(draft);
+        if (minutes === null) return false;
+        const next = createCustomTimeEstimate(minutes);
+        customDraftSourceRef.current = next;
+        onChange(next);
+        return true;
+    };
+
+    const beginCustomEstimate = () => {
+        const next = createCustomTimeEstimate(timeEstimateToMinutes(value || undefined));
+        customDraftSourceRef.current = next;
+        setCustomDraft(formatTimeEstimateLabel(next));
+        onChange(next);
+    };
+
+    const selectValue = isCustom ? customTimeEstimateOptionValue : value;
+
     return (
         <div className="flex flex-col gap-1 w-full">
             <label className={taskEditorLabelClassName}>{t('taskEdit.timeEstimateLabel')}</label>
             <select
-                value={value}
+                value={selectValue}
                 aria-label={t('task.aria.timeEstimate')}
-                onChange={(event) => onChange(event.target.value as TimeEstimate | '')}
+                onChange={(event) => {
+                    const next = event.target.value;
+                    if (next === customTimeEstimateOptionValue) {
+                        beginCustomEstimate();
+                        return;
+                    }
+                    onChange(next as TimeEstimate | '');
+                }}
                 className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
             >
                 <option value="">{t('common.none')}</option>
@@ -583,7 +636,31 @@ export function TimeEstimateField({
                 <option value="3hr">3h</option>
                 <option value="4hr">4h</option>
                 <option value="4hr+">4h+</option>
+                <option value={customTimeEstimateOptionValue}>{t('recurrence.custom')}</option>
             </select>
+            {isCustom && (
+                <input
+                    type="text"
+                    value={customDraft}
+                    onChange={(event) => {
+                        const draft = event.target.value;
+                        setCustomDraft(draft);
+                        const minutes = parseTimeEstimateInput(draft);
+                        if (minutes === null) return;
+                        const next = createCustomTimeEstimate(minutes);
+                        customDraftSourceRef.current = next;
+                        onChange(next);
+                    }}
+                    onBlur={() => {
+                        if (!applyCustomDraft(customDraft)) {
+                            setCustomDraft(formatTimeEstimateLabel(value as TimeEstimate));
+                        }
+                    }}
+                    placeholder="2h30"
+                    aria-label={`${t('task.aria.timeEstimate')} custom`}
+                    className="text-xs bg-muted/50 border border-border rounded px-2 py-1 w-full text-foreground"
+                />
+            )}
         </div>
     );
 }

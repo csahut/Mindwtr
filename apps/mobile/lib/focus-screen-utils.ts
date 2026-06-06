@@ -1,7 +1,9 @@
 import {
     getUsedTaskTokens,
+    formatTimeEstimateLabel,
     matchesHierarchicalToken,
     SAVED_FILTER_NO_PROJECT_ID,
+    timeEstimateToFilterBucket,
     type Task,
     type TaskEnergyLevel,
     type TaskPriority,
@@ -129,21 +131,16 @@ export function taskMatchesFocusFilters(
         return false;
     }
 
-    if (filters.timeEstimates.length > 0 && (!task.timeEstimate || !filters.timeEstimates.includes(task.timeEstimate))) {
-        return false;
+    if (filters.timeEstimates.length > 0) {
+        const bucket = timeEstimateToFilterBucket(task.timeEstimate);
+        if (!bucket || !filters.timeEstimates.includes(bucket)) {
+            return false;
+        }
     }
 
     return true;
 }
 
 export function formatFocusTimeEstimateLabel(value: TimeEstimate): string {
-    if (value === '5min') return '5m';
-    if (value === '10min') return '10m';
-    if (value === '15min') return '15m';
-    if (value === '30min') return '30m';
-    if (value === '1hr') return '1h';
-    if (value === '2hr') return '2h';
-    if (value === '3hr') return '3h';
-    if (value === '4hr') return '4h';
-    return '4h+';
+    return formatTimeEstimateLabel(value);
 }
