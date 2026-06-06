@@ -1052,6 +1052,7 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
     handleAddCalendar,
     handleChooseLocalCalendarFile,
     handleToggleCalendar,
+    handleCalendarColorChange,
     handleRemoveCalendar,
     handleRequestSystemCalendarPermission,
     handleToggleCalendarPush,
@@ -1175,6 +1176,7 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
           onAddCalendar={handleAddCalendar}
           onChooseLocalCalendarFile={handleChooseLocalCalendarFile}
           onToggleCalendar={handleToggleCalendar}
+          onCalendarColorChange={handleCalendarColorChange}
           onRemoveCalendar={handleRemoveCalendar}
           onRequestSystemCalendarPermission={
             handleRequestSystemCalendarPermission

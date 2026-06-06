@@ -36,6 +36,7 @@ import {
   safeParseDate,
   safeParseDueDate,
   shallow,
+  getExternalCalendarColorForId,
   timeEstimateToMinutes as resolveTimeEstimateToMinutes,
   translateText,
   type CalendarSettings,
@@ -122,21 +123,9 @@ type CalendarTaskComposerState = {
   title: string;
 };
 
-const SOURCE_COLORS = ['#2563EB', '#7C3AED', '#DB2777', '#EA580C', '#059669', '#0891B2', '#4F46E5', '#65A30D'];
-const sourceColorCache = new Map<string, string>();
-
-const sourceColorForId = (sourceId: string): string => {
-  const cached = sourceColorCache.get(sourceId);
-  if (cached) return cached;
-  let hash = 0;
-  for (let index = 0; index < sourceId.length; index += 1) {
-    hash = ((hash << 5) - hash) + sourceId.charCodeAt(index);
-    hash |= 0;
-  }
-  const color = SOURCE_COLORS[Math.abs(hash) % SOURCE_COLORS.length] ?? SOURCE_COLORS[0];
-  sourceColorCache.set(sourceId, color);
-  return color;
-};
+const sourceColorForId = (sourceId: string, override?: string): string => (
+  override ?? getExternalCalendarColorForId(sourceId || 'calendar')
+);
 
 const addMinutesToDate = addCalendarMinutes;
 const formatTimeInputValue = formatCalendarTimeInputValue;
@@ -532,6 +521,14 @@ export function useCalendarViewController() {
   const calendarNameById = useMemo(
     () => new Map(externalCalendars.map((calendar) => [calendar.id, calendar.name])),
     [externalCalendars],
+  );
+  const calendarColorById = useMemo(
+    () => new Map(externalCalendars.map((calendar) => [calendar.id, sourceColorForId(calendar.id, calendar.color)])),
+    [externalCalendars],
+  );
+  const getSourceColorForId = useCallback(
+    (sourceId: string) => calendarColorById.get(sourceId) ?? sourceColorForId(sourceId),
+    [calendarColorById],
   );
 
   const nextQuickScheduleCandidates = useMemo(() => {
@@ -1235,7 +1232,7 @@ export function useCalendarViewController() {
     setViewMode,
     shiftSelectedDate,
     showToast,
-    sourceColorForId,
+    sourceColorForId: getSourceColorForId,
     t,
     tc,
     timeEstimateToMinutes,

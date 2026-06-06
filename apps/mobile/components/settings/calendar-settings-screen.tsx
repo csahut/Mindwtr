@@ -4,7 +4,15 @@ import { ActivityIndicator, Alert, ScrollView, Switch, Text, TextInput, Touchabl
 import * as DocumentPicker from 'expo-document-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { generateUUID, tFallback, type ExternalCalendarSubscription, useTaskStore } from '@mindwtr/core';
+import {
+    EXTERNAL_CALENDAR_COLORS,
+    generateUUID,
+    getExternalCalendarColorForId,
+    normalizeExternalCalendarColor,
+    tFallback,
+    type ExternalCalendarSubscription,
+    useTaskStore,
+} from '@mindwtr/core';
 
 import {
     fetchExternalCalendarEvents,
@@ -393,7 +401,11 @@ export function CalendarSettingsScreen() {
         if (!url) return;
 
         const name = (newCalendarName.trim() || tr('nav.calendar')).trim();
-        const next: ExternalCalendarSubscription[] = [...externalCalendars, { id: generateUUID(), name, url, enabled: true }];
+        const id = generateUUID();
+        const next: ExternalCalendarSubscription[] = [
+            ...externalCalendars,
+            { id, name, url, enabled: true, color: getExternalCalendarColorForId(id) },
+        ];
 
         setExternalCalendars(next);
         setNewCalendarName('');
@@ -415,9 +427,10 @@ export function CalendarSettingsScreen() {
             const fileName = (asset.name || asset.uri.split('/').pop() || '').trim();
             const inferredName = fileName.replace(/\.ics$/iu, '').trim();
             const name = (newCalendarName.trim() || inferredName || tr('nav.calendar')).trim();
+            const id = generateUUID();
             const next: ExternalCalendarSubscription[] = [
                 ...externalCalendars,
-                { id: generateUUID(), name, url: asset.uri.trim(), enabled: true },
+                { id, name, url: asset.uri.trim(), enabled: true, color: getExternalCalendarColorForId(id) },
             ];
 
             setExternalCalendars(next);
@@ -444,6 +457,15 @@ export function CalendarSettingsScreen() {
 
     const handleToggleCalendar = async (id: string, enabled: boolean) => {
         const next = externalCalendars.map((c) => (c.id === id ? { ...c, enabled } : c));
+        setExternalCalendars(next);
+        await saveExternalCalendars(next);
+        await updateSettings({ externalCalendars: next });
+    };
+
+    const handleCalendarColorChange = async (id: string, color: string) => {
+        const normalized = normalizeExternalCalendarColor(color);
+        if (!normalized) return;
+        const next = externalCalendars.map((c) => (c.id === id ? { ...c, color: normalized } : c));
         setExternalCalendars(next);
         await saveExternalCalendars(next);
         await updateSettings({ externalCalendars: next });
@@ -875,6 +897,29 @@ export function CalendarSettingsScreen() {
                                         <Text style={[styles.settingDescription, { color: tc.secondaryText }]} numberOfLines={1}>
                                             {maskCalendarUrl(calendar.url)}
                                         </Text>
+                                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                                            {EXTERNAL_CALENDAR_COLORS.map((color) => {
+                                                const selectedColor = calendar.color ?? getExternalCalendarColorForId(calendar.id);
+                                                const selected = selectedColor === color;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={color}
+                                                        accessibilityRole="button"
+                                                        accessibilityState={{ selected }}
+                                                        accessibilityLabel={`${calendar.name} ${color}`}
+                                                        onPress={() => void handleCalendarColorChange(calendar.id, color)}
+                                                        style={{
+                                                            width: 22,
+                                                            height: 22,
+                                                            borderRadius: 11,
+                                                            backgroundColor: color,
+                                                            borderWidth: selected ? 3 : 1,
+                                                            borderColor: selected ? tc.tint : tc.border,
+                                                        }}
+                                                    />
+                                                );
+                                            })}
+                                        </View>
                                     </View>
                                     <View style={{ alignItems: 'flex-end', gap: 10 }}>
                                         <Switch

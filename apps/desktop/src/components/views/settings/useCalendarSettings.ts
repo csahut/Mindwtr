@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { generateUUID, type AppData, type ExternalCalendarSubscription } from '@mindwtr/core';
+import {
+    generateUUID,
+    getExternalCalendarColorForId,
+    normalizeExternalCalendarColor,
+    type AppData,
+    type ExternalCalendarSubscription,
+} from '@mindwtr/core';
 import { ExternalCalendarService } from '../../../lib/external-calendar-service';
 import {
     getCalendarSourceFileName,
@@ -152,9 +158,10 @@ export function useCalendarSettings({ showSaved, settings, updateSettings, isMac
             return;
         }
         const name = (newCalendarName.trim() || 'Calendar').trim();
+        const id = generateUUID();
         const next = [
             ...externalCalendars,
-            { id: generateUUID(), name, url, enabled: true },
+            { id, name, url, enabled: true, color: getExternalCalendarColorForId(id) },
         ];
         setNewCalendarName('');
         setNewCalendarUrl('');
@@ -188,6 +195,15 @@ export function useCalendarSettings({ showSaved, settings, updateSettings, isMac
 
     const handleToggleCalendar = useCallback((id: string, enabled: boolean) => {
         const next = externalCalendars.map((calendar) => (calendar.id === id ? { ...calendar, enabled } : calendar));
+        persistCalendars(next);
+    }, [externalCalendars, persistCalendars]);
+
+    const handleCalendarColorChange = useCallback((id: string, color: string) => {
+        const normalized = normalizeExternalCalendarColor(color);
+        if (!normalized) return;
+        const next = externalCalendars.map((calendar) => (
+            calendar.id === id ? { ...calendar, color: normalized } : calendar
+        ));
         persistCalendars(next);
     }, [externalCalendars, persistCalendars]);
 
@@ -283,6 +299,7 @@ export function useCalendarSettings({ showSaved, settings, updateSettings, isMac
         handleAddCalendar,
         handleChooseLocalCalendarFile,
         handleToggleCalendar,
+        handleCalendarColorChange,
         handleRemoveCalendar,
         handleRequestSystemCalendarPermission,
         handleToggleCalendarPush,

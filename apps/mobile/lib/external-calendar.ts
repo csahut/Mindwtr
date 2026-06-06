@@ -1,7 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import * as Calendar from 'expo-calendar';
-import { generateUUID, parseIcs, type ExternalCalendarEvent, type ExternalCalendarSubscription } from '@mindwtr/core';
+import {
+    generateUUID,
+    normalizeExternalCalendarColor,
+    parseIcs,
+    type ExternalCalendarEvent,
+    type ExternalCalendarSubscription,
+} from '@mindwtr/core';
 import * as FileSystem from './file-system';
 
 export const EXTERNAL_CALENDARS_KEY = 'mindwtr-external-calendars';
@@ -148,6 +154,7 @@ export async function getExternalCalendars(): Promise<ExternalCalendarSubscripti
             name: (c.name || 'Calendar').trim() || 'Calendar',
             url: c.url.trim(),
             enabled: c.enabled !== false,
+            color: normalizeExternalCalendarColor(c.color),
         }))
         .filter((c) => c.url.length > 0);
 }
@@ -159,6 +166,7 @@ export async function saveExternalCalendars(calendars: ExternalCalendarSubscript
             name: (c.name || 'Calendar').trim() || 'Calendar',
             url: (c.url || '').trim(),
             enabled: c.enabled !== false,
+            color: normalizeExternalCalendarColor(c.color),
         }))
         .filter((c) => c.url.length > 0);
     await AsyncStorage.setItem(EXTERNAL_CALENDARS_KEY, JSON.stringify(sanitized));

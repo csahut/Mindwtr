@@ -483,6 +483,7 @@ struct ExternalCalendarSubscription {
     name: String,
     url: String,
     enabled: bool,
+    color: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

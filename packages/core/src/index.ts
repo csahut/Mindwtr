@@ -751,6 +751,15 @@ export type {
 } from './ics';
 
 export {
+    EXTERNAL_CALENDAR_COLORS,
+    getExternalCalendarColorForId,
+    normalizeExternalCalendarColor,
+} from './external-calendar-colors';
+export type {
+    ExternalCalendarColor,
+} from './external-calendar-colors';
+
+export {
     normalizeTaskForLoad,
     normalizeTaskStatus,
     TASK_STATUS_ORDER,

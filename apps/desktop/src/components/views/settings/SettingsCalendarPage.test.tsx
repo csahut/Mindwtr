@@ -20,6 +20,7 @@ const baseProps = {
     onCalendarUrlChange: vi.fn(),
     onAddCalendar: vi.fn(),
     onToggleCalendar: vi.fn(),
+    onCalendarColorChange: vi.fn(),
     onRemoveCalendar: vi.fn(),
     onRequestSystemCalendarPermission: vi.fn(),
     onToggleCalendarPush: vi.fn(),
@@ -50,5 +51,25 @@ describe('SettingsCalendarPage', () => {
         fireEvent.click(getByRole('button', { name: 'Choose local .ics file' }));
 
         expect(onChooseLocalCalendarFile).toHaveBeenCalledTimes(1);
+    });
+
+    it('changes an external calendar color from the swatches', () => {
+        const onCalendarColorChange = vi.fn();
+        const { getByRole } = render(
+            <SettingsCalendarPage
+                {...baseProps}
+                externalCalendars={[{
+                    id: 'work',
+                    name: 'Work',
+                    url: 'https://calendar.example/work.ics',
+                    enabled: true,
+                    color: '#2563EB',
+                }]}
+                onCalendarColorChange={onCalendarColorChange}
+            />,
+        );
+
+        fireEvent.click(getByRole('button', { name: 'Work #7C3AED' }));
+        expect(onCalendarColorChange).toHaveBeenCalledWith('work', '#7C3AED');
     });
 });

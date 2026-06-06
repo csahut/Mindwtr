@@ -78,6 +78,7 @@ type SettingsIntegrationsPageProps = {
     onAddCalendar: () => void;
     onChooseLocalCalendarFile: () => Promise<void> | void;
     onToggleCalendar: (id: string, enabled: boolean) => void;
+    onCalendarColorChange: (id: string, color: string) => void;
     onRemoveCalendar: (id: string) => void;
     onRequestSystemCalendarPermission: () => void;
     onToggleCalendarPush: (enabled: boolean) => Promise<void> | void;
@@ -127,6 +128,7 @@ export function SettingsIntegrationsPage({
     onAddCalendar,
     onChooseLocalCalendarFile,
     onToggleCalendar,
+    onCalendarColorChange,
     onRemoveCalendar,
     onRequestSystemCalendarPermission,
     onToggleCalendarPush,
@@ -176,6 +178,7 @@ export function SettingsIntegrationsPage({
                 onAddCalendar={onAddCalendar}
                 onChooseLocalCalendarFile={isTauri ? onChooseLocalCalendarFile : undefined}
                 onToggleCalendar={onToggleCalendar}
+                onCalendarColorChange={onCalendarColorChange}
                 onRemoveCalendar={onRemoveCalendar}
                 onRequestSystemCalendarPermission={onRequestSystemCalendarPermission}
                 onToggleCalendarPush={onToggleCalendarPush}

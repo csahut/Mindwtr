@@ -27,6 +27,7 @@ import {
     formatCalendarDurationLabel,
     formatCalendarTimeInputValue,
     findFreeSlotForDay as findCalendarFreeSlotForDay,
+    getExternalCalendarColorForId,
     getQuickAddProjectInitialProps,
     getWeekStartsOnIndex,
     isSlotFreeForDay as isCalendarSlotFreeForDay,
@@ -52,7 +53,6 @@ import { usePerformanceMonitor } from '../../../hooks/usePerformanceMonitor';
 import { logError } from '../../../lib/app-log';
 import { resolveAreaFilter, taskMatchesAreaFilter } from '../../../lib/area-filter';
 import { fetchExternalCalendarEvents, summarizeExternalCalendarWarnings } from '../../../lib/external-calendar-events';
-import { fallbackHashString } from '../../../lib/sync-service-utils';
 import { reportError } from '../../../lib/report-error';
 import { getCalendarMonthNames, getCalendarWeekdayHeaders, resolveCalendarLocale } from '../calendar-locale';
 
@@ -88,11 +88,9 @@ export type CalendarTimedItem =
 
 export const dayKey = (date: Date) => format(date, 'yyyy-MM-dd');
 
-export const externalCalendarColor = (sourceId: string): string => {
-    const hash = Number.parseInt(fallbackHashString(sourceId || 'calendar'), 16);
-    const hue = (Number.isFinite(hash) ? hash : 0) % 360;
-    return `hsl(${hue} 68% 48%)`;
-};
+export const externalCalendarColor = (sourceId: string, override?: string): string => (
+    override ?? getExternalCalendarColorForId(sourceId || 'calendar')
+);
 
 export const formatDateInputValue = (date: Date): string => format(date, 'yyyy-MM-dd');
 export const formatTimeInputValue = formatCalendarTimeInputValue;
@@ -402,6 +400,14 @@ export function useDesktopCalendarController() {
     }, [calendarTaskData.visibleTasks, updateTask]);
 
     const calendarNameById = useMemo(() => new Map(externalCalendars.map((c) => [c.id, c.name])), [externalCalendars]);
+    const calendarColorById = useMemo(
+        () => new Map(externalCalendars.map((c) => [c.id, externalCalendarColor(c.id, c.color)])),
+        [externalCalendars]
+    );
+    const getExternalCalendarColor = useCallback(
+        (sourceId: string) => calendarColorById.get(sourceId) ?? externalCalendarColor(sourceId),
+        [calendarColorById]
+    );
     const createTaskFromExternalEvent = useCallback(async (event: ExternalCalendarEvent) => {
         try {
             const { initialProps, title } = buildCalendarEventTaskDraft(event, {
@@ -1204,7 +1210,7 @@ export function useDesktopCalendarController() {
         editingTimeValue,
         externalCalendars,
         externalError,
-        externalCalendarColor,
+        externalCalendarColor: getExternalCalendarColor,
         formatDurationLabel,
         formatTimeInputValue,
         getAllDayItemsForDay,
