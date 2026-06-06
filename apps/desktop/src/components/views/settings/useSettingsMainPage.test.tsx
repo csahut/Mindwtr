@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSettingsMainPage } from './useSettingsMainPage';
 
 const getLaunchAtStartupEnabled = vi.fn();
+const tauriCoreMock = vi.hoisted(() => ({
+    invoke: vi.fn().mockResolvedValue('dark'),
+}));
 const tauriAppMock = vi.hoisted(() => ({
     setTheme: vi.fn().mockResolvedValue(undefined),
 }));
@@ -15,6 +18,10 @@ const tauriWindowMock = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/app', () => ({
     setTheme: tauriAppMock.setTheme,
+}));
+
+vi.mock('@tauri-apps/api/core', () => ({
+    invoke: tauriCoreMock.invoke,
 }));
 
 vi.mock('@tauri-apps/api/window', () => ({
@@ -68,8 +75,10 @@ describe('useSettingsMainPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getLaunchAtStartupEnabled.mockResolvedValue(true);
+        tauriCoreMock.invoke.mockResolvedValue('dark');
         tauriAppMock.setTheme.mockResolvedValue(undefined);
         tauriWindowMock.setTheme.mockResolvedValue(undefined);
+        document.documentElement.className = '';
         localStorage.clear();
     });
 
@@ -104,5 +113,21 @@ describe('useSettingsMainPage', () => {
             expect(tauriAppMock.setTheme).toHaveBeenCalledWith('dark');
             expect(tauriWindowMock.setTheme).toHaveBeenCalledWith('dark');
         });
+    });
+
+    it('resolves System theme through the native command when webview media is stale', async () => {
+        const originalMatchMedia = window.matchMedia;
+        window.matchMedia = vi.fn().mockReturnValue({ matches: false } as MediaQueryList);
+
+        try {
+            render(<Harness isFlatpak={false} isTauri settings={{ theme: 'system' }} />);
+
+            await waitFor(() => {
+                expect(tauriCoreMock.invoke).toHaveBeenCalledWith('get_system_theme_preference');
+                expect(document.documentElement.classList.contains('dark')).toBe(true);
+            });
+        } finally {
+            window.matchMedia = originalMatchMedia;
+        }
     });
 });

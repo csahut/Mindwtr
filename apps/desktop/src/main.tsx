@@ -10,7 +10,14 @@ import { isTauriRuntime } from './lib/runtime';
 import { reportError } from './lib/report-error';
 import { webStorage } from './lib/storage-adapter-web';
 import { isDiagnosticsEnabled, logError, logInfo, logWarn, setupGlobalErrorLogging } from './lib/app-log';
-import { THEME_STORAGE_KEY, applyNativeTheme, applyThemeMode, coerceDesktopThemeMode, resolveNativeTheme } from './lib/theme';
+import {
+    THEME_STORAGE_KEY,
+    applyNativeTheme,
+    applyThemeMode,
+    coerceDesktopThemeMode,
+    resolveNativeTheme,
+    resolveSystemThemeCommandPreference,
+} from './lib/theme';
 import { TEXT_SIZE_STORAGE_KEY, applyDesktopTextSize, coerceDesktopTextSize } from './lib/text-size';
 import { loadStoredFullscreen } from './lib/window-state';
 import { restoreStoredWebviewZoom } from './lib/webview-zoom';
@@ -127,6 +134,14 @@ const logDesktopStartupContext = async (): Promise<void> => {
 // Initialize theme immediately before React renders to prevent flash
 const savedTheme = coerceDesktopThemeMode(localStorage.getItem(THEME_STORAGE_KEY));
 applyThemeMode(savedTheme);
+if ((savedTheme ?? 'system') === 'system' && isTauriRuntime()) {
+    void resolveSystemThemeCommandPreference(
+        () => import('@tauri-apps/api/core'),
+        (step, error) => void logError(error, { scope: 'theme', step: `startup-command:${step}` }),
+    ).then((theme) => {
+        if (theme) applyThemeMode('system', theme);
+    });
+}
 const savedTextSize = coerceDesktopTextSize(localStorage.getItem(TEXT_SIZE_STORAGE_KEY));
 applyDesktopTextSize(savedTextSize);
 

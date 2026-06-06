@@ -62,6 +62,7 @@ import {
     applyThemeMode,
     resolveDesktopThemeMode,
     resolveNativeTheme,
+    resolveSystemThemeCommandPreference,
     watchSystemThemeCommandPreference,
     watchNativeSystemThemePreference,
     watchSystemThemePreference,
@@ -380,10 +381,22 @@ function App() {
 
     useEffect(() => {
         if (!hasHydratedSettings) return;
+        let cancelled = false;
         const normalizedTheme = getActiveThemeMode();
         localStorage.setItem(THEME_STORAGE_KEY, normalizedTheme);
         applyThemeMode(normalizedTheme);
+        if (normalizedTheme === 'system' && isTauriRuntime()) {
+            void resolveSystemThemeCommandPreference(
+                () => import('@tauri-apps/api/core'),
+                (step, error) => void logError(error, { scope: 'theme', step: `initial-command:${step}` }),
+            ).then((theme) => {
+                if (!cancelled && theme) applyThemeMode('system', theme);
+            });
+        }
         applyActiveNativeTheme();
+        return () => {
+            cancelled = true;
+        };
     }, [applyActiveNativeTheme, getActiveThemeMode, hasHydratedSettings]);
 
     useEffect(() => {

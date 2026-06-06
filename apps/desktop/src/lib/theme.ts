@@ -24,6 +24,7 @@ type NativeThemeWindowModule = {
 export const THEME_STORAGE_KEY = 'mindwtr-theme';
 const SYSTEM_THEME_MEDIA_QUERY = '(prefers-color-scheme: dark)';
 const COMMAND_THEME_POLL_INTERVAL_MS = 2000;
+let cachedSystemThemePreference: SystemThemePreference = null;
 
 const isDesktopThemeMode = (value: string | null | undefined): value is DesktopThemeMode => (
     value === 'system'
@@ -60,7 +61,11 @@ export const resolveDesktopThemeMode = (
 );
 
 export const resolveSystemThemePreference = (override?: SystemThemePreference): SystemThemePreference => {
-    if (override === 'light' || override === 'dark') return override;
+    if (override === 'light' || override === 'dark') {
+        cachedSystemThemePreference = override;
+        return override;
+    }
+    if (cachedSystemThemePreference) return cachedSystemThemePreference;
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null;
     return window.matchMedia(SYSTEM_THEME_MEDIA_QUERY).matches ? 'dark' : 'light';
 };
@@ -68,6 +73,19 @@ export const resolveSystemThemePreference = (override?: SystemThemePreference): 
 export const coerceSystemThemePreference = (value: unknown): SystemThemePreference => {
     if (value === 'light' || value === 'dark') return value;
     return null;
+};
+
+export const resolveSystemThemeCommandPreference = async (
+    loadCoreModule: () => Promise<TauriCoreModule>,
+    onError?: (step: 'resolveSystem', error: unknown) => void,
+): Promise<SystemThemePreference> => {
+    try {
+        const coreModule = await loadCoreModule();
+        return coerceSystemThemePreference(await coreModule.invoke('get_system_theme_preference'));
+    } catch (error) {
+        onError?.('resolveSystem', error);
+        return null;
+    }
 };
 
 export const watchSystemThemePreference = (

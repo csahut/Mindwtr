@@ -4,6 +4,8 @@ import {
     applyThemeMode,
     coerceSystemThemePreference,
     resolveDesktopThemeMode,
+    resolveSystemThemeCommandPreference,
+    resolveSystemThemePreference,
     watchSystemThemeCommandPreference,
     watchNativeSystemThemePreference,
     watchSystemThemePreference,
@@ -45,6 +47,18 @@ describe('applyThemeMode', () => {
         applyThemeMode('system', 'light');
 
         expect(document.documentElement.classList.contains('dark')).toBe(false);
+    });
+
+    it('reuses the last native system preference when the webview reports stale light mode', () => {
+        const originalMatchMedia = window.matchMedia;
+        window.matchMedia = vi.fn().mockReturnValue({ matches: false } as MediaQueryList);
+
+        try {
+            expect(resolveSystemThemePreference('dark')).toBe('dark');
+            expect(resolveSystemThemePreference()).toBe('dark');
+        } finally {
+            window.matchMedia = originalMatchMedia;
+        }
     });
 });
 
@@ -156,6 +170,32 @@ describe('coerceSystemThemePreference', () => {
         expect(coerceSystemThemePreference('light')).toBe('light');
         expect(coerceSystemThemePreference('system')).toBeNull();
         expect(coerceSystemThemePreference(null)).toBeNull();
+    });
+});
+
+describe('resolveSystemThemeCommandPreference', () => {
+    it('reads the native command preference', async () => {
+        const invoke = vi.fn(async () => 'dark');
+
+        await expect(resolveSystemThemeCommandPreference(async () => ({ invoke }))).resolves.toBe('dark');
+        expect(invoke).toHaveBeenCalledWith('get_system_theme_preference');
+    });
+
+    it('reports command errors and falls back to no preference', async () => {
+        const error = new Error('command failed');
+        const onError = vi.fn();
+
+        await expect(
+            resolveSystemThemeCommandPreference(
+                async () => ({
+                    invoke: vi.fn(async () => {
+                        throw error;
+                    }),
+                }),
+                onError,
+            ),
+        ).resolves.toBeNull();
+        expect(onError).toHaveBeenCalledWith('resolveSystem', error);
     });
 });
 

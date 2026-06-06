@@ -24,6 +24,7 @@ import {
     applyThemeMode,
     resolveDesktopThemeMode,
     resolveNativeTheme,
+    resolveSystemThemeCommandPreference,
     type DesktopThemeMode,
 } from '../../../lib/theme';
 import { coerceDesktopTextSize } from '../../../lib/text-size';
@@ -95,7 +96,16 @@ export function useSettingsMainPage({
     }, [settings?.theme, themeMode]);
 
     useEffect(() => {
+        let cancelled = false;
         applyThemeMode(themeMode);
+        if (isTauri && themeMode === 'system') {
+            void resolveSystemThemeCommandPreference(
+                () => import('@tauri-apps/api/core'),
+                (_step, error) => reportError('Failed to resolve system theme', error),
+            ).then((theme) => {
+                if (!cancelled && theme) applyThemeMode('system', theme);
+            });
+        }
 
         if (!isTauri) return;
         const tauriTheme = resolveNativeTheme(themeMode);
@@ -105,6 +115,9 @@ export function useSettingsMainPage({
             () => import('@tauri-apps/api/window'),
             (_step, error) => reportError('Failed to set theme', error),
         );
+        return () => {
+            cancelled = true;
+        };
     }, [isTauri, themeMode]);
 
     useEffect(() => {
