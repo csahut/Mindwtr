@@ -88,6 +88,7 @@ AGENTS.md
 .codex/
 .codegraph/
 .agents/
+.serena/
 .claude/
 .gemini/
 .kiro/
