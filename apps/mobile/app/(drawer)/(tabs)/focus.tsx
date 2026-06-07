@@ -445,7 +445,7 @@ export default function FocusScreen() {
     void updateSettings({
       gtd: {
         ...(settings?.gtd ?? {}),
-        focusGroupBy: nextGroupBy === 'none' ? undefined : nextGroupBy,
+        focusGroupBy: nextGroupBy,
       },
     }).catch(() => undefined);
   }, [activeSavedFilter, effectiveFocusGroupBy, settings?.gtd, updateSettings]);

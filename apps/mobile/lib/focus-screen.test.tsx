@@ -735,6 +735,33 @@ describe('FocusScreen', () => {
     });
   });
 
+  it('persists clearing the Focus group-by preference from the filter sheet', async () => {
+    storeState.settings = {
+      appearance: {},
+      features: {},
+      gtd: { focusGroupBy: 'priority' as any },
+    };
+    storeState.updateSettings.mockResolvedValue(undefined);
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<FocusScreen />);
+    });
+
+    act(() => {
+      findButtonByLabel(tree, 'Filters').props.onPress();
+    });
+
+    await act(async () => {
+      findButtonByText(tree, 'None').props.onPress();
+    });
+
+    expect(storeState.updateSettings).toHaveBeenCalledWith({
+      gtd: { focusGroupBy: 'none' },
+    });
+  });
+
   it('renders review-due tasks in a dedicated Review Due section and allows collapsing it', () => {
     storeState.tasks = [
       makeTask('waiting-review', {
