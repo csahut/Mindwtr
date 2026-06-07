@@ -518,14 +518,22 @@ export async function syncCloudAttachments(
         },
         onDownload: async (attachment) => {
             if (!attachment.cloudKey) return false;
-            const fileData = await withRetry(() =>
-                cloudGetFile(`${baseSyncUrl}/${attachment.cloudKey}`, {
-                    allowInsecureHttp: cloudConfig.allowInsecureHttp,
-                    token: cloudConfig.token,
-                    fetcher,
-                    onProgress: (loaded, total) => reportProgress(attachment.id, 'download', loaded, total, 'active'),
-                }),
-            );
+            let fileData: ArrayBuffer;
+            try {
+                fileData = await withRetry(() =>
+                    cloudGetFile(`${baseSyncUrl}/${attachment.cloudKey}`, {
+                        allowInsecureHttp: cloudConfig.allowInsecureHttp,
+                        token: cloudConfig.token,
+                        fetcher,
+                        onProgress: (loaded, total) => reportProgress(attachment.id, 'download', loaded, total, 'active'),
+                    }),
+                );
+            } catch (error) {
+                if (getErrorStatus(error) === 404) {
+                    return markAttachmentUnrecoverable(attachment);
+                }
+                throw error;
+            }
             const bytes = fileData instanceof ArrayBuffer ? new Uint8Array(fileData) : new Uint8Array(fileData as ArrayBuffer);
             await validateAttachmentHash(attachment, bytes);
             const filename = attachment.cloudKey.split('/').pop() || `${attachment.id}${extractExtension(attachment.uri)}`;

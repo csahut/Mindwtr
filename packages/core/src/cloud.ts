@@ -31,6 +31,21 @@ function buildHeaders(options: CloudOptions): Record<string, string> {
 const CLOUD_HTTPS_ERROR = 'Cloud sync requires HTTPS for public URLs (HTTP allowed for localhost, private IPs, and local hostnames).';
 const CLOUD_TIMEOUT_ERROR = 'Cloud request timed out';
 
+export class CloudHttpError extends Error {
+    status: number;
+    statusCode: number;
+
+    constructor(message: string, status: number) {
+        super(message);
+        this.name = 'CloudHttpError';
+        this.status = status;
+        this.statusCode = status;
+    }
+}
+
+const cloudHttpError = (label: string, res: Response): CloudHttpError =>
+    new CloudHttpError(`${label} failed (${res.status}): ${res.statusText}`, res.status);
+
 const assertCloudUrl = (url: string, options: CloudOptions): void => {
     assertConnectionAllowed(url, CLOUD_HTTPS_ERROR, {
         ...SYNC_LOCAL_INSECURE_URL_OPTIONS,
@@ -59,7 +74,7 @@ export async function cloudGetJson<T>(
 
     if (res.status === 404) return null;
     if (!res.ok) {
-        throw new Error(`Cloud GET failed (${res.status}): ${res.statusText}`);
+        throw cloudHttpError('Cloud GET', res);
     }
 
     const text = await res.text();
@@ -98,7 +113,7 @@ export async function cloudHeadJson(
         };
     }
     if (!res.ok) {
-        throw new Error(`Cloud HEAD failed (${res.status}): ${res.statusText}`);
+        throw cloudHttpError('Cloud HEAD', res);
     }
 
     const etag = res.headers.get('etag');
@@ -137,7 +152,7 @@ export async function cloudPutJson(
     );
 
     if (!res.ok) {
-        throw new Error(`Cloud PUT failed (${res.status}): ${res.statusText}`);
+        throw cloudHttpError('Cloud PUT', res);
     }
 }
 
@@ -176,7 +191,7 @@ export async function cloudPutFile(
     );
 
     if (!res.ok) {
-        throw new Error(`Cloud File PUT failed (${res.status}): ${res.statusText}`);
+        throw cloudHttpError('Cloud File PUT', res);
     }
 }
 
@@ -199,7 +214,7 @@ export async function cloudGetFile(
     );
 
     if (!res.ok) {
-        throw new Error(`Cloud File GET failed (${res.status}): ${res.statusText}`);
+        throw cloudHttpError('Cloud File GET', res);
     }
 
     const onProgress = options.onProgress;
@@ -243,6 +258,6 @@ export async function cloudDeleteFile(
     );
 
     if (!res.ok && res.status !== 404) {
-        throw new Error(`Cloud DELETE failed (${res.status}): ${res.statusText}`);
+        throw cloudHttpError('Cloud DELETE', res);
     }
 }

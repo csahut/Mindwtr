@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cloudDeleteFile, cloudGetJson, cloudHeadJson, cloudPutJson } from './cloud';
+import { cloudDeleteFile, cloudGetFile, cloudGetJson, cloudHeadJson, cloudPutJson } from './cloud';
 
 const okResponse = (text: string) =>
     ({
@@ -97,6 +97,16 @@ describe('cloud sync http helpers', () => {
     it('treats 404 delete as success', async () => {
         const fetcher = vi.fn(async () => errorResponse(404, 'Not Found'));
         await expect(cloudDeleteFile('https://example.com/v1/file', { fetcher })).resolves.toBeUndefined();
+    });
+
+    it('exposes status on file get failures', async () => {
+        const fetcher = vi.fn(async () => errorResponse(404, 'Not Found'));
+
+        await expect(cloudGetFile('https://example.com/v1/file', { fetcher })).rejects.toMatchObject({
+            message: 'Cloud File GET failed (404): Not Found',
+            status: 404,
+            statusCode: 404,
+        });
     });
 
     it('throws on delete failures', async () => {
