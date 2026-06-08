@@ -40,11 +40,17 @@ class PrepareGooglePlayListingMetadataTest(unittest.TestCase):
                 short_description="Un sistema GTD completo.",
                 full_description="Mindwtr es un sistema GTD privado.",
             )
+            write_listing(
+                root,
+                "fr-FR",
+                short_description="Gestionnaire GTD privé.",
+                full_description="Mindwtr est un gestionnaire GTD privé.",
+            )
             (root / "chocolatey").mkdir()
 
             listings = MODULE.collect_listings(root)
 
-        self.assertEqual([listing["language"] for listing in listings], ["en-US", "es-ES"])
+        self.assertEqual([listing["language"] for listing in listings], ["en-US", "es-ES", "fr-FR"])
         self.assertEqual(listings[0]["title"], "Mindwtr")
         self.assertIn("shortDescription", listings[0])
         self.assertIn("fullDescription", listings[0])

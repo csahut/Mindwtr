@@ -145,6 +145,36 @@
       },
       "PlatformOverrides": {}
     },
+    "fr": {
+      "BaseListing": {
+        "Keywords": [
+          "gestionnaire de tâches GTD",
+          "liste de tâches hors ligne",
+          "productivité",
+          "application tâches privée"
+        ],
+        "Description": "Mindwtr est un gestionnaire de tâches gratuit et open source conçu pour Getting Things Done (GTD). Il vous aide à capturer, clarifier, organiser et revoir vos engagements sans confier vos données personnelles à un service cloud.\n\nContrairement à de nombreuses applications de productivité, Mindwtr conserve vos tâches, projets et notes sur votre appareil. Vous décidez vous-même si et où les données sont synchronisées, exportées ou sauvegardées.\n\nFonctionnalités principales :\n- Local-first : vos données restent sur votre appareil sauf si vous choisissez de les synchroniser, les exporter ou les sauvegarder.\n- Flux GTD : Inbox, Next, Waiting, Someday, Projects, Areas et Contexts suivent la méthode Getting Things Done.\n- Rapide et léger : construit avec Rust et Tauri pour de bonnes performances.\n- Sans distraction : une interface claire vous aide à vous concentrer sur ce qui compte.\n- Open source : code transparent et vérifiable.\n\nGardez le contrôle de vos tâches et de vos données.",
+        "Features": [
+          "Stockage local-first pour protéger la vie privée",
+          "Interface GTD claire pour capturer et organiser les tâches",
+          "Fonctionne hors ligne sans compte obligatoire",
+          "Projets, contextes, revue et tableau Kanban",
+          "Open source et transparent"
+        ],
+        "ReleaseNotes": "• Les projets peuvent être triés par date limite et grouper les tâches terminées sous le travail actif.\n• La sélection, les pièces jointes, la fermeture et la recherche de listes sont plus fiables.\n• La restauration, la suppression des areas, l'ajout rapide et les répétitions sont plus sûres.",
+        "Images": [],
+        "RecommendedHardware": [],
+        "MinimumHardware": [],
+        "Title": "Mindwtr",
+        "LicenseTerms": "AGPL-3.0 license",
+        "CopyrightAndTrademarkInfo": "AGPL-3.0 license",
+        "ShortDescription": null,
+        "ShortTitle": null,
+        "VoiceTitle": null,
+        "DevStudio": "Dongda Li"
+      },
+      "PlatformOverrides": {}
+    },
     "es": {
       "BaseListing": {
         "Keywords": [

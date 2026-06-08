@@ -97,6 +97,7 @@ map_metadata() {
 map_metadata "en-US" "en-US"
 map_metadata "de-DE" "de-DE"
 map_metadata "es-ES" "es-ES"
+map_metadata "fr-FR" "fr-FR"
 map_metadata "zh-CN" "zh-Hans"
 
 python3 scripts/ci/validate-fastlane-metadata.py "${FASTLANE_METADATA_DIR}"
