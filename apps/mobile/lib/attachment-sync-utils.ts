@@ -472,16 +472,26 @@ export const resolveFileSyncDir = async (syncPath: string): Promise<ResolvedSync
   return { type: 'file', dirUri, attachmentsDirUri };
 };
 
-export const findSafEntry = async (dirUri: string, fileName: string): Promise<string | null> => {
-  if (!StorageAccessFramework?.readDirectoryAsync) return null;
+export const readSafDirectoryEntriesByName = async (dirUri: string): Promise<Map<string, string>> => {
+  const entriesByName = new Map<string, string>();
+  if (!StorageAccessFramework?.readDirectoryAsync) return entriesByName;
   try {
     const entries = await StorageAccessFramework.readDirectoryAsync(dirUri);
-    const matchEntry = entries.find((entry: string) => hasSafLeafName(entry, fileName));
-    return matchEntry ?? null;
+    for (const entry of entries) {
+      const name = getSafLeafName(entry);
+      if (name && !entriesByName.has(name)) {
+        entriesByName.set(name, entry);
+      }
+    }
   } catch (error) {
     logAttachmentWarn('Failed to read SAF directory', error);
-    return null;
   }
+  return entriesByName;
+};
+
+export const findSafEntry = async (dirUri: string, fileName: string): Promise<string | null> => {
+  const entriesByName = await readSafDirectoryEntriesByName(dirUri);
+  return entriesByName.get(fileName) ?? null;
 };
 
 export const readFileAsBytes = async (uri: string): Promise<Uint8Array> => {

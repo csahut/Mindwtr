@@ -207,6 +207,74 @@ describe('attachment sync', () => {
     expect(fileSystemMock.StorageAccessFramework.writeAsStringAsync).not.toHaveBeenCalled();
   });
 
+  it('reads the SAF attachments directory once per file-sync pass', async () => {
+    const syncFileUri = 'content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FMindwtr%20Backup/document/primary%3ADocuments%2FMindwtr%20Backup%2Fdata.json';
+    const attachmentsDirUri = 'content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FMindwtr%20Backup/document/primary%3ADocuments%2FMindwtr%20Backup%2Fattachments/';
+    const firstRemoteFileUri = `${attachmentsDirUri}first.txt`;
+    const secondRemoteFileUri = `${attachmentsDirUri}second.txt`;
+
+    fileSystemMock.getInfoAsync.mockResolvedValue({ exists: true, size: 3 });
+    fileSystemMock.StorageAccessFramework.readDirectoryAsync.mockImplementation(async (uri: string) => {
+      if (uri === attachmentsDirUri) {
+        return [firstRemoteFileUri, secondRemoteFileUri];
+      }
+      if (uri.includes('primary%3ADocuments%2FMindwtr%20Backup')) {
+        return [attachmentsDirUri];
+      }
+      return [];
+    });
+
+    const { syncFileAttachments } = await import('./attachment-sync');
+
+    const didMutate = await syncFileAttachments({
+      tasks: [
+        {
+          id: 'task-1',
+          title: 'Task',
+          status: 'inbox',
+          tags: [],
+          contexts: [],
+          attachments: [
+            {
+              id: 'first',
+              kind: 'file',
+              title: 'first.txt',
+              uri: 'file://document/attachments/first.txt',
+              cloudKey: 'attachments/first.txt',
+              localStatus: 'available',
+              createdAt: '2026-04-18T10:00:00.000Z',
+              updatedAt: '2026-04-18T10:00:00.000Z',
+            },
+            {
+              id: 'second',
+              kind: 'file',
+              title: 'second.txt',
+              uri: 'file://document/attachments/second.txt',
+              cloudKey: 'attachments/second.txt',
+              localStatus: 'available',
+              createdAt: '2026-04-18T10:00:00.000Z',
+              updatedAt: '2026-04-18T10:00:00.000Z',
+            },
+          ],
+          createdAt: '2026-04-18T10:00:00.000Z',
+          updatedAt: '2026-04-18T10:00:00.000Z',
+        },
+      ],
+      projects: [],
+      sections: [],
+      areas: [],
+      settings: {},
+    }, syncFileUri);
+
+    const attachmentDirReads = fileSystemMock.StorageAccessFramework.readDirectoryAsync.mock.calls
+      .filter(([uri]) => uri === attachmentsDirUri);
+
+    expect(didMutate).toBe(false);
+    expect(attachmentDirReads).toHaveLength(1);
+    expect(fileSystemMock.StorageAccessFramework.createFileAsync).not.toHaveBeenCalled();
+    expect(fileSystemMock.StorageAccessFramework.writeAsStringAsync).not.toHaveBeenCalled();
+  });
+
   it('uploads a pending SAF file attachment into the existing attachments directory', async () => {
     const syncFileUri = 'content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FMindwtr%20Backup/document/primary%3ADocuments%2FMindwtr%20Backup%2Fdata.json';
     const attachmentsDirUri = 'content://com.android.externalstorage.documents/tree/primary%3ADocuments%2FMindwtr%20Backup/document/primary%3ADocuments%2FMindwtr%20Backup%2Fattachments/';
