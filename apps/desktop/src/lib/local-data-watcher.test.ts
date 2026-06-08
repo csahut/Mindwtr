@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPendingSave, setStorageAdapter, useTaskStore } from '@mindwtr/core';
 import type { AppData, StorageAdapter } from '@mindwtr/core';
-import { __localDataWatcherTestUtils, markLocalWrite, start } from './local-data-watcher';
+import { __localDataWatcherTestUtils, markLocalSqliteWrite, markLocalWrite, start } from './local-data-watcher';
 
 function getTauriMocks() {
     const globalObject = globalThis as typeof globalThis & {
@@ -172,6 +172,55 @@ describe('local-data-watcher', () => {
 
         expect(refreshStorageData).toHaveBeenCalledTimes(1);
         expect(useTaskStore.getState().tasks[0]?.id).toBe('mcp-1');
+    });
+
+    it('ignores SQLite watcher events caused by local SQLite writes', async () => {
+        const watchers: Array<{ path: string; callback: (event: { path?: string; paths?: string[] }) => void }> = [];
+        const refreshStorageData = vi.fn();
+
+        __localDataWatcherTestUtils.setDependenciesForTests({
+            watchFile: async (path, callback) => {
+                watchers.push({ path, callback });
+                return () => undefined;
+            },
+            refreshStorageData,
+        });
+
+        await start('/tmp/mindwtr/data.json', '/tmp/mindwtr/mindwtr.db');
+
+        markLocalSqliteWrite();
+        watchers[1]?.callback({ paths: ['/tmp/mindwtr/mindwtr.db-wal'] });
+        await flushScheduledTimers();
+
+        expect(refreshStorageData).not.toHaveBeenCalled();
+
+        nowMs = 2100;
+        watchers[1]?.callback({ paths: ['/tmp/mindwtr/mindwtr.db-wal'] });
+        await flushScheduledTimers();
+
+        expect(refreshStorageData).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not cancel a pending external SQLite refresh when a local SQLite write follows', async () => {
+        const watchers: Array<{ path: string; callback: (event: { path?: string; paths?: string[] }) => void }> = [];
+        const refreshStorageData = vi.fn();
+
+        __localDataWatcherTestUtils.setDependenciesForTests({
+            watchFile: async (path, callback) => {
+                watchers.push({ path, callback });
+                return () => undefined;
+            },
+            refreshStorageData,
+        });
+
+        await start('/tmp/mindwtr/data.json', '/tmp/mindwtr/mindwtr.db');
+
+        watchers[1]?.callback({ paths: ['/tmp/mindwtr/mindwtr.db-wal'] });
+        markLocalSqliteWrite();
+        watchers[1]?.callback({ paths: ['/tmp/mindwtr/mindwtr.db-wal'] });
+        await flushScheduledTimers();
+
+        expect(refreshStorageData).toHaveBeenCalledTimes(1);
     });
 
     it('ignores self-written payloads after the ignore window drains', async () => {

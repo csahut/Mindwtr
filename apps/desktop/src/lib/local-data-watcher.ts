@@ -91,6 +91,7 @@ const defaultDependencies: LocalDataWatcherDependencies = {
 let localDataWatcherDependencies: LocalDataWatcherDependencies = { ...defaultDependencies };
 let unwatchFns: Array<() => void> = [];
 let ignoreUntil = 0;
+let sqliteIgnoreUntil = 0;
 let lastKnownHash = '';
 let pendingSelfWrites: Array<{ payload: string; expiresAt: number }> = [];
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -236,6 +237,10 @@ const runSqliteRefresh = (): Promise<void> => {
 };
 
 async function handleSqliteChange(options: { immediate?: boolean } = {}): Promise<void> {
+    if (!options.immediate && localDataWatcherDependencies.now() < sqliteIgnoreUntil) {
+        return;
+    }
+
     if (sqliteDebounceTimer) {
         localDataWatcherDependencies.cancelSchedule(sqliteDebounceTimer);
         sqliteDebounceTimer = null;
@@ -345,6 +350,10 @@ export function markLocalWrite(data?: AppData): void {
     scheduleIgnoreDrain();
 }
 
+export function markLocalSqliteWrite(): void {
+    sqliteIgnoreUntil = localDataWatcherDependencies.now() + IGNORE_WINDOW_MS;
+}
+
 export async function start(dataPath: string, dbPath?: string): Promise<void> {
     if (!isTauriRuntime()) return;
     if (unwatchFns.length > 0) return;
@@ -401,6 +410,7 @@ export function stop(): void {
     hasPendingChangeDuringIgnore = false;
     pendingExternalData = null;
     pendingSelfWrites = [];
+    sqliteIgnoreUntil = 0;
 
     if (unwatchFns.length > 0) {
         unwatchFns.forEach((unwatch) => unwatch());
@@ -426,11 +436,12 @@ export const __localDataWatcherTestUtils = {
         stop();
         localDataWatcherDependencies = { ...defaultDependencies };
         ignoreUntil = 0;
-            lastKnownHash = '';
-            pendingSelfWrites = [];
-            mergeInFlight = null;
-            sqliteRefreshInFlight = null;
-        },
+        sqliteIgnoreUntil = 0;
+        lastKnownHash = '';
+        pendingSelfWrites = [];
+        mergeInFlight = null;
+        sqliteRefreshInFlight = null;
+    },
     getPendingSelfWritePayloadLengthForTests() {
         return pendingSelfWrites.reduce((total, entry) => total + entry.payload.length, 0);
     },

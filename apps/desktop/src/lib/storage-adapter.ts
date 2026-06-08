@@ -2,7 +2,7 @@ import { AppData, SQLITE_SCHEMA_VERSION, StorageAdapter, TaskQueryOptions, type 
 import { invoke } from '@tauri-apps/api/core';
 import { logInfo, logWarn } from './app-log';
 import { reportError } from './report-error';
-import { markLocalWrite } from './local-data-watcher';
+import { markLocalSqliteWrite, markLocalWrite } from './local-data-watcher';
 
 const STORAGE_SCHEMA_VERSION_KEY = 'mindwtr-storage-schema-version';
 let storageInitLogged = false;
@@ -81,8 +81,10 @@ export const tauriStorage: StorageAdapter = {
     },
     saveData: async (data: AppData): Promise<void> => enqueueSave(async () => {
         markLocalWrite(data);
+        markLocalSqliteWrite();
         try {
             await invoke<void>('save_data' as any, { data } as any);
+            markLocalSqliteWrite();
             logStorageInitIfNeeded();
         } catch (error) {
             reportError('saveData failure', error, { category: 'storage', scope: 'storage' });
@@ -91,8 +93,10 @@ export const tauriStorage: StorageAdapter = {
         }
     }),
     saveTask: async (task: Task): Promise<void> => enqueueSave(async () => {
+        markLocalSqliteWrite();
         try {
             await invoke<void>('save_task' as any, { task } as any);
+            markLocalSqliteWrite();
             logStorageInitIfNeeded();
         } catch (error) {
             reportError('saveTask failure', error, { category: 'storage', scope: 'storage' });
