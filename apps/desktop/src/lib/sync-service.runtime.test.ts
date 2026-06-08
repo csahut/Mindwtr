@@ -237,6 +237,117 @@ describe('desktop sync-service runtime', () => {
         });
     });
 
+    it('uses native Tauri commands for self-hosted Cloud data sync on desktop', async () => {
+        const syncServiceModule = await syncServiceModulePromise;
+        const localCloudData: AppData = {
+            tasks: [],
+            projects: [],
+            sections: [],
+            areas: [],
+            settings: {},
+        };
+        const remoteCloudData: AppData = {
+            tasks: [{
+                id: 'remote-task',
+                title: 'Remote',
+                status: 'next',
+                tags: [],
+                contexts: [],
+                createdAt: '2026-06-08T00:00:00.000Z',
+                updatedAt: '2026-06-08T00:00:00.000Z',
+            }],
+            projects: [],
+            sections: [],
+            areas: [],
+            settings: {},
+        };
+        const mergedCloudData: AppData = {
+            ...structuredClone(remoteCloudData),
+            tasks: [{
+                ...remoteCloudData.tasks[0],
+                title: 'Merged remote',
+                updatedAt: '2026-06-08T00:01:00.000Z',
+            }],
+            settings: { lastSyncStatus: 'success' },
+        };
+        const httpFetchMock = vi.fn(async () => {
+            throw new Error('JS HTTP helper should not perform Cloud data sync');
+        });
+
+        storeStateRef.current = {
+            ...storeStateRef.current,
+            _allTasks: [],
+            _allProjects: [],
+            _allSections: [],
+            _allAreas: [],
+            settings: {},
+        };
+        getInMemoryAppDataSnapshotMock.mockImplementation(() => structuredClone(localCloudData));
+        invokeMock.mockImplementation(async (command: string, args?: Record<string, unknown>) => {
+            if (command === 'get_sync_backend') return 'cloud';
+            if (command === 'get_cloud_config') return {
+                url: 'https://sync.example.com',
+                token: 'cloud-token',
+                allowInsecureHttp: false,
+            };
+            if (command === 'create_data_snapshot') return undefined;
+            if (command === 'get_data') return structuredClone(localCloudData);
+            if (command === 'save_data') return undefined;
+            if (command === 'cloud_get_json') return structuredClone(remoteCloudData);
+            if (command === 'cloud_put_json') return true;
+            throw new Error(`Unexpected command: ${command} ${JSON.stringify(args)}`);
+        });
+        syncServiceModule.__syncServiceTestUtils.setDependenciesForTests({
+            getTauriFetch: async () => httpFetchMock as unknown as typeof fetch,
+        });
+        performSyncCycleMock.mockImplementation(async (io: {
+            readLocal: () => Promise<AppData>;
+            readRemote: () => Promise<AppData | null>;
+            writeLocal: (data: AppData) => Promise<void>;
+            writeRemote: (data: AppData) => Promise<void>;
+        }) => {
+            await io.readLocal();
+            await expect(io.readRemote()).resolves.toEqual(remoteCloudData);
+            await io.writeRemote(mergedCloudData);
+            await io.writeLocal(mergedCloudData);
+            return { status: 'success', stats: emptyStats, data: mergedCloudData };
+        });
+
+        const result = await syncServiceModule.SyncService.performSync();
+
+        expect(result).toEqual({ success: true, stats: emptyStats });
+        expect(invokeMock).toHaveBeenCalledWith('cloud_get_json', undefined);
+        expect(invokeMock).toHaveBeenCalledWith('cloud_put_json', {
+            data: expect.objectContaining({
+                tasks: expect.arrayContaining([
+                    expect.objectContaining({
+                        id: 'remote-task',
+                        title: 'Merged remote',
+                    }),
+                ]),
+            }),
+        });
+        expect(invokeMock).toHaveBeenCalledWith('save_data', {
+            data: expect.objectContaining({
+                tasks: expect.arrayContaining([
+                    expect.objectContaining({
+                        id: 'remote-task',
+                        title: 'Merged remote',
+                    }),
+                ]),
+                settings: expect.objectContaining(mergedCloudData.settings),
+            }),
+        });
+        expect(httpFetchMock).not.toHaveBeenCalledWith(
+            'https://sync.example.com/v1/data',
+            expect.objectContaining({ method: 'GET' })
+        );
+        expect(httpFetchMock).not.toHaveBeenCalledWith(
+            'https://sync.example.com/v1/data',
+            expect.objectContaining({ method: 'PUT' })
+        );
+    });
+
     it('preserves attachment pre-sync mutations when local edits land during file attachment sync', async () => {
         const syncServiceModule = await syncServiceModulePromise;
 

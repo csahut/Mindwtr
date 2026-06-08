@@ -595,6 +595,79 @@ fn normalize_webdav_url(raw: &str) -> String {
     }
 }
 
+fn normalize_cloud_url(raw: &str) -> String {
+    let trimmed = raw.trim().trim_end_matches('/');
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let lower = trimmed.to_lowercase();
+    if lower.ends_with("/v1/data") || lower.ends_with("/data") {
+        return trimmed.to_string();
+    }
+    if let Some(last_segment) = trimmed.rsplit('/').next() {
+        if last_segment.len() > 1
+            && last_segment.starts_with('v')
+            && last_segment[1..]
+                .chars()
+                .all(|value| value.is_ascii_digit())
+        {
+            return format!("{trimmed}/data");
+        }
+    }
+    format!("{trimmed}/v1/data")
+}
+
+fn is_likely_local_hostname(host: &str) -> bool {
+    if host.is_empty() {
+        return false;
+    }
+    if host.contains('.') {
+        return host.ends_with(".local")
+            || host.ends_with(".localdomain")
+            || host.ends_with(".home.arpa");
+    }
+    host.chars()
+        .all(|value| value.is_ascii_alphanumeric() || value == '-')
+}
+
+fn is_private_http_host(host: &str) -> bool {
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        return match ip {
+            std::net::IpAddr::V4(ipv4) => {
+                ipv4.is_loopback() || ipv4.is_private() || {
+                    let octets = ipv4.octets();
+                    octets[0] == 100 && (64..=127).contains(&octets[1])
+                }
+            }
+            std::net::IpAddr::V6(ipv6) => {
+                ipv6.is_loopback()
+                    || ipv6.is_unique_local()
+                    || ipv6.segments()[0] & 0xffc0 == 0xfe80
+            }
+        };
+    }
+    is_likely_local_hostname(&host.to_lowercase())
+}
+
+fn assert_cloud_url_allowed(url: &str, allow_insecure_http: bool) -> Result<(), String> {
+    let parsed = reqwest::Url::parse(url).map_err(|_| "Cloud URL is invalid".to_string())?;
+    match parsed.scheme() {
+        "https" => Ok(()),
+        "http" => {
+            let host = parsed.host_str().unwrap_or_default();
+            if allow_insecure_http || is_private_http_host(host) {
+                Ok(())
+            } else {
+                Err("Cloud sync requires HTTPS for public URLs (HTTP allowed for localhost, private IPs, and local hostnames).".to_string())
+            }
+        }
+        _ => Err("Cloud URL must use HTTP or HTTPS.".to_string()),
+    }
+}
+
 fn parent_webdav_collection_url(raw: &str) -> Option<String> {
     let mut parsed = reqwest::Url::parse(raw).ok()?;
     let trimmed_path = parsed.path().trim_end_matches('/').to_string();
@@ -775,6 +848,109 @@ pub(crate) async fn webdav_put_json(app: tauri::AppHandle, data: Value) -> Resul
         .map_err(|e| e.to_string())?
 }
 
+fn read_cloud_token(app: &tauri::AppHandle, config: &AppConfigToml) -> String {
+    match get_keyring_secret(app, KEYRING_CLOUD_TOKEN) {
+        Ok(value) => value,
+        Err(error) => {
+            log::warn!("Failed to read cloud token from keyring (sync): {error}");
+            None
+        }
+    }
+    .or(config.cloud_token.clone())
+    .unwrap_or_default()
+}
+
+fn cloud_request_builder(
+    client: &reqwest::blocking::Client,
+    method: reqwest::Method,
+    url: &str,
+    token: &str,
+) -> reqwest::blocking::RequestBuilder {
+    let request = client.request(method, url);
+    if token.trim().is_empty() {
+        request
+    } else {
+        request.bearer_auth(token.trim())
+    }
+}
+
+fn cloud_get_json_blocking(app: &tauri::AppHandle) -> Result<Value, String> {
+    let config = read_config(app);
+    let url = normalize_cloud_url(&config.cloud_url.clone().unwrap_or_default());
+    if url.trim().is_empty() {
+        return Err("Self-hosted URL not configured".to_string());
+    }
+    let allow_insecure_http = config.cloud_allow_insecure_http.as_deref() == Some("true");
+    assert_cloud_url_allowed(&url, allow_insecure_http)?;
+
+    let token = read_cloud_token(app, &config);
+    let client = reqwest::blocking::Client::new();
+    let response = cloud_request_builder(&client, reqwest::Method::GET, &url, &token)
+        .send()
+        .map_err(|e| format!("Cloud request failed: {e}"))?;
+
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(Value::Null);
+    }
+    if !response.status().is_success() {
+        return Err(format!(
+            "Cloud GET failed ({}): {}",
+            response.status().as_u16(),
+            response.status().canonical_reason().unwrap_or_default()
+        ));
+    }
+
+    let body = response
+        .text()
+        .map_err(|e| format!("Cloud GET failed: error reading response body: {e}"))?;
+    let normalized_body = body.trim_start_matches('\u{feff}').trim();
+    serde_json::from_str::<Value>(normalized_body)
+        .map_err(|e| format!("Cloud GET failed: invalid JSON ({e})"))
+}
+
+#[tauri::command]
+pub(crate) async fn cloud_get_json(app: tauri::AppHandle) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || cloud_get_json_blocking(&app))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn cloud_put_json_blocking(app: &tauri::AppHandle, data: &Value) -> Result<bool, String> {
+    let config = read_config(app);
+    let url = normalize_cloud_url(&config.cloud_url.clone().unwrap_or_default());
+    if url.trim().is_empty() {
+        return Err("Self-hosted URL not configured".to_string());
+    }
+    let allow_insecure_http = config.cloud_allow_insecure_http.as_deref() == Some("true");
+    assert_cloud_url_allowed(&url, allow_insecure_http)?;
+
+    let token = read_cloud_token(app, &config);
+    let payload = serde_json::to_string_pretty(data)
+        .map_err(|e| format!("Failed to encode Cloud payload: {e}"))?;
+    let client = reqwest::blocking::Client::new();
+    let response = cloud_request_builder(&client, reqwest::Method::PUT, &url, &token)
+        .header("Content-Type", "application/json")
+        .body(payload)
+        .send()
+        .map_err(|e| format!("Cloud request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Cloud PUT failed ({}): {}",
+            response.status().as_u16(),
+            response.status().canonical_reason().unwrap_or_default()
+        ));
+    }
+    Ok(true)
+}
+
+#[tauri::command]
+pub(crate) async fn cloud_put_json(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || cloud_put_json_blocking(&app, &data))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -793,6 +969,40 @@ mod tests {
             strip_windows_verbatim_prefix(r"C:\Users\mmbtu\Dropbox\Apps\Mindwtr"),
             r"C:\Users\mmbtu\Dropbox\Apps\Mindwtr"
         );
+    }
+
+    #[test]
+    fn normalize_cloud_url_matches_shared_client_shape() {
+        assert_eq!(
+            normalize_cloud_url("https://example.com"),
+            "https://example.com/v1/data"
+        );
+        assert_eq!(
+            normalize_cloud_url("https://example.com/mindwtr/"),
+            "https://example.com/mindwtr/v1/data"
+        );
+        assert_eq!(
+            normalize_cloud_url("https://example.com/v2"),
+            "https://example.com/v2/data"
+        );
+        assert_eq!(
+            normalize_cloud_url("https://example.com/v1/data"),
+            "https://example.com/v1/data"
+        );
+        assert_eq!(
+            normalize_cloud_url("https://example.com/data/"),
+            "https://example.com/data"
+        );
+    }
+
+    #[test]
+    fn cloud_url_security_allows_https_and_local_http_only_by_default() {
+        assert!(assert_cloud_url_allowed("https://example.com/v1/data", false).is_ok());
+        assert!(assert_cloud_url_allowed("http://localhost:8787/v1/data", false).is_ok());
+        assert!(assert_cloud_url_allowed("http://192.168.1.50:8787/v1/data", false).is_ok());
+        assert!(assert_cloud_url_allowed("http://nas.local:8787/v1/data", false).is_ok());
+        assert!(assert_cloud_url_allowed("http://example.com/v1/data", false).is_err());
+        assert!(assert_cloud_url_allowed("http://example.com/v1/data", true).is_ok());
     }
 
     #[test]

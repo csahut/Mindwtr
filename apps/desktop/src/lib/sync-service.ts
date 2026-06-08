@@ -1232,6 +1232,11 @@ export class SyncService {
                 }
                 const normalizedUrl = normalizeCloudUrl(context.cloudConfig.url);
                 context.syncUrl = normalizedUrl;
+                if (isTauriRuntimeEnv()) {
+                    const data = await tauriInvoke<AppData | null>('cloud_get_json');
+                    context.remoteDataForCompare = data ?? null;
+                    return data;
+                }
                 const fetcher = helpers.createFetchWithAbort((await getTauriFetch()) ?? fetch);
                 const data = await cloudGetJson<AppData>(normalizedUrl, {
                     allowInsecureHttp: context.cloudConfig.allowInsecureHttp,
@@ -1414,6 +1419,12 @@ export class SyncService {
                 const config = context.cloudConfig ?? await SyncService.getCloudConfig();
                 const { url, token } = config;
                 const normalizedUrl = normalizeCloudUrl(url);
+                context.syncUrl = normalizedUrl;
+                if (isTauriRuntimeEnv()) {
+                    await tauriInvoke('cloud_put_json', { data: sanitized });
+                    context.remoteDataForCompare = sanitized;
+                    return;
+                }
                 const fetcher = helpers.createFetchWithAbort((await getTauriFetch()) ?? fetch);
                 await cloudPutJson(normalizedUrl, sanitized, {
                     allowInsecureHttp: config.allowInsecureHttp,

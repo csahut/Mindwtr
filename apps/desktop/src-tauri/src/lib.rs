@@ -96,9 +96,9 @@ use storage::{
     search_fts, upsert_calendar_sync_entry,
 };
 use sync::{
-    connect_dropbox, disconnect_dropbox, get_dropbox_access_token, get_dropbox_redirect_uri,
-    get_sync_path, is_dropbox_connected, read_sync_file, set_sync_path, webdav_get_json,
-    webdav_put_json, write_sync_file,
+    cloud_get_json, cloud_put_json, connect_dropbox, disconnect_dropbox, get_dropbox_access_token,
+    get_dropbox_redirect_uri, get_sync_path, is_dropbox_connected, read_sync_file, set_sync_path,
+    webdav_get_json, webdav_put_json, write_sync_file,
 };
 use ui::{
     acknowledge_close_request, apply_global_quick_add_shortcut, consume_quick_add_pending,
@@ -1258,6 +1258,8 @@ pub fn run() {
             webdav_put_json,
             get_cloud_config,
             set_cloud_config,
+            cloud_get_json,
+            cloud_put_json,
             get_dropbox_redirect_uri,
             is_dropbox_connected,
             connect_dropbox,
