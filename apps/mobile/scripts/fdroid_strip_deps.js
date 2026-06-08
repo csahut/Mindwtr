@@ -8,7 +8,7 @@ const enableExpoBuildFromSource =
   process.env.FDROID_EXPO_BUILD_FROM_SOURCE === '1' ||
   process.env.FDROID_EXPO_BUILD_FROM_SOURCE === 'true';
 
-const removeDeps = ['expo-dev-client'];
+const removeDeps = ['expo-dev-client', 'expo-store-review'];
 let changed = false;
 const changes = [];
 

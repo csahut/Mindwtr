@@ -11,11 +11,13 @@ const mobileLockPath = path.join(repoRoot, 'apps/mobile/package-lock.json');
 
 const pkg = JSON.parse(fs.readFileSync(mobilePackagePath, 'utf8'));
 
-if (pkg.dependencies && pkg.dependencies['expo-dev-client']) {
-  delete pkg.dependencies['expo-dev-client'];
-}
-if (pkg.devDependencies && pkg.devDependencies['expo-dev-client']) {
-  delete pkg.devDependencies['expo-dev-client'];
+for (const dep of ['expo-dev-client', 'expo-store-review']) {
+  if (pkg.dependencies && pkg.dependencies[dep]) {
+    delete pkg.dependencies[dep];
+  }
+  if (pkg.devDependencies && pkg.devDependencies[dep]) {
+    delete pkg.devDependencies[dep];
+  }
 }
 if (pkg.dependencies && pkg.dependencies['@mindwtr/core'] === 'workspace:*') {
   pkg.dependencies['@mindwtr/core'] = 'file:../../packages/core';
