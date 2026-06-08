@@ -331,6 +331,56 @@ const getAttachmentsArray = (attachments: Attachment[] | undefined): Attachment[
   Array.isArray(attachments) ? attachments : []
 );
 
+const getSyncDiagnosticAttachmentCount = (data: AppData): number => {
+  const taskAttachments = data.tasks.reduce(
+    (count, task) => count + getAttachmentsArray(task.attachments).length,
+    0
+  );
+  const projectAttachments = data.projects.reduce(
+    (count, project) => count + getAttachmentsArray(project.attachments).length,
+    0
+  );
+  return taskAttachments + projectAttachments;
+};
+
+const buildSyncDataDiagnostics = (data: AppData | null | undefined): Record<string, string> => {
+  if (!data) return { hasData: 'false' };
+  const contexts = new Set<string>();
+  const tags = new Set<string>();
+  for (const task of data.tasks) {
+    for (const context of task.contexts) contexts.add(context);
+    for (const tag of task.tags) tags.add(tag);
+  }
+  return {
+    hasData: 'true',
+    tasks: String(data.tasks.length),
+    projects: String(data.projects.length),
+    areas: String(data.areas.length),
+    contexts: String(contexts.size),
+    tags: String(tags.size),
+    checklistItems: String(data.tasks.reduce(
+      (count, task) => count + (Array.isArray(task.checklist) ? task.checklist.length : 0),
+      0
+    )),
+    attachments: String(getSyncDiagnosticAttachmentCount(data)),
+  };
+};
+
+const getSyncDiagnosticElapsedMs = (startedAt: number): string => (
+  String(Math.max(0, Date.now() - startedAt))
+);
+
+const logSyncDiagnostic = (
+  message: string,
+  startedAt: number,
+  extra?: Record<string, string>
+) => {
+  logSyncInfo(message, {
+    elapsedMs: getSyncDiagnosticElapsedMs(startedAt),
+    ...(extra ?? {}),
+  });
+};
+
 const buildOfflineSkipResult = (): MobileSyncResult => ({
   success: true,
   skipped: 'offline',
@@ -437,6 +487,18 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
     logSyncInfo('Sync start', { backend });
 
     let step = 'init';
+    const syncDiagnosticStartedAt = Date.now();
+    let syncDiagnosticPhaseStartedAt = syncDiagnosticStartedAt;
+    const logSyncPhaseDiagnostic = (phase: string, extra?: Record<string, string>) => {
+      logSyncDiagnostic('Sync diagnostic phase', syncDiagnosticPhaseStartedAt, {
+        backend,
+        phase,
+        step,
+        ...(extra ?? {}),
+      });
+      syncDiagnosticPhaseStartedAt = Date.now();
+    };
+    logSyncInfo('Sync diagnostic start', { backend });
     let visibleActivityStarted = false;
     let syncUrl: string | undefined;
     let wroteLocal = false;
@@ -517,6 +579,7 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
       let webdavRemoteCorrupted = false;
       step = 'flush';
       await flushPendingSave();
+      logSyncPhaseDiagnostic('flush');
       localSnapshotChangeAt = useTaskStore.getState().lastDataChangeAt;
       if (backend === 'file') {
         const configuredSyncPath = (await getCachedConfigValue(SYNC_PATH_KEY))?.trim() ?? null;
@@ -610,6 +673,7 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
       // Pre-sync local attachments so cloudKeys exist before writing remote data.
       step = 'attachments_prepare';
       logSyncInfo('Sync step', { step });
+      const attachmentPrepareStartedAt = Date.now();
       try {
         const persistedData = await mobileStorage.getData();
         const localData = mergeAppData(persistedData, getInMemoryAppDataSnapshot());
@@ -653,6 +717,11 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
         logSyncInfo('Attachment pre-sync complete', {
           backend,
           mutated: preSyncResult.mutated ? 'true' : 'false',
+        });
+        logSyncDiagnostic('Sync diagnostic attachment prepare complete', attachmentPrepareStartedAt, {
+          backend,
+          mutated: preSyncResult.mutated ? 'true' : 'false',
+          ...buildSyncDataDiagnostics(preSyncResult.data ?? localData),
         });
       } catch (error) {
         if (error instanceof LocalSyncAbort) {
@@ -958,6 +1027,7 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
 
       const trySkipUnchangedFastSync = async (): Promise<MobileSyncResult | null> => {
         if (!fastSyncScope) return null;
+        const fastCheckStartedAt = Date.now();
         step = 'fast-check';
         logSyncInfo('Sync step', { step });
         if (preSyncedLocalData) return null;
@@ -983,16 +1053,21 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
           localFingerprint,
           remoteFingerprint,
           checkedAt: new Date().toISOString(),
-        });
-        useTaskStore.getState().setError(null);
-        logSyncInfo('Sync fast check found no changes', { backend });
-        return { success: true, skipped: 'unchanged' };
-      };
+      });
+      useTaskStore.getState().setError(null);
+      logSyncInfo('Sync fast check found no changes', {
+        backend,
+        elapsedMs: getSyncDiagnosticElapsedMs(fastCheckStartedAt),
+        ...buildSyncDataDiagnostics(localDataForFastCheck),
+      });
+      return { success: true, skipped: 'unchanged' };
+    };
 
-      const trySkipUnchangedReadSync = async (): Promise<MobileSyncResult | null> => {
-        step = 'read-check';
-        logSyncInfo('Sync step', { step });
-        if (preSyncedLocalData) return null;
+    const trySkipUnchangedReadSync = async (): Promise<MobileSyncResult | null> => {
+      const readCheckStartedAt = Date.now();
+      step = 'read-check';
+      logSyncInfo('Sync step', { step });
+      if (preSyncedLocalData) return null;
         const localDataForReadCheck = await readLocalDataForSyncCycle();
         ensureLocalSnapshotFresh();
         if (hasPendingSyncSideEffects(localDataForReadCheck)) return null;
@@ -1008,12 +1083,16 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
         if (!areSyncPayloadsEqual(remoteSanitized, localSanitized)) return null;
 
         await recordFastSyncState(localDataForReadCheck, { allowRemoteFingerprintRead: false });
-        readCheckLocalData = null;
-        readCheckRemoteData = undefined;
-        useTaskStore.getState().setError(null);
-        logSyncInfo('Sync read check found no changes', { backend });
-        return { success: true, skipped: 'unchanged' };
-      };
+      readCheckLocalData = null;
+      readCheckRemoteData = undefined;
+      useTaskStore.getState().setError(null);
+      logSyncInfo('Sync read check found no changes', {
+        backend,
+        elapsedMs: getSyncDiagnosticElapsedMs(readCheckStartedAt),
+        ...buildSyncDataDiagnostics(localDataForReadCheck),
+      });
+      return { success: true, skipped: 'unchanged' };
+    };
 
       const unchangedFastResult = await trySkipUnchangedFastSync();
       const unchangedResult = unchangedFastResult ?? await trySkipUnchangedReadSync();
@@ -1022,6 +1101,7 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
       }
 
       startVisibleSyncActivity();
+      const syncCycleStartedAt = Date.now();
       const syncResult = await performSyncCycle({
         readLocal: readLocalDataForSyncCycle,
         readRemote: readRemoteDataByBackend,
@@ -1058,6 +1138,11 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
           backend,
           type: 'merge',
         },
+      });
+      logSyncDiagnostic('Sync diagnostic merge cycle complete', syncCycleStartedAt, {
+        backend,
+        status: syncResult.status,
+        ...buildSyncDataDiagnostics(syncResult.data),
       });
 
       const stats = syncResult.stats;
@@ -1112,8 +1197,14 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
       const applyAttachmentSyncMutation = async (
         syncAttachments: (candidateData: AppData) => Promise<boolean>
       ): Promise<void> => {
+        const attachmentSyncStartedAt = Date.now();
         const candidateData = cloneAppData(mergedData);
         const mutated = await syncAttachments(candidateData);
+        logSyncDiagnostic('Sync diagnostic attachment sync complete', attachmentSyncStartedAt, {
+          backend,
+          mutated: mutated ? 'true' : 'false',
+          ...buildSyncDataDiagnostics(candidateData),
+        });
         if (!mutated) return;
         ensureLocalSnapshotFresh();
         mergedData = candidateData;
@@ -1331,10 +1422,24 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
       } catch (error) {
         logSyncWarning('[Mobile] Failed to persist sync status', error);
       }
+      logSyncDiagnostic('Sync diagnostic complete', syncDiagnosticStartedAt, {
+        backend,
+        step,
+        status: syncResult.status,
+        success: 'true',
+        wroteLocal: String(wroteLocal),
+        ...buildSyncDataDiagnostics(mergedData),
+      });
       return { success: true, stats: syncResult.stats };
     } catch (error) {
       if (requestAbortController.signal.aborted && activeMobileSyncAbortReason === 'lifecycle') {
         logSyncInfo('Sync aborted by app lifecycle transition', { backend, step });
+        logSyncDiagnostic('Sync diagnostic lifecycle abort', syncDiagnosticStartedAt, {
+          backend,
+          step,
+          success: 'true',
+          aborted: 'lifecycle',
+        });
         requestFollowUp(syncPathOverride);
         return { success: true };
       }
@@ -1348,6 +1453,12 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
         logSyncInfo('Sync requeued after local data changed', {
           backend,
           step,
+          wroteLocal: String(wroteLocal),
+        });
+        logSyncDiagnostic('Sync diagnostic requeued', syncDiagnosticStartedAt, {
+          backend,
+          step,
+          success: 'true',
           wroteLocal: String(wroteLocal),
         });
         return buildRequeuedSkipResult();
@@ -1376,12 +1487,25 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
           reason: offlineDetectionCause ?? 'unknown',
           ...(lastOfflineNetworkStatus ? formatNetworkStatusForLog(lastOfflineNetworkStatus) : {}),
         });
+        logSyncDiagnostic('Sync diagnostic offline skip', syncDiagnosticStartedAt, {
+          backend,
+          step,
+          success: 'true',
+          skipped: 'offline',
+          reason: offlineDetectionCause ?? 'unknown',
+        });
         return buildOfflineSkipResult();
       }
       const now = new Date().toISOString();
       const logPath = await logSyncError(error, { backend, step, url: syncUrl });
       const logHint = logPath ? ` (log: ${logPath})` : '';
       const safeMessage = formatSyncErrorMessage(error, backend);
+      logSyncDiagnostic('Sync diagnostic error', syncDiagnosticStartedAt, {
+        backend,
+        step,
+        success: 'false',
+        error: safeMessage,
+      });
       const nextHistory = appendSyncHistory(useTaskStore.getState().settings, {
         at: now,
         status: 'error',
