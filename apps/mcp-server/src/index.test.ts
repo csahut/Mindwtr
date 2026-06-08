@@ -297,20 +297,39 @@ describe('mcp server index', () => {
     expect(addHandler).toBeTruthy();
     expect(updateHandler).toBeTruthy();
 
-    await addHandler?.({ title: 'Task', projectId: 'p1', sectionId: 's1', contexts: [' @home '], tags: [' #urgent '] });
+    await addHandler?.({
+      title: 'Task',
+      projectId: 'p1',
+      sectionId: 's1',
+      contexts: [' @home '],
+      tags: [' #urgent '],
+      energyLevel: 'high',
+      assignedTo: 'Dana',
+    });
     expect(receivedInput).toMatchObject({
       projectId: 'p1',
       sectionId: 's1',
       contexts: ['@home'],
       tags: ['#urgent'],
+      energyLevel: 'high',
+      assignedTo: 'Dana',
     });
 
-    await updateHandler?.({ id: 't1', sectionId: null, contexts: [' @desk '], tags: [' #ops '] });
+    await updateHandler?.({
+      id: 't1',
+      sectionId: null,
+      contexts: [' @desk '],
+      tags: [' #ops '],
+      energyLevel: 'low',
+      assignedTo: null,
+    });
     expect(receivedInput).toMatchObject({
       id: 't1',
       sectionId: null,
       contexts: ['@desk'],
       tags: ['#ops'],
+      energyLevel: 'low',
+      assignedTo: null,
     });
   });
 

@@ -116,16 +116,76 @@ describe('mcp service', () => {
     await service.addTask({
       quickAdd: 'Buy milk +Home',
       status: 'next',
+      sectionId: 's1',
       tags: [' #weekly '],
       contexts: [' @errands '],
+      energyLevel: 'high',
+      assignedTo: 'Dana',
     });
 
     expect(quickAddCalls).toBe(1);
     expect(receivedAddTaskInput.title).toBe('Buy milk');
     expect(receivedAddTaskInput.props.status).toBe('next');
     expect(receivedAddTaskInput.props.projectId).toBe('p1');
+    expect(receivedAddTaskInput.props.sectionId).toBe('s1');
     expect(receivedAddTaskInput.props.contexts).toEqual(['@errands']);
     expect(receivedAddTaskInput.props.tags).toEqual(['#weekly']);
+    expect(receivedAddTaskInput.props.energyLevel).toBe('high');
+    expect(receivedAddTaskInput.props.assignedTo).toBe('Dana');
+  });
+
+  test('forwards plain-title addTask metadata fields to core addTask', async () => {
+    let receivedAddTaskInput: any = null;
+    const fakeDb = {} as any;
+    const deps = {
+      openMindwtrDb: async () => ({ db: fakeDb }),
+      closeDb: () => undefined,
+      listTasks: () => [],
+      listProjects: () => [],
+      listAreas: () => [],
+      getTask: () => ({ id: 't1', title: 'Task', status: 'inbox', createdAt: '2026-01-01', updatedAt: '2026-01-01' }),
+      getProject: () => ({ id: 'p1', title: 'Project' }),
+      getSection: () => ({ id: 's1', projectId: 'p1', title: 'Section', createdAt: '2026-01-01', updatedAt: '2026-01-01' }),
+      parseQuickAdd: () => ({ title: '', props: {} }),
+      runCoreService: async (_options: any, fn: any) =>
+        fn({
+          addTask: async (input: any) => {
+            receivedAddTaskInput = input;
+            return {
+              id: 'created',
+              title: input.title,
+              status: input.props?.status ?? 'inbox',
+              createdAt: '2026-01-01',
+              updatedAt: '2026-01-01',
+            };
+          },
+          updateTask: async () => ({ id: 't1' }),
+          completeTask: async () => ({ id: 't1' }),
+          deleteTask: async () => ({ id: 't1' }),
+          restoreTask: async () => ({ id: 't1' }),
+          addProject: async () => ({ id: 'p1', title: 'Project' }),
+          updateProject: async () => ({ id: 'p1', title: 'Project' }),
+          deleteProject: async () => ({ id: 'p1', title: 'Project' }),
+          addArea: async () => ({ id: 'a1', name: 'Area' }),
+          updateArea: async () => ({ id: 'a1', name: 'Area' }),
+          deleteArea: async () => ({ id: 'a1', name: 'Area' }),
+        }),
+    };
+    const service = createService({ readonly: false }, deps as any);
+
+    await service.addTask({
+      title: 'Plain task',
+      projectId: 'p1',
+      sectionId: 's1',
+      energyLevel: 'medium',
+      assignedTo: 'Taylor',
+    });
+
+    expect(receivedAddTaskInput.title).toBe('Plain task');
+    expect(receivedAddTaskInput.props.projectId).toBe('p1');
+    expect(receivedAddTaskInput.props.sectionId).toBe('s1');
+    expect(receivedAddTaskInput.props.energyLevel).toBe('medium');
+    expect(receivedAddTaskInput.props.assignedTo).toBe('Taylor');
   });
 
   test('maps updateTask inputs and closes shared db handle', async () => {
@@ -178,6 +238,8 @@ describe('mcp service', () => {
       projectId: null,
       dueDate: null,
       startTime: null,
+      energyLevel: 'low',
+      assignedTo: null,
     } as any);
     await service.close();
 
@@ -187,6 +249,8 @@ describe('mcp service', () => {
     expect(receivedUpdateInput.updates.contexts).toEqual(['@desk']);
     expect(receivedUpdateInput.updates.tags).toEqual(['#weekly']);
     expect(receivedUpdateInput.updates.projectId).toBeUndefined();
+    expect(receivedUpdateInput.updates.energyLevel).toBe('low');
+    expect(receivedUpdateInput.updates.assignedTo).toBeUndefined();
     expect(closedDbCount).toBe(1);
   });
 

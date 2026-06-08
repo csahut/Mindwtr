@@ -156,6 +156,8 @@ const buildTaskUpdates = (input: UpdateTaskInput): Partial<Task> => {
   if (input.tags !== undefined) updates.tags = normalizeNullableTaskTokens('tags', input.tags) ?? [];
   if (input.description !== undefined) updates.description = input.description ?? undefined;
   if (input.priority !== undefined) updates.priority = input.priority ?? undefined;
+  if (input.energyLevel !== undefined) updates.energyLevel = input.energyLevel ?? undefined;
+  if (input.assignedTo !== undefined) updates.assignedTo = input.assignedTo ?? undefined;
   if (input.timeEstimate !== undefined) updates.timeEstimate = input.timeEstimate ?? undefined;
   if (input.reviewAt !== undefined) updates.reviewAt = input.reviewAt ?? undefined;
   if (input.isFocusedToday !== undefined) updates.isFocusedToday = input.isFocusedToday;
@@ -294,15 +296,17 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
           const status = parseInputStatus(normalizedInput.status);
           const props = filterUndefined({
             ...quick.props,
-          status: status ?? quick.props.status,
-          projectId: normalizedInput.projectId ?? quick.props.projectId,
-          sectionId: normalizedInput.sectionId ?? quick.props.sectionId,
-          dueDate: normalizedInput.dueDate ?? quick.props.dueDate,
+            status: status ?? quick.props.status,
+            projectId: normalizedInput.projectId ?? quick.props.projectId,
+            sectionId: normalizedInput.sectionId ?? quick.props.sectionId,
+            dueDate: normalizedInput.dueDate ?? quick.props.dueDate,
             startTime: normalizedInput.startTime ?? quick.props.startTime,
             contexts: normalizedInput.contexts ?? quick.props.contexts,
             tags: normalizedInput.tags ?? quick.props.tags,
             description: normalizedInput.description ?? quick.props.description,
             priority: normalizedInput.priority ?? quick.props.priority,
+            energyLevel: normalizedInput.energyLevel ?? quick.props.energyLevel,
+            assignedTo: normalizedInput.assignedTo ?? quick.props.assignedTo,
             timeEstimate: normalizedInput.timeEstimate ?? quick.props.timeEstimate,
           });
           return core.addTask({ title, props });
@@ -313,12 +317,15 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
           props: filterUndefined({
             status,
             projectId: normalizedInput.projectId,
+            sectionId: normalizedInput.sectionId,
             dueDate: normalizedInput.dueDate,
             startTime: normalizedInput.startTime,
             contexts: normalizedInput.contexts,
             tags: normalizedInput.tags,
             description: normalizedInput.description,
             priority: normalizedInput.priority,
+            energyLevel: normalizedInput.energyLevel,
+            assignedTo: normalizedInput.assignedTo,
             timeEstimate: normalizedInput.timeEstimate,
           }),
         });
