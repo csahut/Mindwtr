@@ -145,6 +145,7 @@ export const createAreaActions = ({
                         return {
                             ...project,
                             areaId: existing.id,
+                            areaTitle: mergedArea.name,
                             color: mergedArea.color ?? project.color,
                             updatedAt: now,
                             rev: nextRevision(project.rev),

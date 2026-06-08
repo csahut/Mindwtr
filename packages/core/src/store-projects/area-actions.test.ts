@@ -232,7 +232,7 @@ describe('area actions', () => {
         expect(home).not.toBeNull();
         if (!work || !home) return;
 
-        const project = await addProject('Launch', '#3b82f6', { areaId: work.id });
+        const project = await addProject('Launch', '#3b82f6', { areaId: work.id, areaTitle: 'Work' });
         expect(project).not.toBeNull();
         if (!project) return;
         const areaTask = await addTask('Area task', { areaId: work.id, status: 'next' });
@@ -258,6 +258,7 @@ describe('area actions', () => {
         expect(state._allAreas.find((item) => item.id === home.id)?.deletedAt).toBeUndefined();
         expect(state.projects.find((item) => item.id === project.id)).toMatchObject({
             areaId: home.id,
+            areaTitle: 'Home',
             color: '#ef4444',
         });
         expect(state.tasks.find((item) => item.id === areaTask.id)).toMatchObject({
@@ -268,6 +269,7 @@ describe('area actions', () => {
         const saved = latestSavedData();
         expect(saved.areas.find((item) => item.id === work.id)?.deletedAt).toBe(BASE_NOW);
         expect(saved.projects.find((item) => item.id === project.id)?.areaId).toBe(home.id);
+        expect(saved.projects.find((item) => item.id === project.id)?.areaTitle).toBe('Home');
         expect(saved.tasks.find((item) => item.id === areaTask.id)?.areaId).toBe(home.id);
     });
 
