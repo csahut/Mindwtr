@@ -12,6 +12,7 @@ const {
   applyAlarmDismissReceiverPatchToSource,
   applyAlarmReceiverPatchToSource,
   applyAlarmCompleteConstantsPatchToSource,
+  applyAlarmTaskOpenIntentPatchToSource,
   applyAlarmCompleteUtilPatchToSource,
   applyAlarmCompleteReceiverPatchToSource,
   applyAlarmIosCompleteActionPatchToSource,
@@ -181,6 +182,19 @@ describe('patch-alarm-notification-gradle', () => {
 }`);
     expect(constants).toContain('NOTIFICATION_ACTION_COMPLETE');
 
+    const openIntent = applyAlarmTaskOpenIntentPatchToSource(`import android.media.MediaPlayer;
+class AlarmUtil {
+    void send(Alarm alarm, Bundle bundle, Intent intent, Context mContext, int notificationID) {
+            PendingIntent pendingIntent = PendingIntent.getActivity(mContext, notificationID, intent, getUpdateCurrentImmutableFlags());
+    }
+}`);
+    expect(openIntent).toContain('import android.net.Uri;');
+    expect(openIntent).toContain('String taskId = bundle.getString("taskId")');
+    expect(openIntent).toContain('intent.setAction(Intent.ACTION_VIEW)');
+    expect(openIntent).toContain('Uri.parse("mindwtr:///focus")');
+    expect(openIntent).toContain('.appendQueryParameter("taskId", taskId)');
+    expect(openIntent).toContain('.appendQueryParameter("taskTab", "view")');
+
     const util = applyAlarmCompleteUtilPatchToSource(`import static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_DISMISS;
 import static com.emekalites.react.alarm.notification.Constants.NOTIFICATION_ACTION_SNOOZE;
 class AlarmUtil {
@@ -217,6 +231,7 @@ class AlarmReceiver {
 }`);
     expect(receiver).toContain('case Constants.NOTIFICATION_ACTION_COMPLETE');
     expect(receiver).toContain('payload.putString("actionIdentifier", "complete")');
+    expect(receiver).toContain('NotificationOpenPayloadStore.cache(pendingPayload)');
     expect(receiver).toContain('emit("OnNotificationOpened"');
   });
 

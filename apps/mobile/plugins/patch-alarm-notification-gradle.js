@@ -261,6 +261,40 @@ const applyAlarmCompleteConstantsPatchToSource = (original) => {
 
 const applyAlarmCompleteConstantsPatch = (filePath) => patchFile(filePath, applyAlarmCompleteConstantsPatchToSource);
 
+const applyAlarmTaskOpenIntentPatchToSource = (original) => {
+  let next = original;
+
+  if (!next.includes('import android.net.Uri;')) {
+    next = next.replace('import android.media.MediaPlayer;\n', 'import android.media.MediaPlayer;\nimport android.net.Uri;\n');
+  }
+
+  if (next.includes('mindwtr:///focus')) return next;
+
+  return next.replace(
+    `            PendingIntent pendingIntent = PendingIntent.getActivity(mContext, notificationID, intent, getUpdateCurrentImmutableFlags());
+`,
+    `            String taskId = bundle.getString("taskId");
+            if (taskId != null && !taskId.equals("")) {
+                String openToken = bundle.getString("alarmKey");
+                if (openToken == null || openToken.equals("")) {
+                    openToken = String.valueOf(alarm.getId());
+                }
+                intent.setAction(Intent.ACTION_VIEW);
+                intent.setData(Uri.parse("mindwtr:///focus")
+                        .buildUpon()
+                        .appendQueryParameter("taskId", taskId)
+                        .appendQueryParameter("openToken", openToken)
+                        .appendQueryParameter("taskTab", "view")
+                        .build());
+            }
+
+            PendingIntent pendingIntent = PendingIntent.getActivity(mContext, notificationID, intent, getUpdateCurrentImmutableFlags());
+`
+  );
+};
+
+const applyAlarmTaskOpenIntentPatch = (filePath) => patchFile(filePath, applyAlarmTaskOpenIntentPatchToSource);
+
 const applyAlarmCompleteUtilPatchToSource = (original) => {
   let next = original;
 
@@ -328,8 +362,38 @@ const applyAlarmCompleteReceiverPatchToSource = (original) => {
   if (!next.includes('import android.os.Bundle;')) {
     next = next.replace('import android.content.Intent;\n', 'import android.content.Intent;\nimport android.os.Bundle;\n');
   }
+  if (!next.includes('import java.util.LinkedHashMap;')) {
+    next = next.replace('import com.facebook.react.modules.core.DeviceEventManagerModule;\n', 'import com.facebook.react.modules.core.DeviceEventManagerModule;\n\nimport java.util.LinkedHashMap;\n');
+  }
+  if (!next.includes('import tech.dongdongbh.mindwtr.notificationopenintents.NotificationOpenPayloadStore;')) {
+    next = next.replace('import java.util.LinkedHashMap;\n', 'import java.util.LinkedHashMap;\n\nimport tech.dongdongbh.mindwtr.notificationopenintents.NotificationOpenPayloadStore;\n');
+  }
 
-  if (next.includes('case Constants.NOTIFICATION_ACTION_COMPLETE')) return next;
+  const pendingPayloadCacheBlock = `                            LinkedHashMap<String, String> pendingPayload = new LinkedHashMap<>();
+                            for (String key : payload.keySet()) {
+                                Object value = payload.get(key);
+                                if (value != null) {
+                                    pendingPayload.put(key, String.valueOf(value));
+                                }
+                            }
+                            NotificationOpenPayloadStore.cache(pendingPayload);
+`;
+
+  if (next.includes('case Constants.NOTIFICATION_ACTION_COMPLETE')) {
+    if (!next.includes('NotificationOpenPayloadStore.cache(pendingPayload)')) {
+      next = next.replace(
+        `                            payload.putString("actionIdentifier", "complete");
+
+                            alarmUtil.removeFiredNotification(alarm.getId());
+`,
+        `                            payload.putString("actionIdentifier", "complete");
+${pendingPayloadCacheBlock}
+                            alarmUtil.removeFiredNotification(alarm.getId());
+`
+      );
+    }
+    return next;
+  }
 
   return next.replace(
     `                    case Constants.NOTIFICATION_ACTION_DISMISS:
@@ -349,6 +413,7 @@ const applyAlarmCompleteReceiverPatchToSource = (original) => {
                                 payload.putString("alarmKey", "task:" + payload.getString("taskId"));
                             }
                             payload.putString("actionIdentifier", "complete");
+${pendingPayloadCacheBlock}
 
                             alarmUtil.removeFiredNotification(alarm.getId());
                             alarmUtil.cancelAlarm(alarm, false);
@@ -627,7 +692,7 @@ function withAlarmNotificationGradlePatch(config) {
         'android:enabled': 'true',
         'android:exported': 'true',
       },
-      ['ACTION_DISMISS', 'ACTION_SNOOZE']
+      ['ACTION_DISMISS', 'ACTION_SNOOZE', 'ACTION_COMPLETE']
     );
 
     ensureReceiver(
@@ -682,6 +747,9 @@ function withAlarmNotificationGradlePatch(config) {
       for (const candidate of alarmUtilCandidates) {
         if (applyAlarmPendingIntentPatch(candidate)) {
           logPatchedCandidate('alarm-pending-intent-patch', candidate);
+        }
+        if (applyAlarmTaskOpenIntentPatch(candidate)) {
+          logPatchedCandidate('alarm-task-open-intent-patch', candidate);
         }
         if (applyAlarmDuplicateToastPatch(candidate)) {
           logPatchedCandidate('alarm-duplicate-toast-patch', candidate);
@@ -755,6 +823,7 @@ module.exports.__testables = {
   applyAlarmDismissReceiverPatchToSource,
   applyAlarmReceiverPatchToSource,
   applyAlarmCompleteConstantsPatchToSource,
+  applyAlarmTaskOpenIntentPatchToSource,
   applyAlarmCompleteUtilPatchToSource,
   applyAlarmCompleteReceiverPatchToSource,
   applyAlarmIosCompleteActionPatchToSource,
