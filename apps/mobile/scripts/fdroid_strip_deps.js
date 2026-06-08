@@ -8,7 +8,7 @@ const enableExpoBuildFromSource =
   process.env.FDROID_EXPO_BUILD_FROM_SOURCE === '1' ||
   process.env.FDROID_EXPO_BUILD_FROM_SOURCE === 'true';
 
-const removeDeps = ['expo-dev-client', 'expo-store-review'];
+const removeDeps = ['expo-dev-client'];
 let changed = false;
 const changes = [];
 
@@ -40,10 +40,12 @@ if (!pkg.expo.autolinking || typeof pkg.expo.autolinking !== 'object' || Array.i
 const existingExclude = Array.isArray(pkg.expo.autolinking.exclude)
   ? pkg.expo.autolinking.exclude.filter((value) => typeof value === 'string')
   : [];
-if (!existingExclude.includes('play-store-updates')) {
-  pkg.expo.autolinking.exclude = [...existingExclude, 'play-store-updates'];
+const autolinkingExcludes = ['play-store-updates', 'expo-store-review'];
+const missingAutolinkingExcludes = autolinkingExcludes.filter((name) => !existingExclude.includes(name));
+if (missingAutolinkingExcludes.length > 0) {
+  pkg.expo.autolinking.exclude = [...existingExclude, ...missingAutolinkingExcludes];
   changed = true;
-  changes.push('excluded play-store-updates from Expo autolinking for F-Droid builds');
+  changes.push(`excluded ${missingAutolinkingExcludes.join(', ')} from Expo autolinking for F-Droid builds`);
 }
 
 if (enableExpoBuildFromSource) {

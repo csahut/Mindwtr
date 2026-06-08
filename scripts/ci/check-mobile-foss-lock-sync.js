@@ -11,14 +11,28 @@ const mobileLockPath = path.join(repoRoot, 'apps/mobile/package-lock.json');
 
 const pkg = JSON.parse(fs.readFileSync(mobilePackagePath, 'utf8'));
 
-for (const dep of ['expo-dev-client', 'expo-store-review']) {
-  if (pkg.dependencies && pkg.dependencies[dep]) {
-    delete pkg.dependencies[dep];
-  }
-  if (pkg.devDependencies && pkg.devDependencies[dep]) {
-    delete pkg.devDependencies[dep];
+if (pkg.dependencies && pkg.dependencies['expo-dev-client']) {
+  delete pkg.dependencies['expo-dev-client'];
+}
+if (pkg.devDependencies && pkg.devDependencies['expo-dev-client']) {
+  delete pkg.devDependencies['expo-dev-client'];
+}
+
+if (!pkg.expo || typeof pkg.expo !== 'object' || Array.isArray(pkg.expo)) {
+  pkg.expo = {};
+}
+if (!pkg.expo.autolinking || typeof pkg.expo.autolinking !== 'object' || Array.isArray(pkg.expo.autolinking)) {
+  pkg.expo.autolinking = {};
+}
+const existingExclude = Array.isArray(pkg.expo.autolinking.exclude)
+  ? pkg.expo.autolinking.exclude.filter((value) => typeof value === 'string')
+  : [];
+for (const excludedModule of ['play-store-updates', 'expo-store-review']) {
+  if (!existingExclude.includes(excludedModule)) {
+    existingExclude.push(excludedModule);
   }
 }
+pkg.expo.autolinking.exclude = existingExclude;
 if (pkg.dependencies && pkg.dependencies['@mindwtr/core'] === 'workspace:*') {
   pkg.dependencies['@mindwtr/core'] = 'file:../../packages/core';
 }
