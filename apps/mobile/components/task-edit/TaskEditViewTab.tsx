@@ -44,6 +44,7 @@ type TaskEditViewTabProps = {
   onContextPress?: (context: string) => void;
   onTagPress?: (tag: string) => void;
   onStatusUpdate?: (status: TaskStatus) => void;
+  showStatusField?: boolean;
 };
 
 function TaskEditViewTabComponent({
@@ -72,6 +73,7 @@ function TaskEditViewTabComponent({
   onContextPress,
   onTagPress,
   onStatusUpdate,
+  showStatusField = true,
 }: TaskEditViewTabProps) {
   const renderViewRow = (label: string, value?: string, onPress?: () => void, accessibilityLabel?: string) => {
     if (value === undefined || value === null || value === '') return null;
@@ -173,7 +175,7 @@ function TaskEditViewTabComponent({
       keyboardShouldPersistTaps="handled"
       nestedScrollEnabled={nestedScrollEnabled}
     >
-      {statusLabel ? (
+      {showStatusField && statusLabel ? (
         <View style={[styles.viewRow, { backgroundColor: tc.inputBg, borderColor: tc.border }]}>
           <Text style={[styles.viewLabel, { color: tc.secondaryText }]}>{t('taskEdit.statusLabel')}</Text>
           {onStatusUpdate && mergedTask.status ? (

@@ -1190,6 +1190,7 @@ export const TaskItem = memo(function TaskItem({
         }
         setCalendarTaskDragData(event.dataTransfer, task.id);
     }, [canCalendarDrag, task.id]);
+    const showConfiguredStatusSelect = showStatusSelect && basicFields.includes('status');
 
     return (
         <>
@@ -1258,7 +1259,7 @@ export const TaskItem = memo(function TaskItem({
                                 timeEstimatesEnabled={timeEstimatesEnabled}
                                 isStagnant={isStagnant}
                                 showQuickDone={showQuickDone}
-                                showStatusSelect={showStatusSelect}
+                                showStatusSelect={showConfiguredStatusSelect}
                                 showProjectBadgeInActions={showProjectBadgeInActions}
                                 readOnly={effectiveReadOnly}
                                 compactMetaEnabled={compactMetaEnabled}

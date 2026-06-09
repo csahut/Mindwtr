@@ -304,6 +304,7 @@ export function useTaskEditDerivedState({
         () => filterVisibleFields(orderFields(taskEditorOrder.filter((fieldId) => sectionAssignments[fieldId] === 'details'))),
         [filterVisibleFields, orderFields, sectionAssignments, taskEditorOrder]
     );
+    const showStatusField = isFieldVisible('status');
     const projectSections = useMemo(() => {
         if (!activeProjectId) return [];
         return sections
@@ -338,6 +339,7 @@ export function useTaskEditDerivedState({
         recurrenceStrategyValue,
         schedulingFields,
         sectionOpenDefaults,
+        showStatusField,
         timeEstimateOptions,
     };
 }

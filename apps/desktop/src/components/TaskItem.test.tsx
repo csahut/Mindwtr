@@ -40,6 +40,28 @@ describe('TaskItem', () => {
         expect(getByText('Test Task')).toBeInTheDocument();
     });
 
+    it('hides the default status selector when the task editor layout hides status', () => {
+        act(() => {
+            useTaskStore.setState({
+                settings: {
+                    gtd: {
+                        taskEditor: {
+                            hidden: ['status'],
+                        },
+                    },
+                },
+            });
+        });
+
+        const { queryByRole } = render(
+            <LanguageProvider>
+                <TaskItem task={mockTask} />
+            </LanguageProvider>
+        );
+
+        expect(queryByRole('combobox', { name: /task status|task\.aria\.status/i })).toBeNull();
+    });
+
     it('enters edit mode when Edit is clicked', () => {
         const { getAllByRole, getByDisplayValue } = render(
             <LanguageProvider>

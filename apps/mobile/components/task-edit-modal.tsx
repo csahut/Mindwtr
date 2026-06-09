@@ -348,6 +348,7 @@ function TaskEditModalInner({
         recurrenceStrategyValue,
         schedulingFields,
         sectionOpenDefaults,
+        showStatusField,
         timeEstimateOptions,
     } = useTaskEditDerivedState({
         task,
@@ -931,6 +932,7 @@ function TaskEditModalInner({
                                     onContextPress={onContextNavigate ? handlePreviewContextPress : undefined}
                                     onTagPress={onTagNavigate ? handlePreviewTagPress : undefined}
                                     onStatusUpdate={handleViewStatusUpdate}
+                                    showStatusField={showStatusField}
                                 />
                             </View>
                         </Animated.ScrollView>
