@@ -23,14 +23,20 @@ export const projectsScreenStyles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 12,
     },
     filterToggleText: {
         fontSize: 12,
         fontWeight: '600',
+        flexShrink: 0,
+        minWidth: 48,
+        textAlign: 'right',
     },
     tagFilterLabel: {
         fontSize: 12,
         fontWeight: '600',
+        flex: 1,
+        minWidth: 0,
     },
     tagFilterChips: {
         flexDirection: 'row',
@@ -57,6 +63,7 @@ export const projectsScreenStyles = StyleSheet.create({
     },
     addProjectInput: {
         flex: 1,
+        minWidth: 0,
     },
     colorPicker: {
         flexDirection: 'row',

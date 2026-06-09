@@ -179,7 +179,7 @@ const flattenStyle = (style: unknown): Record<string, unknown> => {
   return style && typeof style === 'object' ? style as Record<string, unknown> : {};
 };
 
-const getMoreSheetButtonLabelStyle = (tree: ReturnType<typeof create>, label: string) => {
+const getMoreSheetButtonLabelNode = (tree: ReturnType<typeof create>, label: string) => {
   const button = getMoreSheetButtons(tree, label)[0];
   if (!button) throw new Error(`${label} button not found`);
   const text = button.findAll((node) => (
@@ -187,7 +187,11 @@ const getMoreSheetButtonLabelStyle = (tree: ReturnType<typeof create>, label: st
     && node.children.includes(label)
   ))[0];
   if (!text) throw new Error(`${label} label not found`);
-  return flattenStyle(text.props.style);
+  return text;
+};
+
+const getMoreSheetButtonLabelStyle = (tree: ReturnType<typeof create>, label: string) => {
+  return flattenStyle(getMoreSheetButtonLabelNode(tree, label).props.style);
 };
 
 const getCaptureButtonInnerStyle = (tree: ReturnType<typeof create>) => {
@@ -346,6 +350,24 @@ describe('mobile tab quick capture', () => {
     expect(getBottomTabLabels(tree).slice(0, 2)).toEqual(['Focus', 'Inbox']);
   });
 
+  it('shrinks mobile header titles before React Navigation truncates them', () => {
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<TabLayout />);
+    });
+
+    const tabs = tree.root.find((node) => String(node.type) === 'Tabs');
+    const screenOptions = tabs.props.screenOptions({ route: { name: 'projects' } });
+    const headerTitle = screenOptions.headerTitle({ children: 'Projects' });
+
+    expect(headerTitle.props.children).toBe('Projects');
+    expect(headerTitle.props.numberOfLines).toBe(1);
+    expect(headerTitle.props.adjustsFontSizeToFit).toBe(true);
+    expect(headerTitle.props.minimumFontScale).toBe(0.72);
+    expect(headerTitle.props.maxFontSizeMultiplier).toBe(1.15);
+  });
+
   it('redirects root cold launch to Focus', () => {
     let tree!: ReturnType<typeof create>;
 
@@ -412,6 +434,14 @@ describe('mobile tab quick capture', () => {
     expect(getVisibleMoreDestinationLabels(tree)).toEqual(moreDestinationLabels);
     expect(getMoreSheetButtonIconName(tree, 'Board View')).toBe('square.grid.2x2.fill');
     expect(getMoreSheetButtonIconName(tree, 'Someday')).toBe('arrow.up.circle.fill');
+    const trashLabel = getMoreSheetButtonLabelNode(tree, 'Trash');
+    expect(trashLabel.props.numberOfLines).toBe(1);
+    expect(trashLabel.props.adjustsFontSizeToFit).toBe(true);
+    expect(trashLabel.props.maxFontSizeMultiplier).toBe(1.15);
+    expect(flattenStyle(getMoreSheetButtons(tree, 'Trash')[0]?.props.style)).toEqual(expect.objectContaining({
+      flexBasis: '30%',
+      minWidth: 92,
+    }));
 
     const calendarButtons = getMoreSheetButtons(tree, 'Calendar');
     expect(calendarButtons.length).toBeGreaterThan(0);

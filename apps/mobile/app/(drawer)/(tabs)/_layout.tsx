@@ -25,6 +25,7 @@ import {
 
 type IconSymbolName = Parameters<typeof IconSymbol>[0]['name'];
 type Translate = (key: string) => string;
+const COMPACT_NAV_TEXT_MAX_SCALE = 1.15;
 
 type MoreDestination = {
   id: string;
@@ -71,7 +72,13 @@ function MoreSheetTile({
       <View style={[styles.moreTileIcon, { backgroundColor: tc.filterBg }]}>
         <IconSymbol name={item.icon} size={24} color={item.iconColor} />
       </View>
-      <Text style={[styles.moreTileLabel, { color: tc.text }]} numberOfLines={2}>
+      <Text
+        style={[styles.moreTileLabel, { color: tc.text }]}
+        numberOfLines={2}
+        adjustsFontSizeToFit
+        minimumFontScale={0.78}
+        maxFontSizeMultiplier={COMPACT_NAV_TEXT_MAX_SCALE}
+      >
         {item.displayLabel ?? item.label}
       </Text>
     </Pressable>
@@ -109,7 +116,13 @@ function MoreSheetCompactItem({
       <View style={styles.moreCompactIcon}>
         <IconSymbol name={item.icon} size={18} color={item.iconColor} />
       </View>
-      <Text style={[styles.moreCompactLabel, { color: tc.secondaryText }]} numberOfLines={2}>
+      <Text
+        style={[styles.moreCompactLabel, { color: tc.secondaryText }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.76}
+        maxFontSizeMultiplier={COMPACT_NAV_TEXT_MAX_SCALE}
+      >
         {item.displayLabel ?? item.label}
       </Text>
     </Pressable>
@@ -642,6 +655,17 @@ export default function TabLayout() {
           paddingLeft: 16,
         },
         headerTintColor: tc.text,
+        headerTitle: ({ children }) => (
+          <Text
+            style={[styles.headerTitle, { color: tc.text }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+            maxFontSizeMultiplier={COMPACT_NAV_TEXT_MAX_SCALE}
+          >
+            {children}
+          </Text>
+        ),
         headerTitleStyle: {
           fontSize: 17,
           fontWeight: '700',
@@ -839,6 +863,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+    minWidth: 0,
+  },
   captureButton: {
     flex: 1,
     alignItems: 'center',
@@ -906,7 +936,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexBasis: '31%',
     flexGrow: 1,
-    minHeight: 96,
+    minHeight: 104,
     paddingHorizontal: 8,
     paddingVertical: 12,
   },
@@ -931,7 +961,9 @@ const styles = StyleSheet.create({
   },
   moreUtilityRow: {
     flexDirection: 'row',
-    gap: 4,
+    flexWrap: 'wrap',
+    columnGap: 6,
+    rowGap: 8,
   },
   moreUtilityStripContent: {
     flexDirection: 'row',
@@ -942,13 +974,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 56,
-    paddingHorizontal: 2,
+    minHeight: 58,
+    paddingHorizontal: 6,
     paddingVertical: 4,
   },
   moreUtilityRowItem: {
-    flex: 1,
-    minWidth: 0,
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 92,
   },
   moreUtilityScrollItem: {
     width: 76,
@@ -961,7 +994,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 12,
     marginTop: 4,
-    minHeight: 24,
+    minHeight: 16,
     textAlign: 'center',
   },
   moreSavedSection: {

@@ -343,6 +343,12 @@ describe('Quick capture modal composition', () => {
       .filter((node) => typeof node.props.children === 'string');
     expect(compactTexts.length).toBeGreaterThan(0);
     expect(compactTexts.every((node) => node.props.maxFontSizeMultiplier === 1.2)).toBe(true);
+    const moreText = compactTexts.find((node) => node.props.children === 'More');
+    const saveText = compactTexts.find((node) => node.props.children === 'common.save');
+    expect(moreText?.props.numberOfLines).toBe(1);
+    expect(moreText?.props.adjustsFontSizeToFit).toBe(true);
+    expect(saveText?.props.numberOfLines).toBe(1);
+    expect(saveText?.props.adjustsFontSizeToFit).toBe(true);
   });
 
   it('submits the quick capture input from the keyboard Done action on iOS', () => {

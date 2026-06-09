@@ -230,7 +230,9 @@ export function QuickCaptureSheetBody({
                 <SlidersHorizontal size={16} color={tc.text} />
                 <Text
                   style={[styles.optionsToggleText, { color: tc.text }]}
-                  numberOfLines={2}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
                   maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
                 >
                   {optionsToggleLabel}
@@ -401,6 +403,8 @@ export function QuickCaptureSheetBody({
                 <Text
                   style={styles.saveText}
                   numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
                   maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
                 >
                   {t('common.save')}

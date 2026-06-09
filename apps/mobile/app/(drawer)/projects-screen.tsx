@@ -37,6 +37,7 @@ import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigatio
 
 type ProjectTaskSortBy = Extract<TaskSortBy, 'default' | 'due'>;
 const EMPTY_PROJECT_TASKS: Task[] = [];
+const COMPACT_PROJECT_TEXT_MAX_SCALE = 1.2;
 
 function resolveTaskRouteTab(value?: string | string[]): TaskEditTab {
   const routeValue = Array.isArray(value) ? value[0] : value;
@@ -624,6 +625,7 @@ export default function ProjectsScreen() {
             onChangeText={setNewProjectTitle}
             onSubmitEditing={handleAddProject}
             returnKeyType="done"
+            maxFontSizeMultiplier={COMPACT_PROJECT_TEXT_MAX_SCALE}
           />
           <TouchableOpacity
             accessibilityRole="button"
@@ -644,8 +646,20 @@ export default function ProjectsScreen() {
             style={styles.filterHeader}
             onPress={() => setShowTagFilter((prev) => !prev)}
           >
-            <Text style={[styles.tagFilterLabel, { color: tc.text }]}>{t('projects.tagFilter')}</Text>
-            <Text style={[styles.filterToggleText, { color: tc.secondaryText }]}>
+            <Text
+              style={[styles.tagFilterLabel, { color: tc.text }]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={COMPACT_PROJECT_TEXT_MAX_SCALE}
+            >
+              {t('projects.tagFilter')}
+            </Text>
+            <Text
+              style={[styles.filterToggleText, { color: tc.secondaryText }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+              maxFontSizeMultiplier={COMPACT_PROJECT_TEXT_MAX_SCALE}
+            >
               {showTagFilter ? t('filters.hide') : t('filters.show')}
             </Text>
           </TouchableOpacity>
