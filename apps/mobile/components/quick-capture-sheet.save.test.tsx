@@ -1,4 +1,5 @@
 import React from 'react';
+import { Keyboard, Platform } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -147,8 +148,25 @@ vi.mock('./quick-capture-sheet/QuickCaptureSheetPickers', () => ({
   QuickCaptureSheetPickers: (props: Record<string, unknown>) => React.createElement('QuickCaptureSheetPickers', props),
 }));
 
+const withPlatform = async (os: typeof Platform.OS, run: () => Promise<void>) => {
+  const originalPlatformOs = Platform.OS;
+  Object.defineProperty(Platform, 'OS', {
+    configurable: true,
+    value: os,
+  });
+  try {
+    await run();
+  } finally {
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: originalPlatformOs,
+    });
+  }
+};
+
 describe('QuickCaptureSheet save handling', () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -185,6 +203,49 @@ describe('QuickCaptureSheet save handling', () => {
     if (!body) throw new Error('QuickCaptureSheetBody not found');
     expect(body.props.optionsExpanded).toBe(false);
     expect(getUsedTaskTokens).not.toHaveBeenCalled();
+  });
+
+  it('waits for the Android keyboard dismissal before expanding organize options', async () => {
+    vi.useFakeTimers();
+    const keyboardDismiss = vi.spyOn(Keyboard, 'dismiss').mockImplementation(vi.fn());
+
+    await withPlatform('android', async () => {
+      let tree!: ReturnType<typeof create>;
+      await act(async () => {
+        tree = create(
+          <QuickCaptureSheet
+            visible
+            openRequestId={1}
+            initialValue=""
+            onClose={vi.fn()}
+          />
+        );
+        await Promise.resolve();
+      });
+
+      const getBody = () => {
+        const body = tree.root.findAll((node) => String(node.type) === 'QuickCaptureSheetBody')[0];
+        if (!body) throw new Error('QuickCaptureSheetBody not found');
+        return body;
+      };
+
+      expect(getBody().props.optionsExpanded).toBe(false);
+
+      await act(async () => {
+        getBody().props.onToggleOptions();
+        await Promise.resolve();
+      });
+
+      expect(keyboardDismiss).toHaveBeenCalledOnce();
+      expect(getBody().props.optionsExpanded).toBe(false);
+
+      await act(async () => {
+        vi.advanceTimersByTime(160);
+        await Promise.resolve();
+      });
+
+      expect(getBody().props.optionsExpanded).toBe(true);
+    });
   });
 
   it('loads context autocomplete only after the context picker opens', async () => {

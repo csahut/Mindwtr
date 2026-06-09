@@ -36,6 +36,7 @@ import { QuickCaptureSheetPickers } from './quick-capture-sheet/QuickCaptureShee
 import { useQuickCaptureAudio } from './use-quick-capture-audio';
 
 const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
+const ANDROID_OPTIONS_EXPAND_DELAY_MS = 160;
 
 const logCaptureWarn = (message: string, error?: unknown) => {
   void logWarn(message, { scope: 'capture', extra: buildCaptureExtra(undefined, error) });
@@ -130,6 +131,7 @@ export function QuickCaptureSheet({
   const projectsRef = useRef(projects);
   const contextOptionsLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contextOptionsRequestRef = useRef(0);
+  const androidOptionsExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     projectsRef.current = projects;
@@ -150,6 +152,12 @@ export function QuickCaptureSheet({
     if (!contextOptionsLoadTimerRef.current) return;
     clearTimeout(contextOptionsLoadTimerRef.current);
     contextOptionsLoadTimerRef.current = null;
+  }, []);
+
+  const clearAndroidOptionsExpandTimer = useCallback(() => {
+    if (!androidOptionsExpandTimerRef.current) return;
+    clearTimeout(androidOptionsExpandTimerRef.current);
+    androidOptionsExpandTimerRef.current = null;
   }, []);
 
   const loadContextOptions = useCallback(() => {
@@ -258,6 +266,7 @@ export function QuickCaptureSheet({
   }, [projectQuery, projects, showProjectPicker]);
 
   const resetDraftState = useCallback(() => {
+    clearAndroidOptionsExpandTimer();
     setValue(initialValue ?? '');
     setDueDate(initialProps?.dueDate ? safeParseDate(initialProps.dueDate) : null);
     setDueDateHasTime(Boolean(initialProps?.dueDate && hasTimeComponent(initialProps.dueDate)));
@@ -289,12 +298,13 @@ export function QuickCaptureSheet({
     setStartPickerMode(null);
     setPendingStartDate(null);
     setAddAnother(false);
-  }, [clearContextOptionsLoad, initialProps, initialValue, selectedAreaIdForNewTasks]);
+  }, [clearAndroidOptionsExpandTimer, clearContextOptionsLoad, initialProps, initialValue, selectedAreaIdForNewTasks]);
 
   useEffect(() => () => {
+    clearAndroidOptionsExpandTimer();
     clearContextOptionsLoad();
     contextOptionsRequestRef.current += 1;
-  }, [clearContextOptionsLoad]);
+  }, [clearAndroidOptionsExpandTimer, clearContextOptionsLoad]);
 
   useEffect(() => {
     if (!visible) return;
@@ -384,6 +394,7 @@ export function QuickCaptureSheet({
   }, [addProject, areas, contextTags, dueDate, dueDateHasTime, initialProps, prioritiesEnabled, priority, projectId, projects, selectedAreaId, startTime, value]);
 
   const resetState = useCallback(() => {
+    clearAndroidOptionsExpandTimer();
     clearContextOptionsLoad();
     contextOptionsRequestRef.current += 1;
     setValue('');
@@ -408,7 +419,7 @@ export function QuickCaptureSheet({
     setStartPickerMode(null);
     setPendingStartDate(null);
     setAddAnother(false);
-  }, [clearContextOptionsLoad, selectedAreaIdForNewTasks]);
+  }, [clearAndroidOptionsExpandTimer, clearContextOptionsLoad, selectedAreaIdForNewTasks]);
 
   const finalizeClose = useCallback(() => {
     resetState();
@@ -658,13 +669,22 @@ export function QuickCaptureSheet({
 
   const handleToggleOptions = useCallback(() => {
     setOptionsExpanded((prev) => {
+      clearAndroidOptionsExpandTimer();
       if (!prev) {
         inputRef.current?.blur();
         Keyboard.dismiss();
+        if (Platform.OS === 'android') {
+          // Let the transparent modal settle after keyboard resize before growing the sheet.
+          androidOptionsExpandTimerRef.current = setTimeout(() => {
+            androidOptionsExpandTimerRef.current = null;
+            setOptionsExpanded(true);
+          }, ANDROID_OPTIONS_EXPAND_DELAY_MS);
+          return false;
+        }
       }
       return !prev;
     });
-  }, []);
+  }, [clearAndroidOptionsExpandTimer]);
 
   const openContextPicker = useCallback(() => {
     setShowContextPicker(true);
