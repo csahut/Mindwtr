@@ -153,6 +153,7 @@ describe('sync-helpers sanitizeAppDataForRemote', () => {
                 window: { decorations: false, closeBehavior: 'tray' },
                 diagnostics: { loggingEnabled: true },
                 analytics: { heartbeatEnabled: false },
+                network: { proxyUrl: 'http://user:pass@proxy.local:8080' },
                 taskSortBy: 'updatedAt',
                 sidebarCollapsed: true,
                 deviceId: 'local-device-id',
@@ -248,6 +249,7 @@ describe('sync-helpers sanitizeAppDataForRemote', () => {
         expect(sanitized.settings.notificationsEnabled).toBeUndefined();
         expect(sanitized.settings.diagnostics).toBeUndefined();
         expect(sanitized.settings.analytics).toBeUndefined();
+        expect(sanitized.settings.network).toBeUndefined();
         expect(sanitized.settings.gtd).toBeUndefined();
         expect(sanitized.settings.features).toBeUndefined();
         expect(sanitized.settings.taskSortBy).toBeUndefined();

@@ -402,6 +402,10 @@ export interface SecuritySettings {
     mobileAppLockEnabled?: boolean;
 }
 
+export interface NetworkSettings {
+    proxyUrl?: string;
+}
+
 export interface FilterSettings {
     areaId?: string;
 }
@@ -445,6 +449,7 @@ export interface AppSettings extends NotificationSettings {
     diagnostics?: DiagnosticsSettings;
     analytics?: AnalyticsSettings;
     security?: SecuritySettings;
+    network?: NetworkSettings;
     filters?: FilterSettings;
     deviceId?: string;
     migrations?: MigrationSettings;

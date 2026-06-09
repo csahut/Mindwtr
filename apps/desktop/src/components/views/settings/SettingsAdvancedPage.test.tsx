@@ -17,9 +17,12 @@ const baseProps: Parameters<typeof SettingsAdvancedPage>[0] = {
     localApiPortInput: '3456',
     localApiBusy: false,
     localApiPortError: '',
+    networkProxyUrl: '',
     onLocalApiToggle: vi.fn(),
     onLocalApiPortInputChange: vi.fn(),
     onLocalApiPortCommit: vi.fn(),
+    onNetworkProxyUrlChange: vi.fn(),
+    onSaveNetworkProxy: vi.fn(),
 };
 
 describe('SettingsAdvancedPage', () => {
@@ -54,5 +57,29 @@ describe('SettingsAdvancedPage', () => {
 
         expect(onLocalApiPortInputChange).toHaveBeenCalledWith('4567');
         expect(onLocalApiPortCommit).toHaveBeenCalled();
+    });
+
+    it('keeps proxy settings folded until opened', () => {
+        const onNetworkProxyUrlChange = vi.fn();
+        const onSaveNetworkProxy = vi.fn();
+        const { getByRole, queryByRole } = render(
+            <SettingsAdvancedPage
+                {...baseProps}
+                networkProxyUrl="http://proxy.local:8080"
+                onNetworkProxyUrlChange={onNetworkProxyUrlChange}
+                onSaveNetworkProxy={onSaveNetworkProxy}
+            />,
+        );
+
+        expect(queryByRole('textbox', { name: 'Proxy URL' })).not.toBeInTheDocument();
+
+        fireEvent.click(getByRole('button', { name: /Proxy URL/ }));
+        fireEvent.change(getByRole('textbox', { name: 'Proxy URL' }), {
+            target: { value: 'https://proxy.local:8443' },
+        });
+        fireEvent.click(getByRole('button', { name: 'Save proxy' }));
+
+        expect(onNetworkProxyUrlChange).toHaveBeenCalledWith('https://proxy.local:8443');
+        expect(onSaveNetworkProxy).toHaveBeenCalled();
     });
 });

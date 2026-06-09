@@ -50,6 +50,7 @@ const getFetchDataErrorMessage = (error: unknown): string => {
     return `Failed to fetch data: ${trimmed}`;
 };
 const NON_MUTATING_SETTINGS_KEYS = new Set<keyof AppData['settings']>([
+    'network',
     'lastSyncAt',
     'lastSyncStatus',
     'lastSyncError',
@@ -78,6 +79,12 @@ const mergeSettingsUpdates = (
         nextSettings.appearance = appearanceUpdate && typeof appearanceUpdate === 'object'
             ? { ...(settings.appearance ?? {}), ...appearanceUpdate }
             : appearanceUpdate;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'network')) {
+        const networkUpdate = updates.network;
+        nextSettings.network = networkUpdate && typeof networkUpdate === 'object'
+            ? { ...(settings.network ?? {}), ...networkUpdate }
+            : networkUpdate;
     }
     return nextSettings;
 };

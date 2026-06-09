@@ -43,6 +43,7 @@ import {
     type PendingAttachmentUpload,
 } from '@mindwtr/core';
 import { isTauriRuntime } from './runtime';
+import { getTauriHttpFetch } from './tauri-http';
 import { reportError } from './report-error';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
 import { useUiStore } from '../store/ui-store';
@@ -180,8 +181,7 @@ const defaultInvoke = async <T>(command: string, args?: Record<string, unknown>)
 const defaultGetTauriFetch = async (): Promise<typeof fetch | undefined> => {
     if (!syncServiceDependencies.isTauriRuntime()) return undefined;
     try {
-        const mod = await import('@tauri-apps/plugin-http');
-        return mod.fetch;
+        return await getTauriHttpFetch();
     } catch (error) {
         logSyncWarning('Failed to load tauri http fetch', error);
         return undefined;

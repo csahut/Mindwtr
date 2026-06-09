@@ -84,6 +84,14 @@ Existing Dropbox setups continue to work; they are simply shown as the top-level
 - **File Sync (Syncthing/Dropbox/etc.):** works, but **conflicts are file-level** because `data.json` is a single file.
 - **Best practices for File Sync:** avoid editing on two devices at the same time, and wait for sync to finish before opening the app on another device. If conflicts appear, keep the newest `data.json` and delete the `data.json.sync-conflict-*` copies.
 
+### Desktop Proxy
+
+On desktop, Mindwtr can use an optional HTTP(S) proxy for network requests such as WebDAV, Dropbox, self-hosted Cloud sync, and external calendar subscriptions.
+
+Set it in **Settings → Advanced → Network → Proxy URL**. Use a full URL such as `http://proxy-host:port` or `https://proxy-host:port`. Leave it blank to use the default network behavior, including any supported `HTTP_PROXY` / `HTTPS_PROXY` environment variables.
+
+The in-app field is intentionally minimal: it is a single proxy URL, not a full proxy manager. SOCKS, PAC files, and per-backend proxy rules are not configured there. The setting is not synced across devices.
+
 ## Conflict Recovery
 
 Mindwtr normally resolves item conflicts automatically. If a task you deleted comes back after syncing, the most common cause is a concurrent edit on another device inside the delete-vs-live ambiguity window. When revision numbers tie and operation times are within 30 seconds, Mindwtr preserves the live edit so it does not silently discard work.

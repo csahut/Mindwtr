@@ -43,6 +43,7 @@ import {
 } from "../../lib/external-calendar-source";
 import { reportError } from "../../lib/report-error";
 import { SyncService } from "../../lib/sync-service";
+import { isSupportedProxyUrl, normalizeProxyUrl } from "../../lib/tauri-http";
 import { clearLog, readRecentLogText } from "../../lib/app-log";
 import {
   markSettingsOpenTrace,
@@ -280,6 +281,9 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
   );
   const [localApiBusy, setLocalApiBusy] = useState(false);
   const [localApiPortError, setLocalApiPortError] = useState("");
+  const [networkProxyUrl, setNetworkProxyUrl] = useState(() =>
+    normalizeProxyUrl(settings?.network?.proxyUrl),
+  );
   const notificationsEnabled = settings?.notificationsEnabled !== false;
   const startDateNotificationsEnabled =
     settings?.startDateNotificationsEnabled !== false;
@@ -314,6 +318,10 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
     if (!initialPage) return;
     setPage(initialPage);
   }, [initialPage]);
+
+  useEffect(() => {
+    setNetworkProxyUrl(normalizeProxyUrl(settings?.network?.proxyUrl));
+  }, [settings?.network?.proxyUrl]);
 
   const applyLocalApiStatus = useCallback((status: LocalApiServerStatus) => {
     setLocalApiStatus(status);
@@ -403,6 +411,21 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
     );
     return result;
   }, [language, translate]);
+
+  const handleSaveNetworkProxy = useCallback(async () => {
+    const trimmedProxyUrl = normalizeProxyUrl(networkProxyUrl);
+    if (!isSupportedProxyUrl(trimmedProxyUrl)) {
+      showToast(t.networkProxyInvalid, "error");
+      return;
+    }
+    await updateSettings({
+      network: {
+        proxyUrl: trimmedProxyUrl || undefined,
+      },
+    });
+    setNetworkProxyUrl(trimmedProxyUrl);
+    showSaved();
+  }, [networkProxyUrl, showSaved, showToast, t.networkProxyInvalid, updateSettings]);
 
   const handleLocalApiToggle = useCallback(
     async (enabled: boolean) => {
@@ -1335,9 +1358,12 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
           localApiPortInput={localApiPortInput}
           localApiBusy={localApiBusy}
           localApiPortError={localApiPortError}
+          networkProxyUrl={networkProxyUrl}
           onLocalApiToggle={handleLocalApiToggle}
           onLocalApiPortInputChange={setLocalApiPortInput}
           onLocalApiPortCommit={handleLocalApiPortCommit}
+          onNetworkProxyUrlChange={setNetworkProxyUrl}
+          onSaveNetworkProxy={handleSaveNetworkProxy}
         />
       );
     }

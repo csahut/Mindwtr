@@ -4,6 +4,7 @@ import { ExternalCalendarService } from './external-calendar-service';
 import { isLocalCalendarFileUrl } from './external-calendar-source';
 import { isTauriRuntime } from './runtime';
 import { fetchSystemCalendarEvents } from './system-calendar';
+import { getTauriHttpFetch } from './tauri-http';
 
 const MINDWTR_PUSHED_EVENT_PREFIX = 'Mindwtr: ';
 const MINDWTR_MIRROR_CALENDAR_NAMES = new Set(['mindwtr', 'mindwtr calendar', 'mindwtrcal']);
@@ -160,12 +161,11 @@ async function fetchTextWithTimeout(url: string, timeoutMs: number): Promise<str
     }
 
     if (isTauriRuntime()) {
-        const mod: any = await import('@tauri-apps/plugin-http');
-        const tauriFetch: any = mod.fetch;
+        const tauriFetch = await getTauriHttpFetch();
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
         try {
-            const res = await tauriFetch(url, { method: 'GET', signal: controller.signal });
+            const res = await (tauriFetch ?? fetch)(url, { method: 'GET', signal: controller.signal });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return await readCalendarResponseText(res);
         } finally {

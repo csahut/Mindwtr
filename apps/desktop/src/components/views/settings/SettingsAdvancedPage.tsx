@@ -1,3 +1,5 @@
+import { useState, type ReactNode } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { SettingsLabels } from './labels';
 import type { LocalApiServerStatus } from '../../../lib/local-api-server';
 
@@ -8,15 +10,18 @@ type SettingsAdvancedPageProps = {
     localApiPortInput: string;
     localApiBusy: boolean;
     localApiPortError: string;
+    networkProxyUrl: string;
     onLocalApiToggle: (enabled: boolean) => void;
     onLocalApiPortInputChange: (value: string) => void;
     onLocalApiPortCommit: () => void;
+    onNetworkProxyUrlChange: (value: string) => void;
+    onSaveNetworkProxy: () => Promise<void> | void;
 };
 
 const inputCls =
     'h-8 w-24 rounded-md border border-border bg-muted/50 px-2.5 text-right text-[13px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60';
 
-function SectionHeader({ children }: { children: React.ReactNode }) {
+function SectionHeader({ children }: { children: ReactNode }) {
     return (
         <h3 className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
             {children}
@@ -24,7 +29,7 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
     );
 }
 
-function SettingsCard({ children }: { children: React.ReactNode }) {
+function SettingsCard({ children }: { children: ReactNode }) {
     return (
         <div className="bg-card border border-border rounded-lg divide-y divide-border/50">
             {children}
@@ -38,8 +43,8 @@ function SettingsRow({
     children,
 }: {
     title: string;
-    description?: React.ReactNode;
-    children: React.ReactNode;
+    description?: ReactNode;
+    children: ReactNode;
 }) {
     return (
         <div className="px-4 py-3 flex items-center justify-between gap-6">
@@ -90,10 +95,14 @@ export function SettingsAdvancedPage({
     localApiPortInput,
     localApiBusy,
     localApiPortError,
+    networkProxyUrl,
     onLocalApiToggle,
     onLocalApiPortInputChange,
     onLocalApiPortCommit,
+    onNetworkProxyUrlChange,
+    onSaveNetworkProxy,
 }: SettingsAdvancedPageProps) {
+    const [networkProxyOpen, setNetworkProxyOpen] = useState(false);
     const statusText = !isTauri
         ? t.localApiUnavailable
         : localApiStatus.running && localApiStatus.url
@@ -145,6 +154,57 @@ export function SettingsAdvancedPage({
                     </div>
                 )}
             </SettingsCard>
+            {isTauri && (
+                <>
+                    <SectionHeader>{t.network}</SectionHeader>
+                    <SettingsCard>
+                        <div>
+                            <button
+                                type="button"
+                                onClick={() => setNetworkProxyOpen((open) => !open)}
+                                aria-expanded={networkProxyOpen}
+                                className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+                            >
+                                <div className="min-w-0">
+                                    <div className="text-[13px] font-medium">{t.networkProxyUrl}</div>
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                        {t.networkProxyUrlDesc}
+                                    </div>
+                                </div>
+                                {networkProxyOpen ? (
+                                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                ) : (
+                                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                )}
+                            </button>
+                            {networkProxyOpen && (
+                                <div className="border-t border-border/50 px-4 py-3 space-y-2">
+                                    <div className="flex flex-col gap-2 sm:flex-row">
+                                        <input
+                                            aria-label={t.networkProxyUrl}
+                                            type="text"
+                                            value={networkProxyUrl}
+                                            onChange={(event) => onNetworkProxyUrlChange(event.target.value)}
+                                            placeholder="http://proxy-host:port"
+                                            className="min-w-0 flex-1 rounded-md border border-border bg-muted/50 px-2.5 py-2 text-[13px] font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={onSaveNetworkProxy}
+                                            className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/90"
+                                        >
+                                            {t.networkProxySave}
+                                        </button>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {t.networkProxyUrlHint}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </SettingsCard>
+                </>
+            )}
         </div>
     );
 }
