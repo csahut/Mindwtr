@@ -16,10 +16,8 @@ import {
     syncMarkdownChecklistWithCanonical,
     tFallback,
     formatFocusTaskLimitText,
-    getFocusSequentialFirstTaskIds,
-    isDueForReview,
-    isTaskInActiveProject,
-    shouldShowTaskForStart,
+    FOCUS_ELIGIBILITY_ACTIVE_STATUSES,
+    getTaskFocusEligibility,
     useTaskStore,
 } from '@mindwtr/core';
 import { cn } from '../lib/utils';
@@ -87,8 +85,6 @@ type ProjectNextActionPromptState = {
     projectTitle: string;
     sectionId?: string;
 };
-
-const QUICK_ACTION_FOCUS_ACTIVE_STATUSES: TaskStatus[] = ['inbox', 'next', 'waiting', 'someday'];
 
 export const TaskItem = memo(function TaskItem({
     task,
@@ -310,28 +306,20 @@ export const TaskItem = memo(function TaskItem({
             'agenda.focusUnavailableSequential',
             'Complete the earlier sequential action before focusing this task.',
         );
-        const activeFocusBaseTasks = QUICK_ACTION_FOCUS_ACTIVE_STATUSES
+        const activeFocusBaseTasks = FOCUS_ELIGIBILITY_ACTIVE_STATUSES
             .flatMap((status) => activeTasksByStatus.get(status) ?? [])
-            .filter((candidate) => isTaskInActiveProject(candidate, projectMap));
-        const sequentialFirstTaskIds = getFocusSequentialFirstTaskIds(
-            activeFocusBaseTasks,
+        const focusEligibility = getTaskFocusEligibility(task, {
+            tasks: activeFocusBaseTasks,
+            projects: projectMap,
+            now,
+            showFutureStarts,
             sequentialProjectIds,
-            { now, sectionScopedProjectIds: sequentialWithinSectionProjectIds },
-        );
-        const isSequentialBlocked = Boolean(
-            task.projectId
-            && sequentialProjectIds.has(task.projectId)
-            && !sequentialFirstTaskIds.has(task.id),
-        );
-        const isVisibleForStart = shouldShowTaskForStart(task, { showFutureStarts, now });
-        const isVisibleActiveTask = isTaskInActiveProject(task, projectMap) && isVisibleForStart;
-        const isReviewDueEligible = task.status !== 'inbox' && isDueForReview(task.reviewAt, now);
-        const isEligible = isVisibleActiveTask
-            && !isSequentialBlocked
-            && (task.status === 'next' || isReviewDueEligible);
-        const ineligibleReason = !isVisibleForStart
+            sectionScopedProjectIds: sequentialWithinSectionProjectIds,
+        });
+        const isEligible = focusEligibility.eligible;
+        const ineligibleReason = focusEligibility.reason === 'deferred'
             ? deferredReason
-            : isSequentialBlocked
+            : focusEligibility.reason === 'sequential'
                 ? sequentialReason
                 : clarifyReason;
         const canToggle = isFocused || (isEligible && focusedCount < focusTaskLimit);

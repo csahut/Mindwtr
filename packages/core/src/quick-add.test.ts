@@ -16,6 +16,22 @@ describe('quick-add', () => {
         expect(result.props.dueDate).toBe(expectedLocal);
     });
 
+    it('parses focus quick-add tokens and implies next when no status is supplied', () => {
+        const result = parseQuickAdd('Call plumber /* focus');
+
+        expect(result.title).toBe('Call plumber');
+        expect(result.props.status).toBe('next');
+        expect(result.props.isFocusedToday).toBe(true);
+    });
+
+    it('keeps explicit status when parsing focus quick-add tokens', () => {
+        const result = parseQuickAdd('Review someday idea /someday /*');
+
+        expect(result.title).toBe('Review someday idea');
+        expect(result.props.status).toBe('someday');
+        expect(result.props.isFocusedToday).toBe(true);
+    });
+
     it('parses URL notes into the description field', () => {
         const now = new Date('2026-03-30T10:00:00Z');
         const result = parseQuickAdd('Check website /note:https://example.com', undefined, now);

@@ -74,6 +74,13 @@ describe('mcp queries', () => {
         expect(parsed.props.tags).toEqual(['#weekly']);
     });
 
+    test('parseQuickAdd parses focus token as implied next', () => {
+        const parsed = parseQuickAdd('Call plumber /*', []);
+        expect(parsed.title).toBe('Call plumber');
+        expect(parsed.props.status).toBe('next');
+        expect(parsed.props.isFocusedToday).toBe(true);
+    });
+
     test('listTasks escapes wildcard characters in search input', () => {
         const now = '2026-02-01T00:00:00.000Z';
         const { db, calls } = createMockDb([
@@ -204,6 +211,30 @@ describe('mcp queries', () => {
         expect(created.projectId).toBe('p1');
         const projectLookup = calls.find((call) => call.sql.startsWith('SELECT id, title FROM projects WHERE deletedAt IS NULL'));
         expect(projectLookup).toBeTruthy();
+    });
+
+    test('addTask quickAdd can focus an implied-next task', () => {
+        const { db } = createMockDb([]);
+
+        const created = addTask(db, { quickAdd: 'Call plumber /* focus' });
+
+        expect(created.title).toBe('Call plumber');
+        expect(created.status).toBe('next');
+        expect(created.isFocusedToday).toBe(true);
+    });
+
+    test('addTask quickAdd respects focus limit', () => {
+        const now = '2026-02-01T00:00:00.000Z';
+        const { db } = createMockDb([
+            { id: 't1', title: 'Focused 1', status: 'next', isFocusedToday: 1, createdAt: now, updatedAt: now },
+            { id: 't2', title: 'Focused 2', status: 'next', isFocusedToday: 1, createdAt: now, updatedAt: now },
+            { id: 't3', title: 'Focused 3', status: 'next', isFocusedToday: 1, createdAt: now, updatedAt: now },
+        ]);
+
+        const created = addTask(db, { quickAdd: 'Over limit /*' });
+
+        expect(created.status).toBe('next');
+        expect(created.isFocusedToday).toBe(false);
     });
 
     test('wraps addTask in a transaction', () => {

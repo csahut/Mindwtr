@@ -285,11 +285,13 @@ export {
     extractWaitingPerson,
     FOCUS_NEXT_DUE_SOON_WINDOW_DAYS,
     buildTasksByProjectId,
+    FOCUS_ELIGIBILITY_ACTIVE_STATUSES,
     getChecklistProgress,
     getProjectDeadlineBoosts,
     getFocusSequentialFirstTaskIds,
     getSequentialFirstTaskIds,
     getStatusColor,
+    getTaskFocusEligibility,
     getTaskAgeDays,
     getTaskAgeLabel,
     getTaskAreaId,
@@ -311,6 +313,9 @@ export {
 export type {
     ProjectDeadlineBoost,
     SpeechResultLike,
+    TaskFocusEligibilityOptions,
+    TaskFocusEligibilityReason,
+    TaskFocusEligibilityResult,
     SpeechUpdatePlan,
 } from './task-utils';
 

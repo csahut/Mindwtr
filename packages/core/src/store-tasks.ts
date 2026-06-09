@@ -21,7 +21,7 @@ import { logWarn } from './logger';
 import { generateUUID as uuidv4 } from './uuid';
 import { normalizeRecurrenceForLoad } from './recurrence';
 import { normalizeFocusTaskLimit } from './focus-utils';
-import { isTaskFutureStart } from './task-utils';
+import { getTaskFocusEligibility, isTaskFutureStart } from './task-utils';
 
 const stripAttachmentRemoteMetadata = (attachments: Task['attachments']): Task['attachments'] =>
     attachments?.map((attachment) => (
@@ -392,6 +392,19 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave }: TaskA
                 order: resolvedOrder,
                 orderNum: resolvedOrder,
             };
+            if (newTask.isFocusedToday === true) {
+                const focusTaskLimit = normalizeFocusTaskLimit(state.settings.gtd?.focusTaskLimit);
+                const focusedCount = state.getDerivedState().focusedCount;
+                const focusCandidate: Task = { ...newTask, isFocusedToday: false };
+                const focusEligibility = getTaskFocusEligibility(focusCandidate, {
+                    tasks: [...state._allTasks, focusCandidate],
+                    projects: state._allProjects,
+                    showFutureStarts: state.settings.appearance?.showFutureStarts,
+                });
+                if (!focusEligibility.eligible || focusedCount >= focusTaskLimit) {
+                    newTask.isFocusedToday = false;
+                }
+            }
 
             const newAllTasks = [...state._allTasks, newTask];
             const newVisibleTasks = updateVisibleTasks(state.tasks, null, newTask);

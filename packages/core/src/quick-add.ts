@@ -46,8 +46,9 @@ const STATUS_TOKENS: Record<string, TaskStatus> = {
 
 const ESCAPE_SENTINEL = '__MW_ESC__';
 const QUICK_ADD_ESCAPE_CHARS = new Set(['@', '#', '+', '/', '!']);
-const QUICK_ADD_COMMAND_BOUNDARY = String.raw`(?=\s\/(?:link:|note:|start:|due:|review:|project:|area:|inbox\b|next\b|in-progress\b|waiting\b|someday\b|done\b|archived\b)|$)`;
-const QUICK_ADD_INLINE_CONTROL_BOUNDARY = String.raw`(?=\s(?:[@#+!]|\/(?:link:|note:|start:|due:|review:|project:|area:|inbox\b|next\b|in-progress\b|waiting\b|someday\b|done\b|archived\b))|$)`;
+const QUICK_ADD_FOCUS_COMMAND_PATTERN = String.raw`\*(?:\s+focus\b)?`;
+const QUICK_ADD_COMMAND_BOUNDARY = String.raw`(?=\s\/(?:${QUICK_ADD_FOCUS_COMMAND_PATTERN}|link:|note:|start:|due:|review:|project:|area:|inbox\b|next\b|in-progress\b|waiting\b|someday\b|done\b|archived\b)|$)`;
+const QUICK_ADD_INLINE_CONTROL_BOUNDARY = String.raw`(?=\s(?:[@#+!]|\/(?:${QUICK_ADD_FOCUS_COMMAND_PATTERN}|link:|note:|start:|due:|review:|project:|area:|inbox\b|next\b|in-progress\b|waiting\b|someday\b|done\b|archived\b))|$)`;
 const SIMPLE_TASK_TOKEN_RE = /[@#][\p{L}\p{N}_-]+/gu;
 const RICH_TASK_TOKEN_RE = new RegExp(
     String.raw`(?:^|\s)([@#](?![\s\p{L}\p{N}_-])[^@#+/!]+?)${QUICK_ADD_INLINE_CONTROL_BOUNDARY}`,
@@ -402,6 +403,14 @@ export function parseQuickAdd(input: string, projects?: Project[], now: Date = n
         working = stripToken(working, statusMatch[0]);
     }
 
+    // Focus token: /* or /* focus. Bare focus implies Next; explicit status tokens still win.
+    const focusMatch = working.match(/(?:^|\s)\/\*(?:\s+focus\b)?(?=\s|$)/i);
+    const focusToday = Boolean(focusMatch);
+    if (focusMatch) {
+        working = stripToken(working, focusMatch[0]);
+        if (!status) status = 'next';
+    }
+
     // Project: +ProjectName or /project:<id>
     let projectId: string | undefined;
     let projectTitle: string | undefined;
@@ -450,6 +459,7 @@ export function parseQuickAdd(input: string, projects?: Project[], now: Date = n
     if (attachments && attachments.length > 0) props.attachments = attachments;
     if (projectId) props.projectId = projectId;
     if (areaId) props.areaId = areaId;
+    if (focusToday) props.isFocusedToday = true;
 
     return {
         title,

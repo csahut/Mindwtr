@@ -1,8 +1,11 @@
 import {
   DEFAULT_PROJECT_COLOR,
+  getTaskFocusEligibility,
   mapSqliteTaskRow,
+  normalizeFocusTaskLimit,
   TASK_STATUS_SET,
   parseQuickAdd as parseQuickAddCore,
+  type AppData as CoreAppData,
   type Area as CoreArea,
   type Project as CoreProject,
   type Section as CoreSection,
@@ -259,6 +262,7 @@ const BASE_PROJECT_COLUMNS = [
   'orderNum',
   'tagIds',
   'isSequential',
+  'sequentialScope',
   'isFocused',
   'supportNotes',
   'attachments',
@@ -280,7 +284,7 @@ const getProjectColumns = (db: DbClient) => {
     const hasOrderNum = names.has('orderNum');
     const hasDueDate = names.has('dueDate');
     const selectColumns = BASE_PROJECT_COLUMNS.filter(
-      (name) => (hasOrderNum || name !== 'orderNum') && (hasDueDate || name !== 'dueDate')
+      (name) => names.has(name) && (hasOrderNum || name !== 'orderNum') && (hasDueDate || name !== 'dueDate')
     );
     const resolved = { hasOrderNum, selectColumns };
     projectColumnsCache.set(db, resolved);
@@ -314,6 +318,9 @@ const mapProjectRow = (row: any): Project => ({
   orderNum: row.orderNum ?? undefined,
   tagIds: parseJson(row.tagIds, []),
   isSequential: row.isSequential === 1,
+  sequentialScope: row.sequentialScope === 'section' || row.sequentialScope === 'project'
+    ? row.sequentialScope
+    : undefined,
   isFocused: row.isFocused === 1,
   supportNotes: row.supportNotes ?? undefined,
   attachments: parseJson(row.attachments, []),
@@ -492,6 +499,15 @@ const runInTransaction = <T>(db: DbClient, fn: () => T): T => {
   }
 };
 
+const getSettingsForFocus = (db: DbClient): CoreAppData['settings'] => {
+  try {
+    const row = db.prepare('SELECT data FROM settings WHERE id = 1').get();
+    return parseJson(row?.data, {});
+  } catch {
+    return {};
+  }
+};
+
 export function addTask(db: DbClient, input: AddTaskInput): TaskRow {
   return runInTransaction(db, () => {
     const now = new Date().toISOString();
@@ -540,6 +556,26 @@ export function addTask(db: DbClient, input: AddTaskInput): TaskRow {
       deletedAt: undefined,
       purgedAt: undefined,
     };
+    if (task.isFocusedToday === true) {
+      const existingTasks = listTasks(db, { status: 'all', includeDeleted: false });
+      const projects = listProjects(db);
+      const settings = getSettingsForFocus(db);
+      const focusTaskLimit = normalizeFocusTaskLimit(settings.gtd?.focusTaskLimit);
+      const focusedCount = existingTasks.filter((candidate) => (
+        candidate.isFocusedToday === true
+        && candidate.status !== 'done'
+        && candidate.status !== 'reference'
+      )).length;
+      const focusCandidate: Task = { ...task, isFocusedToday: false };
+      const focusEligibility = getTaskFocusEligibility(focusCandidate, {
+        tasks: [...existingTasks, focusCandidate],
+        projects,
+        showFutureStarts: settings.appearance?.showFutureStarts,
+      });
+      if (!focusEligibility.eligible || focusedCount >= focusTaskLimit) {
+        task.isFocusedToday = false;
+      }
+    }
 
     const { hasOrderNum } = getTaskColumns(db);
     const insertColumns = [

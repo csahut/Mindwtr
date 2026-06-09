@@ -356,6 +356,44 @@ describe('TaskStore', () => {
         expect(useTaskStore.getState().getDerivedState().focusedCount).toBe(5);
     });
 
+    it('applies focus eligibility and limit when adding focused tasks', async () => {
+        const { addTask } = useTaskStore.getState();
+
+        const focusedIds: string[] = [];
+        for (const title of ['Focused 1', 'Focused 2', 'Focused 3']) {
+            const result = await addTask(title, { status: 'next', isFocusedToday: true });
+            expect(result.success).toBe(true);
+            if (result.id) focusedIds.push(result.id);
+        }
+
+        const overLimit = await addTask('Over limit', { status: 'next', isFocusedToday: true });
+        const unclarified = await addTask('Inbox focus request', { isFocusedToday: true });
+
+        expect(overLimit.success).toBe(true);
+        expect(unclarified.success).toBe(true);
+        const state = useTaskStore.getState();
+        expect(state.getDerivedState().focusedCount).toBe(3);
+        expect(focusedIds.every((id) => state._tasksById.get(id)?.isFocusedToday === true)).toBe(true);
+        expect(state._tasksById.get(overLimit.id ?? '')?.isFocusedToday).toBe(false);
+        expect(state._tasksById.get(unclarified.id ?? '')?.isFocusedToday).toBe(false);
+    });
+
+    it('does not focus newly added sequential tasks blocked by an earlier action', async () => {
+        const { addProject, addTask } = useTaskStore.getState();
+
+        const projectResult = await addProject('Sequential project', '#2563EB', { isSequential: true });
+        expect(projectResult).not.toBeNull();
+        const projectId = projectResult!.id;
+        const first = await addTask('First action', { status: 'next', projectId });
+        const second = await addTask('Second action', { status: 'next', projectId, isFocusedToday: true });
+
+        expect(first.success).toBe(true);
+        expect(second.success).toBe(true);
+        const state = useTaskStore.getState();
+        expect(state._tasksById.get(second.id ?? '')?.isFocusedToday).toBe(false);
+        expect(state.getDerivedState().focusedCount).toBe(0);
+    });
+
     it('allows new focus promotion after focused tasks are completed or moved to reference', async () => {
         const { addTask, updateTask } = useTaskStore.getState();
 

@@ -6,6 +6,7 @@ import { Task, TaskStatus, TaskSortBy, TaskPriority, Project, AppData, SortField
 import { isDueForReview, safeParseDate, safeParseDueDate } from './date';
 import { timeEstimateToMinutes } from './calendar-scheduling';
 import { TASK_STATUS_ORDER } from './task-status';
+import { isTaskInActiveProject } from './project-utils';
 import type { Language } from './i18n/i18n-types';
 
 export function buildTasksByProjectId(tasks: readonly Task[]): Map<string, Task[]> {
@@ -73,6 +74,22 @@ type FocusSequentialOptions = {
     sectionScopedProjectIds?: ReadonlySet<string>;
 };
 
+export type TaskFocusEligibilityReason = 'eligible' | 'deferred' | 'sequential' | 'clarify';
+
+export type TaskFocusEligibilityResult = {
+    eligible: boolean;
+    reason: TaskFocusEligibilityReason;
+};
+
+export type TaskFocusEligibilityOptions = {
+    tasks: readonly Task[];
+    projects: readonly Project[] | Map<string, Project>;
+    now?: Date;
+    showFutureStarts?: boolean;
+    sequentialProjectIds?: ReadonlySet<string>;
+    sectionScopedProjectIds?: ReadonlySet<string>;
+};
+
 type SequentialTaskOrderFields = Pick<Task, 'createdAt' | 'order' | 'orderNum'>;
 type SequentialGroupingFields = Pick<Task, 'projectId'> & Partial<Pick<Task, 'sectionId'>>;
 
@@ -81,6 +98,8 @@ type SequentialFirstTaskOptions = {
 };
 
 const NO_SECTION_GROUP = '__no_section__';
+export const FOCUS_ELIGIBILITY_ACTIVE_STATUSES: readonly TaskStatus[] = ['inbox', 'next', 'waiting', 'someday'];
+const FOCUS_ELIGIBILITY_ACTIVE_STATUS_SET = new Set<TaskStatus>(FOCUS_ELIGIBILITY_ACTIVE_STATUSES);
 
 const safeTime = (value: string | undefined, fallback: number): number => {
     if (!value) return fallback;
@@ -449,6 +468,80 @@ export function getFocusSequentialFirstTaskIds<
     });
 
     return firstTaskIds;
+}
+
+const getFocusEligibilityProjectMap = (
+    projects: readonly Project[] | Map<string, Project>,
+): Map<string, Project> => {
+    if (Array.isArray(projects)) {
+        return new Map(projects.map((project) => [project.id, project]));
+    }
+    return projects as Map<string, Project>;
+};
+
+const getFocusEligibilitySequentialProjectIds = (
+    projectMap: ReadonlyMap<string, Project>,
+): { sequentialProjectIds: Set<string>; sectionScopedProjectIds: Set<string> } => {
+    const sequentialProjectIds = new Set<string>();
+    const sectionScopedProjectIds = new Set<string>();
+    projectMap.forEach((project) => {
+        if (!project.isSequential) return;
+        sequentialProjectIds.add(project.id);
+        if (project.sequentialScope === 'section') {
+            sectionScopedProjectIds.add(project.id);
+        }
+    });
+    return { sequentialProjectIds, sectionScopedProjectIds };
+};
+
+export function getTaskFocusEligibility(
+    task: Task,
+    options: TaskFocusEligibilityOptions,
+): TaskFocusEligibilityResult {
+    const now = options.now ?? new Date();
+    const projectMap = getFocusEligibilityProjectMap(options.projects);
+    const derivedSequential = options.sequentialProjectIds && options.sectionScopedProjectIds
+        ? null
+        : getFocusEligibilitySequentialProjectIds(projectMap);
+    const sequentialProjectIds = options.sequentialProjectIds ?? derivedSequential?.sequentialProjectIds ?? new Set<string>();
+    const sectionScopedProjectIds = options.sectionScopedProjectIds
+        ?? derivedSequential?.sectionScopedProjectIds
+        ?? new Set<string>();
+    const activeFocusBaseTasks = options.tasks.filter((candidate) => (
+        !candidate.deletedAt
+        && FOCUS_ELIGIBILITY_ACTIVE_STATUS_SET.has(candidate.status)
+        && isTaskInActiveProject(candidate, projectMap)
+    ));
+    const sequentialFirstTaskIds = getFocusSequentialFirstTaskIds(
+        activeFocusBaseTasks,
+        sequentialProjectIds,
+        { now, sectionScopedProjectIds },
+    );
+    const isSequentialBlocked = Boolean(
+        task.projectId
+        && sequentialProjectIds.has(task.projectId)
+        && !sequentialFirstTaskIds.has(task.id),
+    );
+    const isVisibleForStart = shouldShowTaskForStart(task, {
+        now,
+        showFutureStarts: options.showFutureStarts,
+    });
+    const isVisibleActiveTask = isTaskInActiveProject(task, projectMap) && isVisibleForStart;
+    const isReviewDueEligible = task.status !== 'inbox' && isDueForReview(task.reviewAt, now);
+    const eligible = isVisibleActiveTask
+        && !isSequentialBlocked
+        && (task.status === 'next' || isReviewDueEligible);
+
+    if (eligible) {
+        return { eligible: true, reason: 'eligible' };
+    }
+    if (!isVisibleForStart) {
+        return { eligible: false, reason: 'deferred' };
+    }
+    if (isSequentialBlocked) {
+        return { eligible: false, reason: 'sequential' };
+    }
+    return { eligible: false, reason: 'clarify' };
 }
 
 /**
