@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { safeFormatDate, safeParseDate, type Task } from '@mindwtr/core';
 import {
@@ -97,10 +97,10 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
     const closeText = closeLabel && closeLabel !== 'common.close' ? closeLabel : 'Close';
 
     const renderTaskList = (taskList: Task[]) => (
-        <ScrollView style={styles.taskList}>
-            {taskList.map((task) => (
+        <FlatList
+            data={taskList}
+            renderItem={({ item: task }) => (
                 <SwipeableTaskItem
-                    key={task.id}
                     task={task}
                     isDark={isDark}
                     tc={tc}
@@ -111,8 +111,16 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                     onContextPress={handleNavigateToToken}
                     onTagPress={handleNavigateToToken}
                 />
-            ))}
-        </ScrollView>
+            )}
+            keyExtractor={(task) => task.id}
+            style={styles.taskList}
+            initialNumToRender={12}
+            maxToRenderPerBatch={12}
+            windowSize={5}
+            updateCellsBatchingPeriod={50}
+            removeClippedSubviews={taskList.length >= 25}
+            showsVerticalScrollIndicator={false}
+        />
     );
 
     const renderExternalCalendarList = (days: ExternalCalendarDaySummary[]) => {
@@ -204,13 +212,14 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
             );
         }
         return (
-            <ScrollView style={styles.taskList}>
-                {groups.map((group) => {
+            <FlatList
+                data={groups}
+                renderItem={({ item: group }) => {
                     const contextKey = group.context;
                     const isExpanded = expandedContextGroups.has(contextKey);
                     const visibleTasks = isExpanded ? group.tasks : group.tasks.slice(0, 4);
                     return (
-                        <View key={group.context} style={[styles.contextGroupCard, { borderColor: tc.border, backgroundColor: tc.cardBg }]}>
+                        <View style={[styles.contextGroupCard, { borderColor: tc.border, backgroundColor: tc.cardBg }]}>
                             <View style={styles.contextGroupHeader}>
                                 <Text style={[styles.contextGroupTitle, { color: tc.text }]}>{group.context}</Text>
                                 <Text style={[styles.contextGroupCount, { color: tc.secondaryText }]}>{group.tasks.length}</Text>
@@ -235,8 +244,16 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                             )}
                         </View>
                     );
-                })}
-            </ScrollView>
+                }}
+                keyExtractor={(group) => group.context}
+                style={styles.taskList}
+                initialNumToRender={12}
+                maxToRenderPerBatch={12}
+                windowSize={5}
+                updateCellsBatchingPeriod={50}
+                removeClippedSubviews={groups.length >= 25}
+                showsVerticalScrollIndicator={false}
+            />
         );
     };
 
@@ -452,11 +469,12 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                                 </Text>
                             </View>
                         ) : (
-                            <ScrollView style={styles.taskList}>
-                                {projectReviewEntries.map((entry) => {
+                            <FlatList
+                                data={projectReviewEntries}
+                                renderItem={({ item: entry }) => {
                                     const isExpanded = expandedProject === entry.project.id;
                                     return (
-                                        <View key={entry.project.id}>
+                                        <View>
                                             <TouchableOpacity
                                                 style={[styles.projectItem, { backgroundColor: tc.cardBg, borderColor: tc.border }]}
                                                 onPress={() => toggleExpandedProject(entry.project.id)}
@@ -510,8 +528,16 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                                             )}
                                         </View>
                                     );
-                                })}
-                            </ScrollView>
+                                }}
+                                keyExtractor={(entry) => entry.project.id}
+                                style={styles.taskList}
+                                initialNumToRender={12}
+                                maxToRenderPerBatch={12}
+                                windowSize={5}
+                                updateCellsBatchingPeriod={50}
+                                removeClippedSubviews={projectReviewEntries.length >= 25}
+                                showsVerticalScrollIndicator={false}
+                            />
                         )}
                     </View>
                 );

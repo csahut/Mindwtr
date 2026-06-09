@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, FlatList, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { getWaitingPerson, isTaskInActiveProject, safeParseDueDate, shallow, useTaskStore } from '@mindwtr/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task, TaskStatus } from '@mindwtr/core';
@@ -195,8 +195,32 @@ export function WaitingView() {
         )}
       </View>
 
-      <ScrollView style={styles.taskList} showsVerticalScrollIndicator={false} contentContainerStyle={taskListContentStyle}>
-        {deferredProjects.length > 0 && (
+      <FlatList
+        data={filteredWaitingTasks}
+        renderItem={({ item: task }) => (
+          <SwipeableTaskItem
+            task={task}
+            isDark={isDark}
+            tc={tc}
+            onPress={() => setEditingTask(task)}
+            onStatusChange={(status) => handleStatusChange(task.id, status)}
+            onDelete={() => { void deleteTask(task.id); }}
+            isHighlighted={task.id === highlightTaskId}
+            onProjectPress={openProjectScreen}
+            onContextPress={openContextsScreen}
+            onTagPress={openContextsScreen}
+          />
+        )}
+        keyExtractor={(task) => task.id}
+        style={styles.taskList}
+        contentContainerStyle={taskListContentStyle}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={5}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={filteredWaitingTasks.length >= 25}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={deferredProjects.length > 0 ? (
           <View style={[styles.projectSection, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
             <Text style={[styles.sectionLabel, { color: tc.secondaryText }]}>
               {t('projects.title') || 'Projects'}
@@ -233,24 +257,8 @@ export function WaitingView() {
               );
             })}
           </View>
-        )}
-        {filteredWaitingTasks.length > 0 ? (
-          filteredWaitingTasks.map((task) => (
-            <SwipeableTaskItem
-              key={task.id}
-              task={task}
-              isDark={isDark}
-              tc={tc}
-              onPress={() => setEditingTask(task)}
-              onStatusChange={(status) => handleStatusChange(task.id, status)}
-              onDelete={() => { void deleteTask(task.id); }}
-              isHighlighted={task.id === highlightTaskId}
-              onProjectPress={openProjectScreen}
-              onContextPress={openContextsScreen}
-              onTagPress={openContextsScreen}
-            />
-          ))
-        ) : deferredProjects.length === 0 ? (
+        ) : null}
+        ListEmptyComponent={deferredProjects.length === 0 ? (
           <View style={styles.emptyState}>
             <PauseCircle size={48} color={tc.secondaryText} strokeWidth={1.5} style={styles.emptyIcon} />
             <Text style={[styles.emptyTitle, { color: tc.text }]}>{t('waiting.empty')}</Text>
@@ -259,7 +267,7 @@ export function WaitingView() {
             </Text>
           </View>
         ) : null}
-      </ScrollView>
+      />
 
       <TaskEditModal
         visible={editingTask !== null}

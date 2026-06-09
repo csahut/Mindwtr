@@ -1,4 +1,4 @@
-import { BackHandler, View, Text, ScrollView, Pressable, StyleSheet, TouchableOpacity, Modal, TextInput, Share } from 'react-native';
+import { BackHandler, View, Text, FlatList, Pressable, StyleSheet, TouchableOpacity, Modal, TextInput, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { DEFAULT_AREA_COLOR, useTaskStore, sortTasksBy, isTaskInActiveProject, shallow, type Task, type TaskStatus, type TaskSortBy } from '@mindwtr/core';
@@ -351,14 +351,15 @@ export default function ReviewScreen() {
         </View>
       )}
 
-      <ScrollView style={styles.taskList} contentContainerStyle={{ paddingBottom: 16 + insets.bottom }}>
-        {reviewTaskGroups.map((areaGroup) => {
+      <FlatList
+        data={reviewTaskGroups}
+        renderItem={({ item: areaGroup }) => {
           const areaExpanded = expandedAreaIds.has(areaGroup.id);
           const taskSummary = areaGroup.isUnassigned
             ? `${areaGroup.taskCount} ${t('common.tasks')} ${withoutAreaLabel}`
             : `${areaGroup.taskCount} ${t('common.tasks')}`;
           return (
-            <View key={areaGroup.id} style={styles.reviewAreaSection}>
+            <View style={styles.reviewAreaSection}>
               <Pressable
                 style={[
                   styles.reviewAreaHeader,
@@ -472,13 +473,22 @@ export default function ReviewScreen() {
               )}
             </View>
           );
-        })}
-        {sortedTasks.length === 0 && (
+        }}
+        keyExtractor={(areaGroup) => areaGroup.id}
+        style={styles.taskList}
+        contentContainerStyle={{ paddingBottom: 16 + insets.bottom }}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={reviewTaskGroups.length >= 12}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, { color: tc.secondaryText }]}>{t('review.noTasks')}</Text>
           </View>
-        )}
-      </ScrollView>
+        }
+      />
 
       <Modal
         visible={reviewPickerVisible}

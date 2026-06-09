@@ -1,6 +1,7 @@
 import {
   View,
   Text,
+  FlatList,
   ScrollView,
   Pressable,
   StyleSheet,
@@ -546,26 +547,34 @@ export function ContextsView() {
             </View>
           ) : null}
 
-          <ScrollView style={[styles.taskList, { backgroundColor: tc.bg }]} showsVerticalScrollIndicator={false}>
-            {sortedTasks.length > 0 ? (
-              sortedTasks.map((task) => (
-                <SwipeableTaskItem
-                  key={task.id}
-                  task={task}
-                  isDark={isDark}
-                  tc={tc}
-                  onPress={() => setEditingTask(task)}
-                  selectionMode={selectionMode}
-                  isMultiSelected={multiSelectedIds.has(task.id)}
-                  onToggleSelect={() => toggleMultiSelect(task.id)}
-                  onStatusChange={(status) => handleStatusChange(task.id, status)}
-                  onDelete={() => handleDelete(task.id)}
-                  onProjectPress={openProjectScreen}
-                  onContextPress={(context) => setSelectedContexts([context])}
-                  onTagPress={(tag) => setSelectedContexts([tag])}
-                />
-              ))
-            ) : (
+          <FlatList
+            data={sortedTasks}
+            renderItem={({ item: task }) => (
+              <SwipeableTaskItem
+                task={task}
+                isDark={isDark}
+                tc={tc}
+                onPress={() => setEditingTask(task)}
+                selectionMode={selectionMode}
+                isMultiSelected={multiSelectedIds.has(task.id)}
+                onToggleSelect={() => toggleMultiSelect(task.id)}
+                onStatusChange={(status) => handleStatusChange(task.id, status)}
+                onDelete={() => handleDelete(task.id)}
+                onProjectPress={openProjectScreen}
+                onContextPress={(context) => setSelectedContexts([context])}
+                onTagPress={(tag) => setSelectedContexts([tag])}
+              />
+            )}
+            keyExtractor={(task) => task.id}
+            style={[styles.taskList, { backgroundColor: tc.bg }]}
+            contentContainerStyle={styles.taskListContent}
+            initialNumToRender={12}
+            maxToRenderPerBatch={12}
+            windowSize={5}
+            updateCellsBatchingPeriod={50}
+            removeClippedSubviews={sortedTasks.length >= 25}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={(
               <View style={styles.emptyState}>
                 {allContexts.length === 0 ? (
                   <>
@@ -588,7 +597,7 @@ export function ContextsView() {
                 )}
               </View>
             )}
-          </ScrollView>
+          />
         </View>
 
         <TokenPickerModal
@@ -732,6 +741,8 @@ const styles = StyleSheet.create({
   },
   taskList: {
     flex: 1,
+  },
+  taskListContent: {
     padding: 16,
   },
   emptyState: {

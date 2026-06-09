@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native';
 import { useTaskStore } from '@mindwtr/core';
 import type { Task } from '@mindwtr/core';
 import { useTheme } from '../../contexts/theme-context';
@@ -166,19 +166,30 @@ export default function TrashScreen() {
             </Pressable>
           </View>
         )}
-        <ScrollView style={styles.taskList} showsVerticalScrollIndicator={false}>
-          {trashedTasks.length > 0 ? (
-            trashedTasks.map((task) => (
-              <TrashTaskItem
-                key={task.id}
-                task={task}
-                tc={tc}
-                onRestore={() => handleRestore(task.id)}
-                onDelete={() => handleDelete(task.id)}
-                isHighlighted={task.id === highlightTaskId}
-              />
-            ))
-          ) : (
+        <FlatList
+          data={trashedTasks}
+          renderItem={({ item: task }) => (
+            <TrashTaskItem
+              task={task}
+              tc={tc}
+              onRestore={() => handleRestore(task.id)}
+              onDelete={() => handleDelete(task.id)}
+              isHighlighted={task.id === highlightTaskId}
+            />
+          )}
+          keyExtractor={(task) => task.id}
+          style={styles.taskList}
+          contentContainerStyle={[
+            styles.taskListContent,
+            trashedTasks.length === 0 && styles.emptyContent,
+          ]}
+          initialNumToRender={12}
+          maxToRenderPerBatch={12}
+          windowSize={5}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={trashedTasks.length >= 25}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🗑️</Text>
               <Text style={[styles.emptyTitle, { color: tc.text }]}>
@@ -188,8 +199,8 @@ export default function TrashScreen() {
                 {t('trash.emptyHint') || 'Deleted tasks will appear here'}
               </Text>
             </View>
-          )}
-        </ScrollView>
+          }
+        />
       </View>
     </GestureHandlerRootView>
   );
@@ -224,7 +235,13 @@ const styles = StyleSheet.create({
   },
   taskList: {
     flex: 1,
+  },
+  taskListContent: {
     padding: 16,
+  },
+  emptyContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   taskItem: {
     flexDirection: 'row',

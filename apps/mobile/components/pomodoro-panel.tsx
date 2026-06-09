@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   type Task,
@@ -453,40 +453,48 @@ export function PomodoroPanel({
                   {timerOnlyLabel}
                 </Text>
               </Pressable>
-              <ScrollView style={styles.taskPickerList} contentContainerStyle={styles.taskPickerListContent}>
-                {tasks.length === 0 ? (
-                  <Text style={[styles.noTaskText, { color: tc.secondaryText }]}>{noTaskLabel}</Text>
-                ) : (
-                  tasks.map((task) => {
-                    const selected = task.id === selectedTaskId;
-                    return (
-                      <Pressable
-                        key={task.id}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        onPress={() => {
-                          setSelectedTaskId(task.id);
-                          setIsTaskPickerOpen(false);
-                        }}
-                        style={[
-                          styles.taskPickerOption,
-                          {
-                            borderColor: selected ? tc.tint : tc.border,
-                            backgroundColor: selected ? `${tc.tint}18` : tc.filterBg,
-                          },
-                        ]}
+              <FlatList
+                data={tasks}
+                renderItem={({ item: task }) => {
+                  const selected = task.id === selectedTaskId;
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      onPress={() => {
+                        setSelectedTaskId(task.id);
+                        setIsTaskPickerOpen(false);
+                      }}
+                      style={[
+                        styles.taskPickerOption,
+                        {
+                          borderColor: selected ? tc.tint : tc.border,
+                          backgroundColor: selected ? `${tc.tint}18` : tc.filterBg,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.taskPickerOptionText, { color: selected ? tc.tint : tc.text }]}
+                        numberOfLines={2}
                       >
-                        <Text
-                          style={[styles.taskPickerOptionText, { color: selected ? tc.tint : tc.text }]}
-                          numberOfLines={2}
-                        >
-                          {task.title}
-                        </Text>
-                      </Pressable>
-                    );
-                  })
-                )}
-              </ScrollView>
+                        {task.title}
+                      </Text>
+                    </Pressable>
+                  );
+                }}
+                keyExtractor={(task) => task.id}
+                style={styles.taskPickerList}
+                contentContainerStyle={styles.taskPickerListContent}
+                initialNumToRender={12}
+                maxToRenderPerBatch={12}
+                windowSize={5}
+                updateCellsBatchingPeriod={50}
+                removeClippedSubviews={tasks.length >= 25}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  <Text style={[styles.noTaskText, { color: tc.secondaryText }]}>{noTaskLabel}</Text>
+                }
+              />
             </View>
           </View>
         </Modal>

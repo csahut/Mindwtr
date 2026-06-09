@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
+import { View, Text, FlatList, Modal, TouchableOpacity, ScrollView, StyleSheet, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -251,10 +251,10 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
     };
 
     const renderTaskList = (list: Task[], options?: { showFocusToggle?: boolean; hideStatusBadge?: boolean }) => (
-        <ScrollView style={styles.taskList}>
-            {list.map((task) => (
+        <FlatList
+            data={list}
+            renderItem={({ item: task }) => (
                 <SwipeableTaskItem
-                    key={task.id}
                     task={task}
                     isDark={isDark}
                     tc={tc}
@@ -267,8 +267,16 @@ function DailyReviewFlow({ onClose }: { onClose: () => void }) {
                     onContextPress={handleNavigateToToken}
                     onTagPress={handleNavigateToToken}
                 />
-            ))}
-        </ScrollView>
+            )}
+            keyExtractor={(task) => task.id}
+            style={styles.taskList}
+            initialNumToRender={12}
+            maxToRenderPerBatch={12}
+            windowSize={5}
+            updateCellsBatchingPeriod={50}
+            removeClippedSubviews={list.length >= 25}
+            showsVerticalScrollIndicator={false}
+        />
     );
 
     const renderExternalEventList = (events: ExternalCalendarEvent[]) => {

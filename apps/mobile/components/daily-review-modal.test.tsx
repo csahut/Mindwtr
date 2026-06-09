@@ -26,6 +26,26 @@ const storeState: any = {
   deleteTask: vi.fn(),
 };
 
+vi.mock('react-native', async () => {
+  const actual = await vi.importActual<any>('react-native');
+  return {
+    ...actual,
+    FlatList: ({ data = [], renderItem, keyExtractor, ListEmptyComponent, ...props }: any) => {
+      const children = data.length > 0
+        ? data.map((item: any, index: number) => (
+          <React.Fragment key={keyExtractor?.(item, index) ?? item.id ?? index}>
+            {renderItem?.({ item, index })}
+          </React.Fragment>
+        ))
+        : typeof ListEmptyComponent === 'function'
+          ? <ListEmptyComponent />
+          : ListEmptyComponent;
+
+      return React.createElement('FlatList', props, children);
+    },
+  };
+});
+
 vi.mock('@mindwtr/core', () => {
   const parseDate = (value?: string | Date | null) => {
     if (!value) return null;
