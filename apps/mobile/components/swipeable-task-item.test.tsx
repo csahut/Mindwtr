@@ -171,10 +171,10 @@ vi.mock('@/contexts/language-context', () => ({
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
-  Swipeable: ({ renderLeftActions, renderRightActions, children }: any) =>
+  Swipeable: ({ renderLeftActions, renderRightActions, children, ...props }: any) =>
     React.createElement(
       'Swipeable',
-      {},
+      props,
       renderLeftActions ? renderLeftActions() : null,
       renderRightActions ? renderRightActions() : null,
       children
@@ -260,6 +260,44 @@ describe('SwipeableTaskItem', () => {
       formatStr === 'Pp' ? 'May 12, 2026, 8:30 AM' : ''
     ));
     safeParseDate.mockImplementation((value?: string | null) => (value ? new Date(value) : null));
+  });
+
+  it('requires a deliberate horizontal drag before opening swipe actions', () => {
+    let tree!: renderer.ReactTestRenderer;
+    renderer.act(() => {
+      tree = renderer.create(
+        <SwipeableTaskItem
+          task={{
+            id: 'task-1',
+            title: 'Pay rent',
+            status: 'inbox',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          } as any}
+          isDark={false}
+          tc={{
+            taskItemBg: '#111111',
+            border: '#222222',
+            text: '#ffffff',
+            secondaryText: '#999999',
+            tint: '#3b82f6',
+            warning: '#f59e0b',
+          } as any}
+          onPress={vi.fn()}
+          onStatusChange={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      );
+    });
+
+    const swipeable = tree.root.find((node) => (node.type as unknown) === 'Swipeable');
+    expect(swipeable.props.friction).toBe(1.25);
+    expect(swipeable.props.leftThreshold).toBe(72);
+    expect(swipeable.props.rightThreshold).toBe(72);
+    expect(swipeable.props.dragOffsetFromLeftEdge).toBe(28);
+    expect(swipeable.props.dragOffsetFromRightEdge).toBe(28);
+    expect(swipeable.props.overshootLeft).toBe(false);
+    expect(swipeable.props.overshootRight).toBe(false);
   });
 
   it('confirms deletion before invoking onDelete', async () => {

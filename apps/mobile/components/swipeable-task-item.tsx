@@ -65,6 +65,10 @@ type ProjectNextActionPromptState = {
     sectionId?: string;
 };
 
+const TASK_SWIPE_FRICTION = 1.25;
+const TASK_SWIPE_OPEN_THRESHOLD = 72;
+const TASK_SWIPE_DRAG_OFFSET = 28;
+
 const getActionFailureMessage = (result: unknown): string | null => {
     if (!result || typeof result !== 'object') return null;
     const actionResult = result as { error?: unknown; success?: unknown };
@@ -514,6 +518,11 @@ export function SwipeableTaskItem({
                     ref={swipeableRef}
                     renderLeftActions={renderLeftActions}
                     renderRightActions={renderRightActions}
+                    friction={TASK_SWIPE_FRICTION}
+                    leftThreshold={TASK_SWIPE_OPEN_THRESHOLD}
+                    rightThreshold={TASK_SWIPE_OPEN_THRESHOLD}
+                    dragOffsetFromLeftEdge={TASK_SWIPE_DRAG_OFFSET}
+                    dragOffsetFromRightEdge={TASK_SWIPE_DRAG_OFFSET}
                     overshootLeft={false}
                     overshootRight={false}
                     enabled={!selectionMode && !disableSwipe}
