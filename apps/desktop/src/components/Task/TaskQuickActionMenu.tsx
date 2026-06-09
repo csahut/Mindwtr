@@ -34,6 +34,7 @@ interface TaskQuickActionMenuProps {
     dateFormatSetting?: string | null;
     nativeDateInputLocale: string;
     contextOptions: string[];
+    contextSuggestions?: string[];
     areas: Area[];
     readOnly: boolean;
     focusAction?: {
@@ -81,6 +82,7 @@ export function TaskQuickActionMenu({
     dateFormatSetting,
     nativeDateInputLocale,
     contextOptions,
+    contextSuggestions = contextOptions,
     areas,
     readOnly,
     focusAction,
@@ -763,6 +765,7 @@ export function TaskQuickActionMenu({
                                 t={t}
                                 value={contextsDraft}
                                 options={contextOptions}
+                                suggestions={contextSuggestions}
                                 onChange={setContextsDraft}
                             />
                             <div className="flex items-center justify-end gap-2">

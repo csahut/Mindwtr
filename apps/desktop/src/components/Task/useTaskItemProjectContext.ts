@@ -9,6 +9,7 @@ type UseTaskItemProjectContextParams = {
     taskArea?: Area;
     sections: Section[];
     isEditing: boolean;
+    loadTokenOptions?: boolean;
     editProjectId: string;
     setEditAreaId: (value: string) => void;
 };
@@ -41,6 +42,7 @@ export function useTaskItemProjectContext({
     taskArea,
     sections,
     isEditing,
+    loadTokenOptions = isEditing,
     editProjectId,
     setEditAreaId,
 }: UseTaskItemProjectContextParams) {
@@ -72,26 +74,29 @@ export function useTaskItemProjectContext({
     const [assignedToOptions, setAssignedToOptions] = useState<string[]>([]);
 
     useEffect(() => {
-        if (!isEditing) return;
-        if (editProjectId) {
-            setEditAreaId('');
-        }
+        if (!isEditing && !loadTokenOptions) return;
         const { tasks: storeTasks, projects: storeProjects } = useTaskStore.getState();
-        const projectId = editProjectId || task.projectId;
-        const activeProject = project || (projectId ? storeProjects.find((item) => item.id === projectId) : undefined);
-        if (projectId) {
-            const projectTasks = storeTasks
-                .filter((candidate) => candidate.projectId === projectId && candidate.id !== task.id && !candidate.deletedAt)
-                .map((candidate) => `${candidate.title}${candidate.status ? ` (${candidate.status})` : ''}`)
-                .filter(Boolean)
-                .slice(0, 20);
-            setProjectContext({
-                projectTitle: activeProject?.title || '',
-                projectTasks,
-            });
-        } else {
-            setProjectContext(null);
+        if (isEditing) {
+            if (editProjectId) {
+                setEditAreaId('');
+            }
+            const projectId = editProjectId || task.projectId;
+            const activeProject = project || (projectId ? storeProjects.find((item) => item.id === projectId) : undefined);
+            if (projectId) {
+                const projectTasks = storeTasks
+                    .filter((candidate) => candidate.projectId === projectId && candidate.id !== task.id && !candidate.deletedAt)
+                    .map((candidate) => `${candidate.title}${candidate.status ? ` (${candidate.status})` : ''}`)
+                    .filter(Boolean)
+                    .slice(0, 20);
+                setProjectContext({
+                    projectTitle: activeProject?.title || '',
+                    projectTasks,
+                });
+            } else {
+                setProjectContext(null);
+            }
         }
+        if (!loadTokenOptions) return;
 
         const allTagOptions = uniquePrefixedTokenOptions(
             getUsedTaskTokens(storeTasks, (candidate) => candidate.tags),
@@ -121,7 +126,7 @@ export function useTaskItemProjectContext({
                     .filter((value): value is string => Boolean(value))
             )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
         );
-    }, [editProjectId, isEditing, project, setEditAreaId, task.id, task.projectId]);
+    }, [editProjectId, isEditing, loadTokenOptions, project, setEditAreaId, task.id, task.projectId]);
 
     return {
         sectionsByProject,

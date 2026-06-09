@@ -438,6 +438,7 @@ export const TaskItem = memo(function TaskItem({
         taskArea: storeTaskArea,
         sections,
         isEditing,
+        loadTokenOptions: isEditing || Boolean(quickActionMenu),
         editProjectId,
         setEditAreaId,
     });
@@ -1281,6 +1282,7 @@ export const TaskItem = memo(function TaskItem({
                     dateFormatSetting={settings?.dateFormat}
                     nativeDateInputLocale={nativeDateInputLocale}
                     contextOptions={popularContextOptions}
+                    contextSuggestions={allContexts}
                     areas={areas}
                     readOnly={effectiveReadOnly}
                     focusAction={quickActionFocus}

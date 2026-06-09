@@ -536,6 +536,55 @@ describe('TaskItem', () => {
         });
     });
 
+    it('offers full context autocomplete from the task quick actions menu', async () => {
+        const quickContextTask: Task = {
+            ...mockTask,
+            id: 'quick-context-autocomplete-task',
+        };
+        const contextSourceTasks: Task[] = [
+            ['context-alpha', '@alpha', '2026-02-08T00:00:00.000Z'],
+            ['context-beta', '@beta', '2026-02-07T00:00:00.000Z'],
+            ['context-delta', '@delta', '2026-02-06T00:00:00.000Z'],
+            ['context-gamma', '@gamma', '2026-02-05T00:00:00.000Z'],
+            ['context-office', '@office', '2026-02-04T00:00:00.000Z'],
+            ['context-home', '@home', '2026-02-03T00:00:00.000Z'],
+        ].map(([id, context, updatedAt]) => ({
+            ...mockTask,
+            id,
+            contexts: [context],
+            updatedAt,
+        }));
+        act(() => {
+            useTaskStore.setState((state) => ({
+                ...state,
+                tasks: [quickContextTask, ...contextSourceTasks],
+                _allTasks: [quickContextTask, ...contextSourceTasks],
+                projects: [],
+                _allProjects: [],
+            }));
+        });
+
+        const { container, findByRole, getByLabelText, getByRole } = render(
+            <LanguageProvider>
+                <TaskItem task={quickContextTask} />
+            </LanguageProvider>
+        );
+
+        const row = container.querySelector('[data-task-id="quick-context-autocomplete-task"]');
+        expect(row).toBeTruthy();
+        fireEvent.contextMenu(row!);
+        fireEvent.click(getByRole('menuitem', { name: /contexts/i }));
+        const input = getByLabelText('Contexts', { selector: 'input' }) as HTMLInputElement;
+        fireEvent.focus(input);
+        fireEvent.change(input, { target: { value: '@ho' } });
+
+        expect(await findByRole('option', { name: '@home' })).toBeInTheDocument();
+
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(input).toHaveValue('@home');
+    });
+
     it('applies inset ring style when selected to avoid clipped borders', () => {
         const { container } = render(
             <LanguageProvider>
