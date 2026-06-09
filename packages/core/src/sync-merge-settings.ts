@@ -20,6 +20,7 @@ import { MAX_FOCUS_TASK_LIMIT, MIN_FOCUS_TASK_LIMIT, normalizeFocusTaskLimit } f
 import { normalizeSavedFilters } from './saved-filters';
 import { chooseDeterministicWinner } from './sync-signatures';
 import { CLOCK_SKEW_THRESHOLD_MS, DELETE_VS_LIVE_AMBIGUOUS_WINDOW_MS } from './sync-types';
+import { normalizeExternalCalendarColor } from './external-calendar-colors';
 
 const parseSyncTimestamp = (value?: string): number => {
     if (!value) return NaN;
@@ -189,7 +190,7 @@ const sanitizeExternalCalendars = (
 ): AppData['settings']['externalCalendars'] | undefined => {
     if (value === undefined) return fallback ? cloneSettingValue(fallback) : undefined;
     if (!Array.isArray(value)) return fallback ? cloneSettingValue(fallback) : undefined;
-    const isValidCalendar = (item: unknown): item is { id: string; name: string; url: string; enabled: boolean } =>
+    const isValidCalendar = (item: unknown): item is { color?: unknown; id: string; name: string; url: string; enabled: boolean } =>
         isObjectRecord(item)
         && isNonEmptyString(item.id)
         && isNonEmptyString(item.name)
@@ -199,27 +200,27 @@ const sanitizeExternalCalendars = (
         const url = item.url.trim().toLowerCase();
         return url.startsWith('file://') || url.startsWith('content://');
     };
-    const next = value
-        .filter(isValidCalendar)
-        .filter((item) => !isLocalCalendarSource(item))
-        .map((item) => ({
+    const sanitizeCalendar = (item: { color?: unknown; id: string; name: string; url: string; enabled: boolean }) => {
+        const color = normalizeExternalCalendarColor(item.color);
+        return {
             id: item.id.trim(),
             name: item.name.trim(),
             url: item.url.trim(),
             enabled: item.enabled,
-        }));
+            ...(color ? { color } : {}),
+        };
+    };
+    const next = value
+        .filter(isValidCalendar)
+        .filter((item) => !isLocalCalendarSource(item))
+        .map(sanitizeCalendar);
     const deduped = new Map<string, (typeof next)[number]>();
     for (const item of next) {
         deduped.set(item.id, item);
     }
     for (const item of fallback ?? []) {
         if (!isValidCalendar(item) || !isLocalCalendarSource(item)) continue;
-        const localSource = {
-            id: item.id.trim(),
-            name: item.name.trim(),
-            url: item.url.trim(),
-            enabled: item.enabled,
-        };
+        const localSource = sanitizeCalendar(item);
         if (!deduped.has(localSource.id)) {
             deduped.set(localSource.id, localSource);
         }

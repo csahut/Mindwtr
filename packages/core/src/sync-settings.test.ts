@@ -298,7 +298,7 @@ describe('Sync Logic', () => {
 
         it('deep-clones merged settings arrays to avoid shared references', () => {
             const incomingCalendars = [
-                { id: 'cal-1', name: 'Team', url: 'https://calendar.example.com/team.ics', enabled: true },
+                { id: 'cal-1', name: 'Team', url: 'https://calendar.example.com/team.ics', enabled: true, color: '#7c3aed' },
             ];
             const local: AppData = {
                 ...mockAppData(),
@@ -323,7 +323,9 @@ describe('Sync Logic', () => {
 
             const merged = mergeAppData(local, incoming);
 
-            expect(merged.settings.externalCalendars).toEqual(incomingCalendars);
+            expect(merged.settings.externalCalendars).toEqual([
+                { id: 'cal-1', name: 'Team', url: 'https://calendar.example.com/team.ics', enabled: true, color: '#7C3AED' },
+            ]);
             expect(merged.settings.externalCalendars).not.toBe(incomingCalendars);
 
             incomingCalendars[0].name = 'Mutated Incoming';
@@ -332,8 +334,8 @@ describe('Sync Logic', () => {
 
         it('keeps local file calendar sources out of synced settings merges', () => {
             const localCalendars = [
-                { id: 'cal-local', name: 'Local', url: 'file:///home/user/agenda.ics', enabled: true },
-                { id: 'cal-android-local', name: 'Android Local', url: 'content://calendar/agenda.ics', enabled: true },
+                { id: 'cal-local', name: 'Local', url: 'file:///home/user/agenda.ics', enabled: true, color: '#DB2777' },
+                { id: 'cal-android-local', name: 'Android Local', url: 'content://calendar/agenda.ics', enabled: true, color: '#059669' },
             ];
             const local: AppData = {
                 ...mockAppData(),
@@ -350,7 +352,7 @@ describe('Sync Logic', () => {
                     externalCalendars: [
                         { id: 'cal-file', name: 'File', url: 'file:///tmp/other.ics', enabled: true },
                         { id: 'cal-content', name: 'Android File', url: 'content://downloads/other.ics', enabled: true },
-                        { id: 'cal-team', name: 'Team', url: 'https://calendar.example.com/team.ics', enabled: true },
+                        { id: 'cal-team', name: 'Team', url: 'https://calendar.example.com/team.ics', enabled: true, color: '#EA580C' },
                     ],
                     syncPreferencesUpdatedAt: {
                         externalCalendars: '2024-01-02T00:00:00.000Z',
@@ -361,7 +363,7 @@ describe('Sync Logic', () => {
             const merged = mergeAppData(local, incoming);
 
             expect(merged.settings.externalCalendars).toEqual([
-                { id: 'cal-team', name: 'Team', url: 'https://calendar.example.com/team.ics', enabled: true },
+                { id: 'cal-team', name: 'Team', url: 'https://calendar.example.com/team.ics', enabled: true, color: '#EA580C' },
                 ...localCalendars,
             ]);
         });
