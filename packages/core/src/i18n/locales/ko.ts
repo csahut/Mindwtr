@@ -527,6 +527,8 @@ export const koOverrides: Record<string, string> = {
         'review.deadline': '사선',
         'review.contexts': '컨텍스트',
         'review.markDone': '완료로 표시',
+        'review.markReviewed': '검토됨으로 표시',
+        'review.markReviewedDone': '검토됨으로 표시했습니다',
         'review.noTasks': '검토할 작업이 없습니다.',
         'process.title': '공정 품목',
         'process.refineTitle': '작업 구체화',
