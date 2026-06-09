@@ -16,15 +16,19 @@ const emptyFilters: MobileTaskListFilters = {
   tokens: [],
 };
 
-const task: Pick<Task, 'contexts' | 'description' | 'energyLevel' | 'location' | 'priority' | 'tags' | 'timeEstimate' | 'title'> = {
+const task: Task = {
   contexts: ['@work/deep'],
+  createdAt: '2026-05-27T10:00:00.000Z',
   description: 'Draft launch notes',
   energyLevel: 'high',
+  id: 'c5290e2c-1b77-4f77-8927-6d187e141891',
   location: 'Office',
   priority: 'urgent',
+  status: 'next',
   tags: ['#client/acme'],
   timeEstimate: '30min',
   title: 'Prepare release checklist',
+  updatedAt: '2026-05-27T10:00:00.000Z',
 };
 
 describe('task-list-filter-utils', () => {
@@ -45,6 +49,12 @@ describe('task-list-filter-utils', () => {
     expect(taskMatchesMobileTaskFilters(task, { ...emptyFilters, searchQuery: 'release' })).toBe(true);
     expect(taskMatchesMobileTaskFilters(task, { ...emptyFilters, searchQuery: 'launch notes' })).toBe(true);
     expect(taskMatchesMobileTaskFilters(task, { ...emptyFilters, searchQuery: 'vacation' })).toBe(false);
+  });
+
+  it('matches fielded task id searches with full and partial UUIDs', () => {
+    expect(taskMatchesMobileTaskFilters(task, { ...emptyFilters, searchQuery: 'id:c5290e2c-1b77-4f77-8927-6d187e141891' })).toBe(true);
+    expect(taskMatchesMobileTaskFilters(task, { ...emptyFilters, searchQuery: 'id:6d187e141891' })).toBe(true);
+    expect(taskMatchesMobileTaskFilters(task, { ...emptyFilters, searchQuery: 'id:missing-task-id' })).toBe(false);
   });
 
   it('matches context and tag filters using hierarchy prefixes', () => {

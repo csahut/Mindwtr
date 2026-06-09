@@ -1,5 +1,5 @@
 import type { Task, TaskEnergyLevel, TaskPriority, TimeEstimate } from '@mindwtr/core';
-import { matchesHierarchicalToken, timeEstimateToFilterBucket } from '@mindwtr/core';
+import { matchesHierarchicalToken, matchesTask, parseSearchQuery, timeEstimateToFilterBucket } from '@mindwtr/core';
 
 export type MobileTaskListFilters = {
   energyLevels: TaskEnergyLevel[];
@@ -22,13 +22,25 @@ export const countActiveMobileTaskFilters = (filters: MobileTaskListFilters): nu
 );
 
 export const taskMatchesMobileTaskFilters = (
-  task: Pick<Task, 'contexts' | 'description' | 'energyLevel' | 'location' | 'priority' | 'tags' | 'timeEstimate' | 'title'>,
+  task: Task,
   filters: MobileTaskListFilters,
 ): boolean => {
   const searchQuery = normalize(filters.searchQuery);
   if (searchQuery) {
-    const searchable = `${task.title} ${task.description ?? ''}`.toLowerCase();
-    if (!searchable.includes(searchQuery)) return false;
+    const parsedSearch = parseSearchQuery(searchQuery);
+    const hasFieldedTerm = parsedSearch.clauses.some((clause) =>
+      clause.terms.some((term) => term.field !== null)
+    );
+    if (hasFieldedTerm) {
+      const now = new Date();
+      const matchesSearch = parsedSearch.clauses.some((clause) =>
+        clause.terms.every((term) => matchesTask(term, task, null, now))
+      );
+      if (!matchesSearch) return false;
+    } else {
+      const searchable = `${task.title} ${task.description ?? ''}`.toLowerCase();
+      if (!searchable.includes(searchQuery)) return false;
+    }
   }
 
   if (filters.tokens.length > 0) {
