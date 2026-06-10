@@ -146,6 +146,25 @@ describe('ReviewView', () => {
         ))).toEqual([false, false]);
     });
 
+    it('shows bulk organize for selected review tasks', () => {
+        const tasks = [
+            makeTask('review-1', { title: 'First review task' }),
+            makeTask('review-2', { title: 'Second review task' }),
+        ];
+        useTaskStore.setState({
+            tasks,
+            _allTasks: tasks,
+            lastDataChangeAt: 1,
+        });
+
+        const { getByRole } = renderWithProviders(<ReviewView />);
+
+        fireEvent.click(getByRole('button', { name: 'Select' }));
+        fireEvent.click(getByRole('button', { name: 'Select All' }));
+
+        expect(getByRole('button', { name: 'Bulk organize' })).toBeInTheDocument();
+    });
+
     it('auto-skips an empty weekly review to the all-clear state while showing checked stages', async () => {
         const { getByText } = renderWithProviders(<ReviewView />);
 

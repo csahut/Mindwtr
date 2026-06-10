@@ -26,7 +26,7 @@ import { ListEmptyState } from './list/ListEmptyState';
 import { ListControlsPanel } from './list/ListControlsPanel';
 import { PromptModal } from '../PromptModal';
 import { InboxProcessor } from './InboxProcessor';
-import { InboxBulkOrganizeModal } from './inbox/InboxBulkOrganizeModal';
+import { TaskBulkOrganizeModal } from './list/TaskBulkOrganizeModal';
 import { useLanguage } from '../../contexts/language-context';
 import { useKeybindings } from '../../contexts/keybinding-context';
 import { useListCopilot } from './list/useListCopilot';
@@ -603,7 +603,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
     const bulkAreaOptions = [...areas]
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((area) => ({ id: area.id, name: area.name }));
-    const handleApplyInboxBulkOrganize = useCallback(async (input: BulkOrganizeTaskUpdateInput) => {
+    const handleApplyTaskBulkOrganize = useCallback(async (input: BulkOrganizeTaskUpdateInput) => {
         if (selectedIdsArray.length === 0 || isBulkOrganizing) return;
         const updates = buildBulkOrganizeTaskUpdates(selectedIdsArray, tasksById, input);
         if (updates.length === 0) return;
@@ -618,7 +618,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
             ).replace('{{count}}', String(updates.length));
             showToast(message, 'success');
         } catch (error) {
-            reportError('Failed to bulk organize inbox tasks', error);
+            reportError('Failed to bulk organize selected tasks', error);
             showToast(translateWithFallback('bulk.organizeFailed', 'Failed to organize selected tasks'), 'error');
         } finally {
             setIsBulkOrganizing(false);
@@ -845,7 +845,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                     onMoveToStatus={handleBatchMove}
                     onAssignArea={handleBatchAssignArea}
                     areaOptions={bulkAreaOptions}
-                    onBulkOrganize={isInbox ? () => setBulkOrganizeOpen(true) : undefined}
+                    onBulkOrganize={() => setBulkOrganizeOpen(true)}
                     onAddTag={handleBatchAddTag}
                     onAddContext={handleBatchAddContext}
                     onRemoveContext={handleBatchRemoveContext}
@@ -1105,15 +1105,17 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
             onCancel={() => setPendingBatchDeleteIds([])}
             onConfirm={confirmBatchDelete}
         />
-        <InboxBulkOrganizeModal
+        <TaskBulkOrganizeModal
             isOpen={bulkOrganizeOpen}
             selectedCount={selectedIdsArray.length}
             projects={projects}
             areas={areas}
             isApplying={isBulkOrganizing}
             t={t}
+            titleKey={isInbox ? 'bulk.organizeInbox' : 'bulk.organizeTasks'}
+            titleFallback={isInbox ? 'Bulk organize Inbox' : 'Bulk organize tasks'}
             onCancel={() => setBulkOrganizeOpen(false)}
-            onApply={handleApplyInboxBulkOrganize}
+            onApply={handleApplyTaskBulkOrganize}
         />
         </ErrorBoundary>
     );

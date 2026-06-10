@@ -13,13 +13,15 @@ import {
 import { ModalPortal } from '../../ModalPortal';
 import { Button } from '../../ui/Button';
 
-type InboxBulkOrganizeModalProps = {
+type TaskBulkOrganizeModalProps = {
     isOpen: boolean;
     selectedCount: number;
     projects: Project[];
     areas: Area[];
     isApplying: boolean;
     t: (key: string) => string;
+    titleKey?: string;
+    titleFallback?: string;
     onApply: (input: BulkOrganizeTaskUpdateInput) => Promise<void> | void;
     onCancel: () => void;
 };
@@ -28,16 +30,18 @@ const STATUS_OPTIONS: BulkOrganizeStatus[] = ['next', 'waiting', 'someday', 'ref
 const KEEP_VALUE = '__KEEP__';
 const NONE_VALUE = '__NONE__';
 
-export function InboxBulkOrganizeModal({
+export function TaskBulkOrganizeModal({
     isOpen,
     selectedCount,
     projects,
     areas,
     isApplying,
     t,
+    titleKey = 'bulk.organizeTasks',
+    titleFallback = 'Bulk organize tasks',
     onApply,
     onCancel,
-}: InboxBulkOrganizeModalProps) {
+}: TaskBulkOrganizeModalProps) {
     const [status, setStatus] = useState<BulkOrganizeStatus>('next');
     const [projectChoice, setProjectChoice] = useState(KEEP_VALUE);
     const [areaChoice, setAreaChoice] = useState(KEEP_VALUE);
@@ -81,6 +85,7 @@ export function InboxBulkOrganizeModal({
     const isWaiting = status === 'waiting';
     const canApply = selectedCount > 0 && (!isWaiting || delegateWho.trim().length > 0);
     const selectedProjectId = projectChoice !== KEEP_VALUE && projectChoice !== NONE_VALUE ? projectChoice : undefined;
+    const title = tFallback(t, titleKey, titleFallback);
 
     const apply = () => {
         if (!canApply) {
@@ -114,7 +119,7 @@ export function InboxBulkOrganizeModal({
             className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pt-[8vh]"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="inbox-bulk-organize-title"
+            aria-labelledby="task-bulk-organize-title"
             onClick={onCancel}
         >
             <div
@@ -125,8 +130,8 @@ export function InboxBulkOrganizeModal({
                     <div>
                         <div className="flex items-center gap-2">
                             <ClipboardCheck className="h-4 w-4 text-primary" aria-hidden="true" />
-                            <h3 id="inbox-bulk-organize-title" className="font-semibold">
-                                {tFallback(t, 'bulk.organizeInbox', 'Bulk organize Inbox')}
+                            <h3 id="task-bulk-organize-title" className="font-semibold">
+                                {title}
                             </h3>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">

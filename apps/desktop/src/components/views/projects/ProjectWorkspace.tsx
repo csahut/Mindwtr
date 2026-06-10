@@ -3,10 +3,12 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import {
     Attachment,
     Task,
+    buildBulkOrganizeTaskUpdates,
     buildBulkTaskTokenUpdates,
     collectBulkTaskTokens,
     getSequentialProjectTaskCues,
     type Area,
+    type BulkOrganizeTaskUpdateInput,
     type Project,
     type ProjectSequenceTaskCue,
     type RangeSelectionOptions,
@@ -30,6 +32,7 @@ import { TaskItem } from '../../TaskItem';
 import { TaskInput } from '../../Task/TaskInput';
 import { BulkSelectionToolbar } from '../list/BulkSelectionToolbar';
 import { ListBulkActions } from '../list/ListBulkActions';
+import { TaskBulkOrganizeModal } from '../list/TaskBulkOrganizeModal';
 import { normalizeAttachmentInput } from '../../../lib/attachment-utils';
 import { cn } from '../../../lib/utils';
 import { reportError } from '../../../lib/report-error';
@@ -345,6 +348,8 @@ export function ProjectWorkspace({
     const [selectionMode, setSelectionMode] = useState(false);
     const [multiSelectedIds, setMultiSelectedIds] = useState<Set<string>>(new Set());
     const [bulkTokenPicker, setBulkTokenPicker] = useState<BulkTokenPickerState>(null);
+    const [bulkOrganizeOpen, setBulkOrganizeOpen] = useState(false);
+    const [isBulkOrganizing, setIsBulkOrganizing] = useState(false);
     const [isBatchDeleting, setIsBatchDeleting] = useState(false);
     const [completedTasksCollapsed, setCompletedTasksCollapsed] = useState(true);
     const multiSelectAnchorIdRef = useRef<string | null>(null);
@@ -577,6 +582,12 @@ export function ProjectWorkspace({
     const selectedVisibleCount = visibleProjectTaskIds.filter((id) => multiSelectedIds.has(id)).length;
     const allVisibleTasksSelected = visibleProjectTaskIds.length > 0 && selectedVisibleCount === visibleProjectTaskIds.length;
     const tasksById = useMemo(() => new Map(allTasks.map((task) => [task.id, task])), [allTasks]);
+    const bulkAreaOptions = useMemo(
+        () => sortedAreas
+            .filter((area) => !area.deletedAt)
+            .map((area) => ({ id: area.id, name: area.name })),
+        [sortedAreas],
+    );
     const addTagOptions = useMemo(
         () => allTokens.filter((token) => token.startsWith('#')),
         [allTokens],
@@ -598,6 +609,7 @@ export function ProjectWorkspace({
         setSelectionMode(false);
         setMultiSelectedIds(new Set());
         setBulkTokenPicker(null);
+        setBulkOrganizeOpen(false);
         multiSelectAnchorIdRef.current = null;
     }, []);
 
@@ -651,6 +663,36 @@ export function ProjectWorkspace({
             showToast(resolveText('bulk.moveFailed', 'Failed to move selected tasks'), 'error');
         }
     }, [batchMoveTasks, exitSelectionMode, resolveText, selectedIdsArray, showToast]);
+
+    const handleBatchAssignArea = useCallback(async (areaId: string | null) => {
+        if (selectedIdsArray.length === 0) return;
+        try {
+            await Promise.resolve(batchUpdateTasks(selectedIdsArray.map((id) => ({
+                id,
+                updates: { areaId: areaId ?? undefined },
+            }))));
+            exitSelectionMode();
+        } catch (error) {
+            reportError('Failed to batch assign project task area', error);
+            showToast(resolveText('bulk.updateFailed', 'Failed to update selected tasks'), 'error');
+        }
+    }, [batchUpdateTasks, exitSelectionMode, resolveText, selectedIdsArray, showToast]);
+
+    const handleApplyTaskBulkOrganize = useCallback(async (input: BulkOrganizeTaskUpdateInput) => {
+        if (selectedIdsArray.length === 0 || isBulkOrganizing) return;
+        const updates = buildBulkOrganizeTaskUpdates(selectedIdsArray, tasksById, input);
+        if (updates.length === 0) return;
+        setIsBulkOrganizing(true);
+        try {
+            await Promise.resolve(batchUpdateTasks(updates));
+            exitSelectionMode();
+        } catch (error) {
+            reportError('Failed to bulk organize project tasks', error);
+            showToast(resolveText('bulk.organizeFailed', 'Failed to organize selected tasks'), 'error');
+        } finally {
+            setIsBulkOrganizing(false);
+        }
+    }, [batchUpdateTasks, exitSelectionMode, isBulkOrganizing, resolveText, selectedIdsArray, showToast, tasksById]);
 
     const handleBatchDelete = useCallback(async () => {
         if (selectedIdsArray.length === 0) return;
@@ -1602,6 +1644,9 @@ export function ProjectWorkspace({
                                                 <ListBulkActions
                                                     selectionCount={selectedIdsArray.length}
                                                     onMoveToStatus={handleBatchMove}
+                                                    onAssignArea={handleBatchAssignArea}
+                                                    areaOptions={bulkAreaOptions}
+                                                    onBulkOrganize={() => setBulkOrganizeOpen(true)}
                                                     onAddTag={() => handleBatchTokenPick('tags', 'add')}
                                                     onRemoveTag={() => handleBatchTokenPick('tags', 'remove')}
                                                     disableRemoveTag={removableTagOptions.length === 0}
@@ -1732,6 +1777,16 @@ export function ProjectWorkspace({
                 cancelLabel={t('common.cancel')}
                 onCancel={() => setBulkTokenPicker(null)}
                 onConfirm={handleBulkTokenConfirm}
+            />
+            <TaskBulkOrganizeModal
+                isOpen={bulkOrganizeOpen}
+                selectedCount={selectedIdsArray.length}
+                projects={projects}
+                areas={areas}
+                isApplying={isBulkOrganizing}
+                t={t}
+                onCancel={() => setBulkOrganizeOpen(false)}
+                onApply={handleApplyTaskBulkOrganize}
             />
         </>
     );

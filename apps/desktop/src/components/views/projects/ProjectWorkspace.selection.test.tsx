@@ -67,6 +67,7 @@ const translations: Record<string, string> = {
     'bulk.delete': 'Delete',
     'bulk.exitSelect': 'Exit Select',
     'bulk.moveTo': 'Move to',
+    'bulk.organize': 'Bulk organize',
     'bulk.removeContext': 'Remove context',
     'bulk.removeTag': 'Remove tag',
     'bulk.select': 'Select',
@@ -83,6 +84,7 @@ const translations: Record<string, string> = {
     'projects.addSection': 'Add section',
     'projects.addTask': 'Add task',
     'projects.addTaskPlaceholder': 'Add task',
+    'projects.areaLabel': 'Area',
     'projects.noActiveTasks': 'No active tasks',
     'projects.sectionsLabel': 'Tasks',
     'sort.default': 'Default',
@@ -94,6 +96,7 @@ const translations: Record<string, string> = {
     'status.reference': 'Reference',
     'status.someday': 'Someday',
     'status.waiting': 'Waiting',
+    'taskEdit.noAreaOption': 'No area',
 };
 
 const t = (key: string) => translations[key] ?? key;
@@ -218,6 +221,30 @@ describe('ProjectWorkspace Select mode', () => {
         });
         expect(setHighlightTask).toHaveBeenCalledWith('created-task');
         expect(useUiStore.getState().editingTaskId).toBe('created-task');
+    });
+
+    it('shows bulk organize and area assignment for selected project tasks', () => {
+        const area = {
+            id: 'area-1',
+            name: 'Work',
+            color: '#2563eb',
+            order: 0,
+            createdAt: '2026-05-12T00:00:00.000Z',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+        };
+        const projectTask = task('task-1', 'Move me');
+        const { getByRole } = renderWorkspace({
+            allTasks: [projectTask],
+            areas: [area],
+            sortedAreas: [area],
+            selectedProjectTasks: [projectTask],
+        });
+
+        fireEvent.click(getByRole('button', { name: 'Select' }));
+        fireEvent.click(getByRole('checkbox', { name: 'Select task' }));
+
+        expect(getByRole('button', { name: 'Bulk organize' })).toBeInTheDocument();
+        expect(getByRole('combobox', { name: 'Area' })).toBeInTheDocument();
     });
 
     it('retries scrolling to a highlighted project task after navigation', async () => {
