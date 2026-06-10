@@ -1,7 +1,9 @@
 import { ChevronDown, ChevronsUpDown, List, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { TaskSortBy } from '@mindwtr/core';
-import type { NextGroupBy } from './next-grouping';
+import type { TaskListGroupBy } from './next-grouping';
+
+const DEFAULT_GROUP_BY_OPTIONS: TaskListGroupBy[] = ['none', 'context', 'area', 'project', 'energy', 'priority'];
 
 type ListHeaderProps = {
     title: string;
@@ -14,8 +16,9 @@ type ListHeaderProps = {
     sortBy: TaskSortBy;
     onChangeSortBy: (value: TaskSortBy) => void;
     showGroupBy?: boolean;
-    groupBy?: NextGroupBy;
-    onChangeGroupBy?: (value: NextGroupBy) => void;
+    groupBy?: TaskListGroupBy;
+    groupByOptions?: TaskListGroupBy[];
+    onChangeGroupBy?: (value: TaskListGroupBy) => void;
     selectionMode: boolean;
     onToggleSelection: () => void;
     showListDetails: boolean;
@@ -37,6 +40,7 @@ export function ListHeader({
     onChangeSortBy,
     showGroupBy = false,
     groupBy = 'none',
+    groupByOptions = DEFAULT_GROUP_BY_OPTIONS,
     onChangeGroupBy,
     selectionMode,
     onToggleSelection,
@@ -79,6 +83,10 @@ export function ListHeader({
         const value = t('list.groupByProject');
         return value === 'list.groupByProject' ? 'Project' : value;
     })();
+    const groupByTagLabel = (() => {
+        const value = t('taskEdit.tagsLabel');
+        return value === 'taskEdit.tagsLabel' ? 'Tags' : value;
+    })();
     const groupByPriorityLabel = (() => {
         const value = t('filters.priority');
         return value === 'filters.priority' ? 'Priority' : value;
@@ -90,6 +98,15 @@ export function ListHeader({
     const controlBaseClass = "h-9 text-xs border transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40";
     const controlMutedClass = "bg-card text-muted-foreground border-border hover:bg-muted/70 hover:text-foreground";
     const controlActiveClass = "bg-primary/10 text-primary border-primary";
+    const groupByLabels: Record<TaskListGroupBy, string> = {
+        none: noGroupingLabel,
+        context: groupByContextLabel,
+        area: groupByAreaLabel,
+        project: groupByProjectLabel,
+        tag: groupByTagLabel,
+        energy: groupByEnergyLabel,
+        priority: groupByPriorityLabel,
+    };
 
     return (
         <header className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
@@ -142,7 +159,7 @@ export function ListHeader({
                     <div className="relative min-w-[132px]">
                         <select
                             value={groupBy}
-                            onChange={(e) => onChangeGroupBy(e.target.value as NextGroupBy)}
+                            onChange={(e) => onChangeGroupBy(e.target.value as TaskListGroupBy)}
                             aria-label={groupLabel}
                             className={cn(
                                 controlBaseClass,
@@ -150,12 +167,9 @@ export function ListHeader({
                                 "w-full appearance-none rounded-lg pl-3 pr-9 text-foreground"
                             )}
                         >
-                            <option value="none">{noGroupingLabel}</option>
-                            <option value="context">{groupByContextLabel}</option>
-                            <option value="area">{groupByAreaLabel}</option>
-                            <option value="project">{groupByProjectLabel}</option>
-                            <option value="energy">{groupByEnergyLabel}</option>
-                            <option value="priority">{groupByPriorityLabel}</option>
+                            {groupByOptions.map((option) => (
+                                <option key={option} value={option}>{groupByLabels[option]}</option>
+                            ))}
                         </select>
                         <ChevronDown
                             className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"

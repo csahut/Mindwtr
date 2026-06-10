@@ -3,6 +3,8 @@ import type { Area, Project, Task, TaskEnergyLevel, TaskPriority } from '@mindwt
 import { getContextColor } from '../../../lib/context-color';
 
 export type NextGroupBy = 'none' | 'context' | 'area' | 'project' | 'energy' | 'priority';
+export type ReferenceGroupBy = 'none' | 'area' | 'project' | 'tag';
+export type TaskListGroupBy = NextGroupBy | ReferenceGroupBy;
 
 export interface TaskGroup {
     id: string;
@@ -28,6 +30,11 @@ interface GroupByProjectParams {
     tasks: Task[];
     projectMap: Map<string, Project>;
     noProjectLabel: string;
+}
+
+interface GroupByTagParams {
+    tasks: Task[];
+    noTagLabel: string;
 }
 
 interface GroupByPriorityParams {
@@ -273,5 +280,52 @@ export function groupTasksByProject({
         });
     });
 
+    return groups;
+}
+
+export function groupTasksByTag({
+    tasks,
+    noTagLabel,
+}: GroupByTagParams): TaskGroup[] {
+    const grouped = new Map<string, Task[]>();
+    const noTagTasks: Task[] = [];
+
+    tasks.forEach((task) => {
+        const tags = (task.tags ?? [])
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0);
+        if (tags.length === 0) {
+            noTagTasks.push(task);
+            return;
+        }
+        Array.from(new Set(tags)).forEach((tag) => {
+            const tagTasks = grouped.get(tag) ?? [];
+            tagTasks.push(task);
+            grouped.set(tag, tagTasks);
+        });
+    });
+
+    const groups: TaskGroup[] = [];
+    if (noTagTasks.length > 0) {
+        groups.push({
+            id: 'tag:none',
+            title: noTagLabel,
+            tasks: noTagTasks,
+            muted: true,
+        });
+    }
+
+    const sortedTags = [...grouped.keys()].sort((a, b) =>
+        a.localeCompare(b, undefined, { sensitivity: 'base' })
+    );
+    sortedTags.forEach((tag) => {
+        const tagTasks = grouped.get(tag) ?? [];
+        groups.push({
+            id: `tag:${tag}`,
+            title: tag,
+            tasks: tagTasks,
+            dotColor: getContextColor(tag),
+        });
+    });
     return groups;
 }

@@ -39,7 +39,7 @@ const renderStaticListView = (statusFilter: 'inbox' | 'done', title: string) =>
     </LanguageProvider>
   );
 
-const renderListView = (statusFilter: 'inbox' | 'next' | 'done' | 'archived' = 'next', title = 'Next') =>
+const renderListView = (statusFilter: 'inbox' | 'next' | 'done' | 'archived' | 'reference' = 'next', title = 'Next') =>
   render(
     <LanguageProvider>
       <KeybindingProvider currentView={statusFilter} onNavigate={() => {}}>
@@ -73,6 +73,7 @@ describe('ListView', () => {
       listOptions: {
         showDetails: false,
         nextGroupBy: 'none',
+        referenceGroupBy: 'area',
         focusTop3Only: false,
       },
       projectView: {
@@ -150,6 +151,47 @@ describe('ListView', () => {
     await waitFor(() => {
       expect(queryByText('Filtering...')).not.toBeInTheDocument();
     });
+  });
+
+  it('defaults reference tasks to area grouping', () => {
+    useTaskStore.setState({
+      areas: [{ id: 'area-1', name: 'Work', color: '#2563eb', order: 0, createdAt: now, updatedAt: now }],
+      tasks: [
+        makeTask('1', { title: 'Work reference', status: 'reference', areaId: 'area-1' }),
+        makeTask('2', { title: 'Loose reference', status: 'reference' }),
+      ],
+      lastDataChangeAt: 1,
+    });
+
+    const { getByRole, queryByText } = renderListView('reference', 'Reference');
+
+    expect(getByRole('combobox', { name: 'Group' })).toHaveValue('area');
+    expect(queryByText('Work')).toBeInTheDocument();
+    expect(queryByText('General')).toBeInTheDocument();
+  });
+
+  it('groups reference tasks by each tag when tag grouping is selected', () => {
+    useTaskStore.setState({
+      tasks: [
+        makeTask('1', { title: 'Dual-tag reference', status: 'reference', tags: ['#alpha', '#beta'] }),
+        makeTask('2', { title: 'Untagged reference', status: 'reference' }),
+      ],
+      lastDataChangeAt: 1,
+    });
+    useUiStore.setState((state) => ({
+      ...state,
+      listOptions: {
+        ...state.listOptions,
+        referenceGroupBy: 'tag',
+      },
+    }));
+
+    const { getAllByText, queryByText } = renderListView('reference', 'Reference');
+
+    expect(queryByText('#alpha')).toBeInTheDocument();
+    expect(queryByText('#beta')).toBeInTheDocument();
+    expect(queryByText('No tags')).toBeInTheDocument();
+    expect(getAllByText('Dual-tag reference')).toHaveLength(2);
   });
 
   it('collapses expanded task details when page details are turned off', async () => {

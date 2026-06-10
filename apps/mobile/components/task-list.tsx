@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, FlatList, Text, TextInput, RefreshControl, TouchableOpacity, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { View, FlatList, Text, TextInput, RefreshControl, Modal, Pressable, TouchableOpacity, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, GripVertical, MoveVertical } from 'lucide-react-native';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Folder, GripVertical, MoveVertical } from 'lucide-react-native';
 import { NestableDraggableFlatList, ScaleDecorator, type DragEndParams, type RenderItemParams } from 'react-native-draggable-flatlist';
 import {
   useTaskStore,
@@ -18,6 +18,7 @@ import {
   createAIProvider,
   type AIProviderId,
   type TaskSortBy,
+  type Project,
   type ProjectSequenceTaskCue,
   DEFAULT_PROJECT_COLOR,
   getTranslationsSync,
@@ -96,6 +97,8 @@ type AddTaskOptions = {
   openAfterCreate?: boolean;
 };
 
+export type ReferenceGroupBy = 'none' | 'area' | 'project' | 'tag';
+
 export interface TaskListProps {
   statusFilter: TaskStatus | 'all';
   title: string;
@@ -131,6 +134,8 @@ export interface TaskListProps {
   includeArchived?: boolean;
   includeDone?: boolean;
   groupCompletedTasksLast?: boolean;
+  referenceGroupBy?: ReferenceGroupBy;
+  onChangeReferenceGroupBy?: (value: ReferenceGroupBy) => void;
   getTaskSequenceCue?: (task: Task) => ProjectSequenceTaskCue | undefined;
   sequenceCueLabels?: Record<ProjectSequenceTaskCue, string>;
 }
@@ -171,6 +176,8 @@ function TaskListComponent({
   includeArchived = false,
   includeDone = true,
   groupCompletedTasksLast = false,
+  referenceGroupBy = 'area',
+  onChangeReferenceGroupBy,
   getTaskSequenceCue,
   sequenceCueLabels,
 }: TaskListProps) {
@@ -227,6 +234,7 @@ function TaskListComponent({
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [sortModalVisible, setSortModalVisible] = useState(false);
+  const [referenceGroupModalVisible, setReferenceGroupModalVisible] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [bulkOrganizeVisible, setBulkOrganizeVisible] = useState(false);
   const [internalProjectReorderMode, setInternalProjectReorderMode] = useState(false);
@@ -343,6 +351,7 @@ function TaskListComponent({
   });
 
   const sortBy = (projectSortBy ?? settings?.taskSortBy ?? 'default') as TaskSortBy;
+  const referenceGroupByValue = referenceGroupBy ?? 'area';
   const canUseProjectReorder = Boolean(enableProjectReorder && projectId && sortBy === 'default');
   const shouldGroupCompletedTasks = Boolean(groupCompletedTasksLast && projectId && statusFilter === 'all');
   const projectReorderMode = projectReorderModeProp ?? internalProjectReorderMode;
@@ -616,7 +625,7 @@ function TaskListComponent({
 
   type ListItem =
     | { type: 'section'; id: string; title: string; count: number; muted?: boolean; collapsible?: boolean; collapsed?: boolean }
-    | { type: 'task'; task: Task; reorderSectionId?: string | null };
+    | { type: 'task'; task: Task; reorderSectionId?: string | null; groupId?: string };
 
   const LIST_CONTENT_VERTICAL_PADDING = 12;
   const ESTIMATED_SECTION_HEIGHT = 32;
@@ -624,6 +633,80 @@ function TaskListComponent({
 
   const listItems = useMemo<ListItem[]>(() => {
     if (statusFilter === 'reference' && !projectId) {
+      if (referenceGroupByValue === 'none') {
+        return orderedActiveTasks.map((task) => ({ type: 'task', task }));
+      }
+      const appendSection = (items: ListItem[], id: string, title: string, tasksForGroup: Task[], muted = false) => {
+        if (tasksForGroup.length === 0) return;
+        items.push({
+          type: 'section',
+          id,
+          title,
+          count: tasksForGroup.length,
+          muted,
+        });
+        tasksForGroup.forEach((task) => items.push({ type: 'task', task, groupId: id }));
+      };
+      if (referenceGroupByValue === 'project') {
+        const grouped = new Map<string, Task[]>();
+        const noProjectTasks: Task[] = [];
+
+        orderedActiveTasks.forEach((task) => {
+          if (!task.projectId) {
+            noProjectTasks.push(task);
+            return;
+          }
+          const project = projectById.get(task.projectId);
+          if (!project) {
+            noProjectTasks.push(task);
+            return;
+          }
+          const items = grouped.get(project.id) ?? [];
+          items.push(task);
+          grouped.set(project.id, items);
+        });
+
+        const items: ListItem[] = [];
+        appendSection(items, 'project:none', tFallback(t, 'taskEdit.noProjectOption', 'No project'), noProjectTasks, true);
+        const sortedProjects = [...grouped.keys()]
+          .map((itemProjectId) => projectById.get(itemProjectId))
+          .filter((project): project is Project => Boolean(project))
+          .sort((a, b) => {
+            const aOrder = Number.isFinite(a.order) ? a.order : Number.POSITIVE_INFINITY;
+            const bOrder = Number.isFinite(b.order) ? b.order : Number.POSITIVE_INFINITY;
+            if (aOrder !== bOrder) return aOrder - bOrder;
+            return a.title.localeCompare(b.title);
+          });
+        sortedProjects.forEach((project) => appendSection(items, `project:${project.id}`, project.title, grouped.get(project.id) ?? []));
+        return items;
+      }
+      if (referenceGroupByValue === 'tag') {
+        const grouped = new Map<string, Task[]>();
+        const noTagTasks: Task[] = [];
+
+        orderedActiveTasks.forEach((task) => {
+          const tags = (task.tags ?? [])
+            .map((tag) => tag.trim())
+            .filter((tag) => tag.length > 0);
+          if (tags.length === 0) {
+            noTagTasks.push(task);
+            return;
+          }
+          Array.from(new Set(tags)).forEach((tag) => {
+            const items = grouped.get(tag) ?? [];
+            items.push(task);
+            grouped.set(tag, items);
+          });
+        });
+
+        const items: ListItem[] = [];
+        appendSection(items, 'tag:none', tFallback(t, 'taskEdit.noTags', 'No tags'), noTagTasks, true);
+        [...grouped.keys()]
+          .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+          .forEach((tag) => appendSection(items, `tag:${tag}`, tag, grouped.get(tag) ?? []));
+        return items;
+      }
+
       const activeAreas = [...areas].filter((area) => !area.deletedAt).sort((a, b) => {
         if (a.order !== b.order) return a.order - b.order;
         return a.name.localeCompare(b.name);
@@ -645,22 +728,11 @@ function TaskListComponent({
       });
 
       const items: ListItem[] = [];
-      if (generalTasks.length > 0) {
-        items.push({
-          type: 'section',
-          id: 'general',
-          title: tFallback(t, 'settings.general', 'General'),
-          count: generalTasks.length,
-          muted: true,
-        });
-        generalTasks.forEach((task) => items.push({ type: 'task', task }));
-      }
+      appendSection(items, 'general', tFallback(t, 'settings.general', 'General'), generalTasks, true);
 
       activeAreas.forEach((area) => {
         const tasksForArea = grouped.get(area.id) ?? [];
-        if (tasksForArea.length === 0) return;
-        items.push({ type: 'section', id: area.id, title: area.name, count: tasksForArea.length });
-        tasksForArea.forEach((task) => items.push({ type: 'task', task }));
+        appendSection(items, area.id, area.name, tasksForArea);
       });
       return items;
     }
@@ -718,15 +790,15 @@ function TaskListComponent({
       unsectioned.forEach((task) => items.push({ type: 'task', task, reorderSectionId }));
     }
     return appendCompletedTasks(items);
-  }, [areas, completedTasksCollapsed, orderedActiveTasks, orderedCompletedTasks, projectById, projectId, projectReorderMode, projectSections, shouldGroupCompletedTasks, statusFilter, t]);
+  }, [areas, completedTasksCollapsed, orderedActiveTasks, orderedCompletedTasks, projectById, projectId, projectReorderMode, projectSections, referenceGroupByValue, shouldGroupCompletedTasks, statusFilter, t]);
   const orderedTaskIds = useMemo(
-    () => listItems.flatMap((item) => (item.type === 'task' ? [item.task.id] : [])),
+    () => Array.from(new Set(listItems.flatMap((item) => (item.type === 'task' ? [item.task.id] : [])))),
     [listItems],
   );
   const itemHeightsRef = useRef<Record<string, number>>({});
   const [itemLayoutVersion, setItemLayoutVersion] = useState(0);
   const getListItemKey = useCallback((item: ListItem) => (
-    item.type === 'section' ? `section-${item.id}` : item.task.id
+    item.type === 'section' ? `section-${item.id}` : (item.groupId ? `${item.groupId}:${item.task.id}` : item.task.id)
   ), []);
   const estimateItemHeight = useCallback((item: ListItem) => (
     item.type === 'section' ? ESTIMATED_SECTION_HEIGHT : ESTIMATED_TASK_HEIGHT
@@ -771,6 +843,44 @@ function TaskListComponent({
   }, [canUseProjectReorder, listItems, projectSections.length, shouldGroupCompletedTasks]);
   const projectSectionIds = useMemo(() => projectSections.map((section) => section.id), [projectSections]);
   const hasProjectReorderItems = projectReorderGroups.some((group) => group.tasks.length > 0) || projectSections.length > 1;
+  const referenceGroupOptions: ReferenceGroupBy[] = ['none', 'area', 'project', 'tag'];
+  const getReferenceGroupLabel = useCallback((groupBy: ReferenceGroupBy) => {
+    switch (groupBy) {
+      case 'none':
+        return tFallback(t, 'list.groupByNone', 'No grouping');
+      case 'area':
+        return tFallback(t, 'list.groupByArea', 'Area');
+      case 'project':
+        return tFallback(t, 'taskEdit.projectLabel', 'Project');
+      case 'tag':
+        return tFallback(t, 'taskEdit.tagsLabel', 'Tags');
+      default:
+        return groupBy;
+    }
+  }, [t]);
+  const referenceGroupLabel = getReferenceGroupLabel(referenceGroupByValue);
+  const groupLabel = tFallback(t, 'list.groupBy', 'Group');
+  const showReferenceGroupControl = statusFilter === 'reference' && !projectId && Boolean(onChangeReferenceGroupBy);
+  const referenceGroupControl = showReferenceGroupControl ? (
+    <TouchableOpacity
+      onPress={() => setReferenceGroupModalVisible(true)}
+      style={[
+        styles.sortButton,
+        { borderColor: themeColorsMemo.border, backgroundColor: themeColorsMemo.filterBg },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${groupLabel}: ${referenceGroupLabel}`}
+      hitSlop={8}
+    >
+      <Folder size={16} color={themeColorsMemo.secondaryText} strokeWidth={2} />
+    </TouchableOpacity>
+  ) : null;
+  const effectiveHeaderAccessory = referenceGroupControl || headerAccessory ? (
+    <>
+      {referenceGroupControl}
+      {headerAccessory}
+    </>
+  ) : undefined;
   const staticListVirtualWindow = useMemo(() => {
     const effectiveViewportHeight = resolveStaticListViewportHeight(
       staticListVirtualization?.viewportHeight ?? 0,
@@ -1400,7 +1510,7 @@ function TaskListComponent({
         count={orderedTasks.length}
         filterActiveCount={totalFilterActiveCount}
         hasActiveFilters={hasAnyActiveFilters}
-        headerAccessory={headerAccessory}
+        headerAccessory={effectiveHeaderAccessory}
         onClearFilters={clearAllFilters}
         onOpenFilters={() => setFiltersVisible(true)}
         onOpenSort={() => setSortModalVisible(true)}
@@ -1655,6 +1765,40 @@ function TaskListComponent({
         themeColors={themeColorsMemo}
         visible={sortModalVisible}
       />
+
+      {showReferenceGroupControl && (
+        <Modal
+          visible={referenceGroupModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setReferenceGroupModalVisible(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setReferenceGroupModalVisible(false)}>
+            <View style={[styles.modalCard, { backgroundColor: themeColorsMemo.cardBg }]}>
+              <Text style={[styles.modalTitle, { color: themeColorsMemo.text }]}>{groupLabel}</Text>
+              <View style={styles.sortList}>
+                {referenceGroupOptions.map((option) => (
+                  <Pressable
+                    key={option}
+                    onPress={() => {
+                      onChangeReferenceGroupBy?.(option);
+                      setReferenceGroupModalVisible(false);
+                    }}
+                    style={[
+                      styles.sortItem,
+                      option === referenceGroupByValue && { backgroundColor: themeColorsMemo.filterBg },
+                    ]}
+                  >
+                    <Text style={[styles.sortItemText, { color: themeColorsMemo.text }]}>
+                      {getReferenceGroupLabel(option)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+      )}
 
       <ErrorBoundary>
         <TaskEditModal

@@ -3,9 +3,11 @@ import type { TaskPriority, TimeEstimate } from '@mindwtr/core';
 
 const toastTimeouts = new Map<string, number>();
 type ListNextGroupBy = 'none' | 'context' | 'area' | 'project' | 'energy' | 'priority';
+type ListReferenceGroupBy = 'none' | 'area' | 'project' | 'tag';
 type ListOptions = {
     showDetails: boolean;
     nextGroupBy: ListNextGroupBy;
+    referenceGroupBy: ListReferenceGroupBy;
     focusTop3Only: boolean;
 };
 
@@ -14,6 +16,7 @@ export const LIST_OPTIONS_STORAGE_KEY = 'mindwtr:list-options:v1';
 const DEFAULT_LIST_OPTIONS: ListOptions = {
     showDetails: false,
     nextGroupBy: 'none',
+    referenceGroupBy: 'area',
     focusTop3Only: false,
 };
 
@@ -24,6 +27,13 @@ function isListNextGroupBy(value: unknown): value is ListNextGroupBy {
         || value === 'project'
         || value === 'energy'
         || value === 'priority';
+}
+
+function isListReferenceGroupBy(value: unknown): value is ListReferenceGroupBy {
+    return value === 'none'
+        || value === 'area'
+        || value === 'project'
+        || value === 'tag';
 }
 
 function getListOptionsStorage(): Storage | null {
@@ -45,6 +55,7 @@ function readStoredListOptions(): ListOptions {
         return {
             showDetails: typeof parsed?.showDetails === 'boolean' ? parsed.showDetails : DEFAULT_LIST_OPTIONS.showDetails,
             nextGroupBy: isListNextGroupBy(parsed?.nextGroupBy) ? parsed.nextGroupBy : DEFAULT_LIST_OPTIONS.nextGroupBy,
+            referenceGroupBy: isListReferenceGroupBy(parsed?.referenceGroupBy) ? parsed.referenceGroupBy : DEFAULT_LIST_OPTIONS.referenceGroupBy,
             focusTop3Only: typeof parsed?.focusTop3Only === 'boolean' ? parsed.focusTop3Only : DEFAULT_LIST_OPTIONS.focusTop3Only,
         };
     } catch {

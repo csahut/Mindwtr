@@ -15,12 +15,12 @@ import { BulkSelectionToolbar } from './BulkSelectionToolbar';
 import { ListFiltersPanel } from './ListFiltersPanel';
 import { ListHeader } from './ListHeader';
 import { ListQuickAdd } from './ListQuickAdd';
-import type { NextGroupBy } from './next-grouping';
+import type { TaskListGroupBy } from './next-grouping';
 
 const NEXT_WARNING_THRESHOLD = 15;
 
 type ListControlsPanelProps = {
-    activeNextGroupBy: NextGroupBy;
+    activeGroupBy: TaskListGroupBy;
     addInputRef: RefObject<HTMLInputElement | null>;
     allTokens: string[];
     areaById: Map<string, Area>;
@@ -34,13 +34,15 @@ type ListControlsPanelProps = {
     inboxProcessor: ReactNode;
     isBatchDeleting: boolean;
     isNextView: boolean;
+    isReferenceView: boolean;
     isProcessing: boolean;
     isWaitingView: boolean;
     onAddContext: () => void;
     onAddTag: () => void;
     onAssignArea: (areaId: string | null) => Promise<void>;
     onBulkOrganize?: () => void;
-    onChangeGroupBy: (value: NextGroupBy) => void;
+    groupByOptions: TaskListGroupBy[];
+    onChangeGroupBy: (value: TaskListGroupBy) => void;
     onChangeQuickAdd: (value: string) => void;
     onChangeSearch: (value: string) => void;
     onChangeSelectedWaitingPerson: (value: string) => void;
@@ -97,7 +99,7 @@ type ListControlsPanelProps = {
 };
 
 export function ListControlsPanel({
-    activeNextGroupBy,
+    activeGroupBy,
     addInputRef,
     allTokens,
     areaById,
@@ -111,12 +113,14 @@ export function ListControlsPanel({
     inboxProcessor,
     isBatchDeleting,
     isNextView,
+    isReferenceView,
     isProcessing,
     isWaitingView,
     onAddContext,
     onAddTag,
     onAssignArea,
     onBulkOrganize,
+    groupByOptions,
     onChangeGroupBy,
     onChangeQuickAdd,
     onChangeSearch,
@@ -184,8 +188,9 @@ export function ListControlsPanel({
                 filterSummarySuffix={filterSummarySuffix}
                 sortBy={sortBy}
                 onChangeSortBy={onChangeSortBy}
-                showGroupBy={isNextView}
-                groupBy={activeNextGroupBy}
+                showGroupBy={isNextView || isReferenceView}
+                groupBy={activeGroupBy}
+                groupByOptions={groupByOptions}
                 onChangeGroupBy={onChangeGroupBy}
                 selectionMode={selectionMode}
                 onToggleSelection={onToggleSelection}
