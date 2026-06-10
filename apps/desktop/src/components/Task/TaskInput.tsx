@@ -71,6 +71,22 @@ function getTrigger(text: string, caret: number): TriggerState | null {
     };
 }
 
+const compareAutocompleteLabels = (left: string, right: string, query: string): number => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const leftLabel = left.toLowerCase();
+    const rightLabel = right.toLowerCase();
+    const leftStartsWithQuery = normalizedQuery.length === 0 || leftLabel.startsWith(normalizedQuery);
+    const rightStartsWithQuery = normalizedQuery.length === 0 || rightLabel.startsWith(normalizedQuery);
+
+    if (leftStartsWithQuery !== rightStartsWithQuery) {
+        return leftStartsWithQuery ? -1 : 1;
+    }
+    return left.localeCompare(right, undefined, { sensitivity: 'base' });
+};
+
+const matchesAutocompleteQuery = (label: string, query: string): boolean =>
+    query.length === 0 || label.toLowerCase().includes(query);
+
 export function TaskInput({
     id,
     value,
@@ -106,11 +122,15 @@ export function TaskInput({
         const query = trigger.query.trim().toLowerCase();
         if (trigger.type === 'project') {
             const activeProjects = projects.filter((project) => project.status !== 'archived');
-            const matches = activeProjects.filter((project) =>
-                project.title.toLowerCase().includes(query)
-            );
+            const matches = activeProjects
+                .filter((project) => matchesAutocompleteQuery(project.title, query))
+                .sort((a, b) => compareAutocompleteLabels(a.title, b.title, query));
             const hasExact = query.length > 0 && activeProjects.some((project) => project.title.toLowerCase() === query);
-            const result: Option[] = [];
+            const result: Option[] = matches.map((project) => ({
+                kind: 'project' as const,
+                label: project.title,
+                value: project.title,
+            }));
             if (!hasExact && query.length > 0) {
                 result.push({
                     kind: 'create' as const,
@@ -118,17 +138,12 @@ export function TaskInput({
                     value: trigger.query.trim(),
                 });
             }
-            result.push(
-                ...matches.map((project) => ({
-                    kind: 'project' as const,
-                    label: project.title,
-                    value: project.title,
-                }))
-            );
             return result;
         }
         if (trigger.type === 'area') {
-            const matches = areas.filter((area) => area.name.toLowerCase().includes(query));
+            const matches = areas
+                .filter((area) => matchesAutocompleteQuery(area.name, query))
+                .sort((a, b) => compareAutocompleteLabels(a.name, b.name, query));
             return matches.map((area) => ({
                 kind: 'area' as const,
                 label: area.name,
@@ -142,10 +157,9 @@ export function TaskInput({
                 return `${expectedPrefix}${token}`;
             })
             .filter((token) => token.startsWith(expectedPrefix));
-        const matches = normalizedTokens.filter((token) => {
-            const raw = token.slice(1);
-            return raw.toLowerCase().includes(query);
-        });
+        const matches = normalizedTokens
+            .filter((token) => matchesAutocompleteQuery(token.slice(1), query))
+            .sort((a, b) => compareAutocompleteLabels(a.slice(1), b.slice(1), query));
         return matches.map((token) => ({
             kind: (trigger.type === 'tag' ? 'tag' : 'context') as 'tag' | 'context',
             label: token,
@@ -302,6 +316,12 @@ export function TaskInput({
                 return;
             }
             if (event.key === 'Enter') {
+                event.preventDefault();
+                event.stopPropagation();
+                await applyOption(options[selectedIndex]);
+                return;
+            }
+            if (event.key === 'Tab' && !event.shiftKey) {
                 event.preventDefault();
                 event.stopPropagation();
                 await applyOption(options[selectedIndex]);

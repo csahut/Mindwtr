@@ -71,6 +71,27 @@ describe('TaskInput autocomplete', () => {
         expect(getByRole('option', { name: /Create Project "Arc"/ })).toBeInTheDocument();
     });
 
+    it('prioritizes prefix matches before substring matches', () => {
+        const onChange = vi.fn();
+        const { getAllByRole, getByRole } = render(
+            <TaskInput
+                value="@ho"
+                onChange={onChange}
+                projects={[]}
+                contexts={['@school', '@home', '@chores']}
+            />
+        );
+        const input = getByRole('combobox') as HTMLInputElement;
+        input.setSelectionRange(input.value.length, input.value.length);
+        fireEvent.click(input);
+
+        expect(getAllByRole('option').map((option) => option.textContent)).toEqual([
+            '@home',
+            '@chores',
+            '@school',
+        ]);
+    });
+
     it('suggests tags for # trigger and inserts selected tag', () => {
         const onChange = vi.fn();
         const { getByRole } = render(
@@ -104,6 +125,51 @@ describe('TaskInput autocomplete', () => {
             expect(input.selectionStart).toBe('@work '.length);
             expect(input.selectionEnd).toBe('@work '.length);
         });
+    });
+
+    it('accepts a hotkey suggestion with Tab', async () => {
+        const { getByRole } = render(<TaskInputHarness initialValue="@wo" contexts={['@work']} />);
+        const input = getByRole('combobox') as HTMLInputElement;
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        fireEvent.click(input);
+
+        fireEvent.keyDown(input, { key: 'Tab' });
+
+        await waitFor(() => {
+            expect(input.value).toBe('@work ');
+            expect(input.selectionStart).toBe('@work '.length);
+            expect(input.selectionEnd).toBe('@work '.length);
+        });
+    });
+
+    it('uses Tab to choose an existing project before creating one', async () => {
+        const onChange = vi.fn();
+        const onCreateProject = vi.fn();
+        const { getAllByRole, getByRole } = render(
+            <TaskInput
+                value="+La"
+                onChange={onChange}
+                projects={[buildProject('Launch'), buildProject('Archive')]}
+                contexts={[]}
+                onCreateProject={onCreateProject}
+            />
+        );
+        const input = getByRole('combobox') as HTMLInputElement;
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        fireEvent.click(input);
+
+        expect(getAllByRole('option').map((option) => option.textContent)).toEqual([
+            'Launch',
+            '✨ Create Project "La"',
+        ]);
+        fireEvent.keyDown(input, { key: 'Tab' });
+
+        await waitFor(() => {
+            expect(onChange).toHaveBeenLastCalledWith('+Launch ');
+        });
+        expect(onCreateProject).not.toHaveBeenCalled();
     });
 
     it('accepts a hotkey suggestion against the live input value during rapid typing', async () => {
