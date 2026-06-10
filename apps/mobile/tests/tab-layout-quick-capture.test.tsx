@@ -439,9 +439,10 @@ describe('mobile tab quick capture', () => {
     expect(trashLabel.props.adjustsFontSizeToFit).toBe(true);
     expect(trashLabel.props.maxFontSizeMultiplier).toBe(1.15);
     expect(flattenStyle(getMoreSheetButtons(tree, 'Trash')[0]?.props.style)).toEqual(expect.objectContaining({
-      flexBasis: '30%',
-      minWidth: 92,
+      flex: 1,
+      minWidth: 0,
     }));
+    expect(flattenStyle(getMoreSheetButtons(tree, 'Trash')[0]?.props.style)).not.toHaveProperty('flexBasis');
 
     const calendarButtons = getMoreSheetButtons(tree, 'Calendar');
     expect(calendarButtons.length).toBeGreaterThan(0);

@@ -961,9 +961,7 @@ const styles = StyleSheet.create({
   },
   moreUtilityRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    columnGap: 6,
-    rowGap: 8,
+    gap: 4,
   },
   moreUtilityStripContent: {
     flexDirection: 'row',
@@ -975,13 +973,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 58,
-    paddingHorizontal: 6,
+    paddingHorizontal: 2,
     paddingVertical: 4,
   },
   moreUtilityRowItem: {
-    flexGrow: 1,
-    flexBasis: '30%',
-    minWidth: 92,
+    flex: 1,
+    minWidth: 0,
   },
   moreUtilityScrollItem: {
     width: 76,
