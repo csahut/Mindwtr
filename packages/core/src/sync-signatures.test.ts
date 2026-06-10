@@ -119,6 +119,27 @@ describe('sync signatures', () => {
         expect(chooseDeterministicWinner(local, incoming)).toBe(incoming);
     });
 
+    it('ignores stale recurrence preview flags on non-recurring tasks', () => {
+        const local = normalizeTaskForContentComparison(task({
+            showFutureRecurrence: true,
+        }));
+        const incoming = normalizeTaskForContentComparison(task());
+
+        expect(toComparableSignature(local)).toBe(toComparableSignature(incoming));
+    });
+
+    it('keeps recurrence preview flags meaningful for recurring tasks', () => {
+        const local = normalizeTaskForContentComparison(task({
+            recurrence: { rule: 'weekly' },
+            showFutureRecurrence: true,
+        }));
+        const incoming = normalizeTaskForContentComparison(task({
+            recurrence: { rule: 'weekly' },
+        }));
+
+        expect(toComparableSignature(local)).not.toBe(toComparableSignature(incoming));
+    });
+
     it('ignores project archive section sidecars in comparable signatures', () => {
         const local = normalizeSectionForContentComparison(section({
             projectArchivedAt: '2099-01-01T00:00:00.000Z',

@@ -73,6 +73,7 @@ const normalizeAttachmentsForContentComparison = (
 };
 
 export const normalizeTaskForContentComparison = (task: Task): Record<string, unknown> => {
+    const hasRecurrence = task.recurrence !== undefined && task.recurrence !== null;
     const comparable: Record<string, unknown> = {
         ...task,
         tags: normalizeOptionalArrayForComparison(task.tags),
@@ -84,7 +85,7 @@ export const normalizeTaskForContentComparison = (task: Task): Record<string, un
         // surfacing as a user-visible task conflict.
         attachments: task.deletedAt ? undefined : normalizeAttachmentsForContentComparison(task.attachments),
         isFocusedToday: task.isFocusedToday ? true : undefined,
-        showFutureRecurrence: task.showFutureRecurrence ? true : undefined,
+        showFutureRecurrence: hasRecurrence && task.showFutureRecurrence ? true : undefined,
         suppressMindwtrReminders: task.suppressMindwtrReminders ? true : undefined,
         pushCount: task.pushCount === 0 ? undefined : task.pushCount,
     };

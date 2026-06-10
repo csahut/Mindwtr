@@ -1083,6 +1083,28 @@ describe('Sync Logic', () => {
             expect(result.stats.tasks.conflictIds).toHaveLength(0);
         });
 
+        it('does not count conflict when stale recurrence preview flag differs on non-recurring task', () => {
+            const localTask = {
+                ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
+                rev: 7,
+                revBy: 'device-a',
+                showFutureRecurrence: true,
+            } satisfies Task;
+            const incomingTask = {
+                ...createMockTask('1', '2023-01-02T00:05:00.000Z'),
+                rev: 7,
+                revBy: 'device-a',
+            } satisfies Task;
+
+            const result = mergeAppDataWithStats(mockAppData([localTask]), mockAppData([incomingTask]));
+
+            expect(result.data.tasks).toHaveLength(1);
+            expect(result.data.tasks[0].showFutureRecurrence).toBeUndefined();
+            expect(result.stats.tasks.conflicts).toBe(0);
+            expect(result.stats.tasks.conflictIds).toHaveLength(0);
+            expect(result.stats.tasks.conflictSamples).toHaveLength(0);
+        });
+
         it('does not count conflict when only revBy differs', () => {
             const localTask = {
                 ...createMockTask('1', '2023-01-02T00:05:00.000Z'),

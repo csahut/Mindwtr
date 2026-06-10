@@ -69,13 +69,14 @@ const normalizeProjectStatusForMerge = (value: unknown): Project['status'] => {
 
 export const normalizeTaskForSyncMerge = (task: Task, nowIso: string): Task => {
     const normalized = normalizeTaskForLoad(task, nowIso);
+    const hasRecurrence = normalized.recurrence !== undefined && normalized.recurrence !== null;
     return {
         ...normalized,
         tags: normalizeStringArray(normalized.tags),
         contexts: normalizeStringArray(normalized.contexts),
         sectionId: normalizeOptionalString(normalized.sectionId),
         isFocusedToday: normalized.isFocusedToday === true,
-        showFutureRecurrence: normalized.showFutureRecurrence === true,
+        showFutureRecurrence: hasRecurrence && normalized.showFutureRecurrence === true ? true : undefined,
         suppressMindwtrReminders: normalized.suppressMindwtrReminders === true,
     };
 };
