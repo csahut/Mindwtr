@@ -608,9 +608,12 @@ describe('FocusScreen', () => {
       'mindwtr:view:focus:v1',
       JSON.stringify({
         expandedSections: {
+          focus: true,
           schedule: true,
+          next: false,
           nextActions: false,
           reviewDue: true,
+          reviewProjects: true,
         },
       })
     );
