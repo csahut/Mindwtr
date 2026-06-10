@@ -404,7 +404,7 @@ type SyncRunResult = {
     success: boolean;
     stats?: MergeStats;
     error?: string;
-    skipped?: 'requeued' | 'unchanged';
+    skipped?: 'requeued' | 'unchanged' | 'pendingRemoteWriteBackoff';
 };
 
 type SyncRunOptions = {
@@ -1962,6 +1962,13 @@ export class SyncService {
                     type: 'merge',
                 },
             });
+            if (syncResult.status === 'skipped') {
+                logSyncInfo('Sync skipped while pending remote write backoff is active', {
+                    backend: context.backend,
+                    retryInMs: String(Math.ceil(syncResult.retryInMs)),
+                });
+                return { success: true, skipped: 'pendingRemoteWriteBackoff' as const };
+            }
             const stats = syncResult.stats;
             let mergedData = syncResult.data;
             const remotePersistedPayloadFingerprint = computeSyncPayloadFingerprint(mergedData);

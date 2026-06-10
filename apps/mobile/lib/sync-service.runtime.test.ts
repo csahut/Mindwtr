@@ -463,6 +463,22 @@ describe('mobile sync-service runtime', () => {
     expect(attachmentSyncMocks.syncWebdavAttachments).not.toHaveBeenCalled();
   });
 
+  it('treats pending remote write backoff as a skipped sync', async () => {
+    coreMocks.webdavGetJson.mockResolvedValue(remoteChangedData);
+    coreMocks.performSyncCycle.mockResolvedValue({
+      status: 'skipped',
+      skipped: 'pendingRemoteWriteBackoff',
+      retryInMs: 5_000,
+      message: 'Sync paused briefly after remote write failure. Retry in about 5s.',
+      data: emptyData,
+    });
+
+    const result = await syncServiceModule.performMobileSync();
+
+    expect(result).toEqual({ success: true, skipped: 'pendingRemoteWriteBackoff' });
+    expect(storeStateRef.current.setError).not.toHaveBeenCalled();
+  });
+
   it('does not cache fast-sync state when attachment cleanup changes the sync payload after remote write', async () => {
     const dataWithDeletedAttachment: AppData = {
       ...emptyData,

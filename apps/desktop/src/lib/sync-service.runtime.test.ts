@@ -237,6 +237,22 @@ describe('desktop sync-service runtime', () => {
         });
     });
 
+    it('treats pending remote write backoff as a skipped sync', async () => {
+        const syncServiceModule = await syncServiceModulePromise;
+        performSyncCycleMock.mockResolvedValue({
+            status: 'skipped',
+            skipped: 'pendingRemoteWriteBackoff',
+            retryInMs: 5_000,
+            message: 'Sync paused briefly after remote write failure. Retry in about 5s.',
+            data: localData,
+        });
+
+        const result = await syncServiceModule.SyncService.performSync();
+
+        expect(result).toEqual({ success: true, skipped: 'pendingRemoteWriteBackoff' });
+        expect(storeStateRef.current.setError).not.toHaveBeenCalled();
+    });
+
     it('uses native Tauri commands for self-hosted Cloud data sync on desktop', async () => {
         const syncServiceModule = await syncServiceModulePromise;
         const localCloudData: AppData = {

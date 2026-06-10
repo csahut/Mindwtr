@@ -53,7 +53,7 @@ const IOS_TEMP_INBOX_PATH_PATTERN = /\/tmp\/[^/]*-Inbox\//i;
 const INVALID_CONFIG_CHAR_PATTERN = /[\u0000-\u001F\u007F]/;
 type MobileSyncActivityState = 'idle' | 'syncing';
 type MobileSyncActivityListener = (state: MobileSyncActivityState) => void;
-type MobileSyncSkipReason = 'offline' | 'requeued' | 'unchanged';
+type MobileSyncSkipReason = 'offline' | 'requeued' | 'unchanged' | 'pendingRemoteWriteBackoff';
 type MobileSyncResult = { success: boolean; stats?: MergeStats; error?: string; skipped?: MobileSyncSkipReason };
 type MobileWebDavSyncConfig = { url: string; username: string; password: string; allowInsecureHttp?: boolean; allowWeakFingerprint?: boolean };
 type MobileCloudSyncConfig = { url: string; token: string; allowInsecureHttp?: boolean };
@@ -1190,6 +1190,21 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
           type: 'merge',
         },
       });
+      if (syncResult.status === 'skipped') {
+        logSyncInfo('Sync skipped while pending remote write backoff is active', {
+          backend,
+          retryInMs: String(Math.ceil(syncResult.retryInMs)),
+        });
+        logSyncDiagnostic('Sync diagnostic skipped', syncCycleStartedAt, {
+          backend,
+          step,
+          success: 'true',
+          skipped: syncResult.skipped,
+          retryInMs: String(Math.ceil(syncResult.retryInMs)),
+          ...buildSyncDataDiagnostics(syncResult.data),
+        });
+        return { success: true, skipped: 'pendingRemoteWriteBackoff' };
+      }
       logSyncDiagnostic('Sync diagnostic merge cycle complete', syncCycleStartedAt, {
         backend,
         status: syncResult.status,

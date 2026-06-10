@@ -1083,7 +1083,13 @@ async function performSyncCycleUnlocked(io: SyncCycleIO): Promise<SyncCycleResul
         const blockedMs = getPendingRemoteWriteBlockedMs(localData, nowIso);
         if (blockedMs > 0) {
             const seconds = Math.max(1, Math.ceil(blockedMs / 1000));
-            throw new Error(`Sync paused briefly after remote write failure. Retry in about ${seconds}s.`);
+            return {
+                data: localData,
+                status: 'skipped',
+                skipped: 'pendingRemoteWriteBackoff',
+                retryInMs: blockedMs,
+                message: `Sync paused briefly after remote write failure. Retry in about ${seconds}s.`,
+            };
         }
         pendingRemoteWriteMeta = {
             pendingAt: localData.settings.pendingRemoteWriteAt as string,
@@ -1256,7 +1262,14 @@ async function performSyncCycleUnlocked(io: SyncCycleIO): Promise<SyncCycleResul
 
     io.onStep?.('write-local');
     await yieldToUi();
-    await io.writeLocal(persistedFinalData);
+    try {
+        await io.writeLocal(persistedFinalData);
+    } catch (error) {
+        if (isLocalSyncAbortError(error)) {
+            await io.clearPendingRemoteWriteAfterLocalAbort?.(finalDataWithPendingRemoteWrite.settings.pendingRemoteWriteAt as string);
+        }
+        throw error;
+    }
 
     return {
         data: persistedFinalData,
