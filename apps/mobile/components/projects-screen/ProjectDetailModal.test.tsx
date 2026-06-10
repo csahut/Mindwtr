@@ -72,12 +72,20 @@ vi.mock('../../components/markdown-text', () => ({
 
 const taskListPropsSpy = vi.hoisted(() => vi.fn());
 
-vi.mock('../../components/task-list', () => ({
-    TaskList: (props: any) => {
-        taskListPropsSpy(props);
-        return props.filterSheetAccessory ?? props.headerAccessory ?? null;
-    },
-}));
+vi.mock('../../components/task-list', async () => {
+    const ReactModule = await import('react');
+    return {
+        TaskList: (props: any) => {
+            taskListPropsSpy(props);
+            return ReactModule.createElement(
+                ReactModule.Fragment,
+                null,
+                props.filterSheetAccessory,
+                props.headerAccessory,
+            );
+        },
+    };
+});
 
 vi.mock('../../components/AttachmentProgressIndicator', () => ({
     AttachmentProgressIndicator: () => null,
@@ -155,6 +163,7 @@ const createProjectDetailModalProps = (overrides: Partial<React.ComponentProps<t
     onDownloadAttachment: vi.fn(),
     onOpenAreaPicker: vi.fn(),
     onOpenAttachment: vi.fn(),
+    onOpenProjectQuickAdd: vi.fn(),
     onOpenTagPicker: vi.fn(),
     onRemoveProjectAttachment: vi.fn(),
     deleteSection: vi.fn(),
@@ -210,6 +219,7 @@ const createProjectDetailModalProps = (overrides: Partial<React.ComponentProps<t
         'common.notSet': 'Not set',
         'common.save': 'Save',
         'common.showCompleted': 'Show completed',
+        'nav.addTask': 'Add task',
         'markdown.edit': 'Edit',
         'markdown.expand': 'Expand',
         'markdown.preview': 'Preview',
@@ -224,6 +234,7 @@ const createProjectDetailModalProps = (overrides: Partial<React.ComponentProps<t
         'projects.notesPlaceholder': 'Notes',
         'projects.noArea': 'No Area',
         'projects.reactivate': 'Reactivate',
+        'projects.reorderTasks': 'Order',
         'projects.reviewAt': 'Review',
         'projects.sectionPlaceholder': 'Section title',
         'projects.sectionsLabel': 'Sections',
@@ -401,6 +412,27 @@ describe('ProjectDetailModal section management', () => {
 });
 
 describe('ProjectDetailModal task sorting', () => {
+    it('opens global quick add for project task creation instead of inline add', () => {
+        const onOpenProjectQuickAdd = vi.fn();
+        let tree!: ReturnType<typeof create>;
+
+        act(() => {
+            tree = create(<ProjectDetailModal {...createProjectDetailModalProps({ onOpenProjectQuickAdd })} />);
+        });
+
+        expect(taskListPropsSpy).toHaveBeenCalled();
+        expect(taskListPropsSpy.mock.calls.at(-1)?.[0].allowAdd).toBe(false);
+
+        act(() => {
+            tree.root.findByProps({ testID: 'project-add-task-button' }).props.onPress();
+        });
+
+        expect(onOpenProjectQuickAdd).toHaveBeenCalledWith(expect.objectContaining({
+            id: 'project-1',
+            title: 'Launch',
+        }));
+    });
+
     it('passes the project-local sort to TaskList and handles sort changes', () => {
         const onProjectTaskSortByChange = vi.fn();
         const selectedProjectTasks = [

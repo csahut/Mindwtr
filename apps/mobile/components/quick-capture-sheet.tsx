@@ -265,9 +265,9 @@ export function QuickCaptureSheet({
     return projects.some((project) => project.title.toLowerCase() === query);
   }, [projectQuery, projects, showProjectPicker]);
 
-  const resetDraftState = useCallback(() => {
+  const resetDraftState = useCallback((options?: { keepAddAnother?: boolean; value?: string }) => {
     clearAndroidOptionsExpandTimer();
-    setValue(initialValue ?? '');
+    setValue(options?.value ?? initialValue ?? '');
     setDueDate(initialProps?.dueDate ? safeParseDate(initialProps.dueDate) : null);
     setDueDateHasTime(Boolean(initialProps?.dueDate && hasTimeComponent(initialProps.dueDate)));
     setStartTime(initialProps?.startTime ? safeParseDate(initialProps.startTime) : null);
@@ -297,7 +297,7 @@ export function QuickCaptureSheet({
     setShowDueTimePicker(false);
     setStartPickerMode(null);
     setPendingStartDate(null);
-    setAddAnother(false);
+    setAddAnother(Boolean(options?.keepAddAnother));
   }, [clearAndroidOptionsExpandTimer, clearContextOptionsLoad, initialProps, initialValue, selectedAreaIdForNewTasks]);
 
   useEffect(() => () => {
@@ -473,7 +473,7 @@ export function QuickCaptureSheet({
       await addTask(title, props);
 
       if (addAnother) {
-        setValue('');
+        resetDraftState({ keepAddAnother: true, value: '' });
         setTimeout(() => inputRef.current?.focus(), 80);
         return;
       }
@@ -482,7 +482,7 @@ export function QuickCaptureSheet({
     } finally {
       isSavingRef.current = false;
     }
-  }, [addAnother, addTask, buildTaskProps, finalizeClose, showToast, t, value]);
+  }, [addAnother, addTask, buildTaskProps, finalizeClose, resetDraftState, showToast, t, value]);
 
   const selectedProject = projectId ? projects.find((project) => project.id === projectId) : null;
   const dueLabel = dueDate ? safeFormatDate(dueDate, dueDateHasTime ? 'Pp' : 'P') : t('taskEdit.dueDateLabel');
@@ -786,6 +786,7 @@ export function QuickCaptureSheet({
         prioritiesEnabled={prioritiesEnabled}
         priorityLabel={priorityLabel}
         projectLabel={projectLabel}
+        projectSelected={Boolean(selectedProject)}
         recording={Boolean(recording)}
         recordingBusy={recordingBusy}
         recordingReady={recordingReady}

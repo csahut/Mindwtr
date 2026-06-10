@@ -39,6 +39,8 @@ type CaptureSearchParams = {
   title?: string;
 };
 
+const URL_INITIAL_TASK_STATUSES = new Set<Task['status']>(['inbox', 'next', 'waiting', 'someday', 'reference']);
+
 const firstSearchParam = (value: string | string[] | undefined): string => {
   if (Array.isArray(value)) return value[0] ?? '';
   return typeof value === 'string' ? value : '';
@@ -100,6 +102,11 @@ const sanitizeInitialPropsParam = (
 
   const contexts = normalizeInitialTokenList(parsed.contexts, '@');
   if (contexts) next.contexts = contexts;
+
+  const status = typeof parsed.status === 'string' ? parsed.status.trim().toLowerCase() : '';
+  if (URL_INITIAL_TASK_STATUSES.has(status as Task['status'])) {
+    next.status = status as Task['status'];
+  }
 
   const projectId = typeof parsed.projectId === 'string' ? parsed.projectId.trim() : '';
   if (projectId && projects.some((project) => project.id === projectId && isSelectableProjectForTaskAssignment(project))) {

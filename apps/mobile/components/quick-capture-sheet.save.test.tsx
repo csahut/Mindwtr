@@ -175,6 +175,9 @@ describe('QuickCaptureSheet save handling', () => {
     addProject.mockReset();
     updateSettings.mockReset();
     showToast.mockReset();
+    selectStore.getState().areas = [];
+    selectStore.getState().projects = [];
+    selectStore.getState().tasks = [];
     getUsedTaskTokens.mockClear();
     getUsedTaskTokens.mockReturnValue([]);
     parseQuickAdd.mockReset();
@@ -445,5 +448,71 @@ describe('QuickCaptureSheet save handling', () => {
       projectId: 'project-launch',
       areaId: undefined,
     }));
+  });
+
+  it('keeps project initial props when saving and adding another', async () => {
+    selectStore.getState().projects = [{
+      id: 'project-1',
+      title: 'Launch',
+      status: 'active',
+    }];
+    addTask.mockResolvedValue({ success: true, id: 'task-1' });
+    const onClose = vi.fn();
+
+    let tree!: ReturnType<typeof create>;
+    await act(async () => {
+      tree = create(
+        <QuickCaptureSheet
+          visible
+          openRequestId={1}
+          initialValue="First task"
+          initialProps={{ projectId: 'project-1', status: 'next' }}
+          onClose={onClose}
+        />
+      );
+      await Promise.resolve();
+    });
+
+    const getBody = () => {
+      const body = tree.root.findAll((node) => String(node.type) === 'QuickCaptureSheetBody')[0];
+      if (!body) throw new Error('QuickCaptureSheetBody not found');
+      return body;
+    };
+
+    await act(async () => {
+      getBody().props.onToggleAddAnother(true);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      getBody().props.handleSave();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(addTask).toHaveBeenCalledWith('First task', expect.objectContaining({
+      projectId: 'project-1',
+      status: 'next',
+    }));
+    expect(getBody().props.value).toBe('');
+    expect(getBody().props.projectLabel).toBe('Launch');
+    expect(getBody().props.projectSelected).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => {
+      getBody().props.onValueChange('Second task');
+      await Promise.resolve();
+    });
+    await act(async () => {
+      getBody().props.handleSave();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(addTask).toHaveBeenLastCalledWith('Second task', expect.objectContaining({
+      projectId: 'project-1',
+      status: 'next',
+    }));
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

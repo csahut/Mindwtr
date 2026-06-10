@@ -42,6 +42,7 @@ interface QuickCaptureSheetBodyProps {
   prioritiesEnabled: boolean;
   priorityLabel: string;
   projectLabel: string;
+  projectSelected?: boolean;
   recording: boolean;
   recordingBusy: boolean;
   recordingReady: boolean;
@@ -86,6 +87,7 @@ export function QuickCaptureSheetBody({
   prioritiesEnabled,
   priorityLabel,
   projectLabel,
+  projectSelected = false,
   recording,
   recordingBusy,
   recordingReady,
@@ -97,6 +99,7 @@ export function QuickCaptureSheetBody({
   visible,
 }: QuickCaptureSheetBodyProps) {
   const optionsToggleLabel = optionsExpanded ? t('taskEdit.hideOptions') : tFallback(t, 'common.more', 'More');
+  const defaultProjectLabel = tFallback(t, 'taskEdit.projectLabel', 'Project');
 
   return (
     <Modal
@@ -156,11 +159,13 @@ export function QuickCaptureSheetBody({
                 accessibilityLabel={t('quickAdd.inputLabel')}
                 accessibilityHint={t('quickAdd.inputHint')}
                 onSubmitEditing={() => {
-                  inputRef.current?.blur();
+                  if (!addAnother) {
+                    inputRef.current?.blur();
+                  }
                   handleSave();
                 }}
                 returnKeyType="done"
-                blurOnSubmit
+                blurOnSubmit={!addAnother}
                 numberOfLines={1}
                 textAlignVertical="center"
                 maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
@@ -201,7 +206,26 @@ export function QuickCaptureSheetBody({
             )}
 
             <View style={styles.optionsHeaderRow}>
-              {!optionsExpanded && (
+              {!optionsExpanded && projectSelected ? (
+                <TouchableOpacity
+                  style={[styles.collapsedProjectChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
+                  onPress={onOpenProjectPicker}
+                  onLongPress={onResetProject}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${defaultProjectLabel}: ${projectLabel}`}
+                >
+                  <Folder size={16} color={tc.text} />
+                  <Text
+                    style={[styles.collapsedProjectText, { color: tc.text }]}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
+                  >
+                    {projectLabel}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              {!optionsExpanded && !projectSelected ? (
                 <TouchableOpacity
                   style={[styles.collapsedContextChip, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
                   onPress={onOpenContextPicker}
@@ -219,7 +243,7 @@ export function QuickCaptureSheetBody({
                     {contextLabel}
                   </Text>
                 </TouchableOpacity>
-              )}
+              ) : null}
               <TouchableOpacity
                 style={[styles.optionsToggle, { backgroundColor: tc.filterBg, borderColor: tc.border }]}
                 onPress={onToggleOptions}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, TextInput, TouchableOpacity, Alert, FlatList, Dimensions, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -27,6 +28,7 @@ import { TaskEditModal } from '@/components/task-edit-modal';
 import type { TaskEditTab } from '@/components/task-edit/use-task-edit-state';
 import { useProjectFiltering } from '@/hooks/use-project-filtering';
 import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
+import { useQuickCapture } from '../../contexts/quick-capture-context';
 import { useLanguage } from '../../contexts/language-context';
 import { useToast } from '../../contexts/toast-context';
 import { useThemeColors } from '@/hooks/use-theme-colors';
@@ -38,6 +40,60 @@ import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigatio
 type ProjectTaskSortBy = Extract<TaskSortBy, 'default' | 'due'>;
 const EMPTY_PROJECT_TASKS: Task[] = [];
 const COMPACT_PROJECT_TEXT_MAX_SCALE = 1.2;
+const PROJECT_LIST_VIEW_STATE_STORAGE_KEY = 'mindwtr:view:projects:v1';
+
+type ProjectListViewState = {
+  collapsedAreas: Record<string, boolean>;
+  showArchivedProjects: boolean;
+  showDeferredProjects: boolean;
+};
+
+const DEFAULT_PROJECT_LIST_VIEW_STATE: ProjectListViewState = {
+  collapsedAreas: {},
+  showArchivedProjects: false,
+  showDeferredProjects: false,
+};
+
+function compactCollapsedAreas(collapsedAreas: Record<string, boolean>): Record<string, boolean> {
+  return Object.fromEntries(
+    Object.entries(collapsedAreas).filter(([areaId, collapsed]) => (
+      areaId.trim().length > 0 && collapsed === true
+    ))
+  );
+}
+
+function readProjectListViewState(raw: string | null): ProjectListViewState | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<ProjectListViewState>;
+    const collapsedAreas = parsed.collapsedAreas && typeof parsed.collapsedAreas === 'object' && !Array.isArray(parsed.collapsedAreas)
+      ? Object.fromEntries(
+        Object.entries(parsed.collapsedAreas).filter(([areaId, collapsed]) => (
+          typeof areaId === 'string' && areaId.trim().length > 0 && collapsed === true
+        ))
+      )
+      : {};
+    return {
+      collapsedAreas,
+      showArchivedProjects: typeof parsed.showArchivedProjects === 'boolean'
+        ? parsed.showArchivedProjects
+        : DEFAULT_PROJECT_LIST_VIEW_STATE.showArchivedProjects,
+      showDeferredProjects: typeof parsed.showDeferredProjects === 'boolean'
+        ? parsed.showDeferredProjects
+        : DEFAULT_PROJECT_LIST_VIEW_STATE.showDeferredProjects,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function serializeProjectListViewState(state: ProjectListViewState): string {
+  return JSON.stringify({
+    collapsedAreas: compactCollapsedAreas(state.collapsedAreas),
+    showArchivedProjects: state.showArchivedProjects,
+    showDeferredProjects: state.showDeferredProjects,
+  });
+}
 
 function resolveTaskRouteTab(value?: string | string[]): TaskEditTab {
   const routeValue = Array.isArray(value) ? value[0] : value;
@@ -92,6 +148,7 @@ export default function ProjectsScreen() {
   }), shallow);
   const { t, language } = useLanguage();
   const { showToast } = useToast();
+  const { openQuickCapture } = useQuickCapture();
   const tc = useThemeColors();
   const {
     focusedProjectCount,
@@ -133,6 +190,8 @@ export default function ProjectsScreen() {
   const [showDeferredProjects, setShowDeferredProjects] = useState(false);
   const [showArchivedProjects, setShowArchivedProjects] = useState(false);
   const [showCompletedProjectTasks, setShowCompletedProjectTasks] = useState(false);
+  const projectListViewStateRef = useRef<ProjectListViewState>(DEFAULT_PROJECT_LIST_VIEW_STATE);
+  const projectListViewStateTouchedRef = useRef(false);
   const {
     areaById,
     resolvedAreaFilter: selectedAreaFilter,
@@ -142,6 +201,25 @@ export default function ProjectsScreen() {
   const logProjectError = useCallback((message: string, error?: unknown) => {
     if (!error) return;
     void logError(error, { scope: 'project', extra: { message } });
+  }, []);
+  const applyProjectListViewState = useCallback((nextState: ProjectListViewState) => {
+    const compactState = {
+      ...nextState,
+      collapsedAreas: compactCollapsedAreas(nextState.collapsedAreas),
+    };
+    projectListViewStateRef.current = compactState;
+    setCollapsedAreas(compactState.collapsedAreas);
+    setShowArchivedProjects(compactState.showArchivedProjects);
+    setShowDeferredProjects(compactState.showDeferredProjects);
+  }, []);
+  const persistProjectListViewState = useCallback((nextState: ProjectListViewState) => {
+    const compactState = {
+      ...nextState,
+      collapsedAreas: compactCollapsedAreas(nextState.collapsedAreas),
+    };
+    projectListViewStateRef.current = compactState;
+    AsyncStorage.setItem(PROJECT_LIST_VIEW_STATE_STORAGE_KEY, serializeProjectListViewState(compactState))
+      .catch(() => undefined);
   }, []);
   const resolveText = useCallback((key: string, fallback: string) => {
     const value = t(key);
@@ -213,6 +291,21 @@ export default function ProjectsScreen() {
     updateProject,
     language,
   });
+
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem(PROJECT_LIST_VIEW_STATE_STORAGE_KEY)
+      .then((raw) => {
+        if (!active || projectListViewStateTouchedRef.current) return;
+        const persisted = readProjectListViewState(raw);
+        if (!persisted) return;
+        applyProjectListViewState(persisted);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [applyProjectListViewState]);
   const {
     linkModalVisible,
     setLinkModalVisible,
@@ -279,6 +372,15 @@ export default function ProjectsScreen() {
     setShowStatusMenu(false);
     resetProjectAttachmentUi();
   }, [resetProjectAttachmentUi, resetProjectNotesUi]);
+
+  const openProjectQuickAdd = useCallback((projectToAddTo: Project) => {
+    openQuickCapture({
+      initialProps: {
+        projectId: projectToAddTo.id,
+        status: 'next',
+      },
+    });
+  }, [openQuickCapture]);
 
   useEffect(() => {
     if (!projectId || typeof projectId !== 'string') return;
@@ -425,11 +527,41 @@ export default function ProjectsScreen() {
   };
 
   const toggleAreaCollapse = useCallback((areaId: string) => {
-    setCollapsedAreas((current) => ({
+    projectListViewStateTouchedRef.current = true;
+    const current = projectListViewStateRef.current;
+    const collapsedAreas = { ...current.collapsedAreas };
+    if (collapsedAreas[areaId]) {
+      delete collapsedAreas[areaId];
+    } else {
+      collapsedAreas[areaId] = true;
+    }
+    const nextState = {
       ...current,
-      [areaId]: !(current[areaId] ?? false),
-    }));
-  }, []);
+      collapsedAreas,
+    };
+    setCollapsedAreas(compactCollapsedAreas(collapsedAreas));
+    persistProjectListViewState(nextState);
+  }, [persistProjectListViewState]);
+
+  const toggleProjectSection = useCallback((sectionKind: Extract<ProjectListRow, { type: 'section-toggle' }>['sectionKind']) => {
+    projectListViewStateTouchedRef.current = true;
+    const current = projectListViewStateRef.current;
+    if (sectionKind === 'deferred') {
+      const nextState = {
+        ...current,
+        showDeferredProjects: !current.showDeferredProjects,
+      };
+      setShowDeferredProjects(nextState.showDeferredProjects);
+      persistProjectListViewState(nextState);
+      return;
+    }
+    const nextState = {
+      ...current,
+      showArchivedProjects: !current.showArchivedProjects,
+    };
+    setShowArchivedProjects(nextState.showArchivedProjects);
+    persistProjectListViewState(nextState);
+  }, [persistProjectListViewState]);
 
   const renderProjectListRow = ({ item, index }: { item: ProjectListRow; index: number }) => {
     if (item.type === 'section-label') {
@@ -441,11 +573,7 @@ export default function ProjectsScreen() {
       return (
         <TouchableOpacity
           onPress={() => {
-            if (item.sectionKind === 'deferred') {
-              setShowDeferredProjects((current) => !current);
-              return;
-            }
-            setShowArchivedProjects((current) => !current);
+            toggleProjectSection(item.sectionKind);
           }}
           style={[
             styles.collapsibleSectionToggle,
@@ -785,6 +913,7 @@ export default function ProjectsScreen() {
         onDownloadAttachment={downloadAttachment}
         onOpenAreaPicker={openAreaPicker}
         onOpenAttachment={openAttachment}
+        onOpenProjectQuickAdd={openProjectQuickAdd}
         onOpenTagPicker={openTagPicker}
         onRemoveProjectAttachment={removeProjectAttachment}
         deleteSection={deleteSection}

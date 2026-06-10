@@ -227,6 +227,7 @@ describe('Quick capture modal composition', () => {
       'taskEdit.contextsLabel': 'Contexts',
       'taskEdit.dueDate': 'Due Date',
       'taskEdit.project': 'Project',
+      'taskEdit.projectLabel': 'Project',
       'taskEdit.priorityLabel': 'Priority',
     })[key] ?? key;
 
@@ -263,7 +264,7 @@ describe('Quick capture modal composition', () => {
           optionsExpanded={false}
           prioritiesEnabled
           priorityLabel="High"
-          projectLabel="Launch"
+          projectLabel="Project"
           recording={false}
           recordingBusy={false}
           recordingReady={false}
@@ -281,9 +282,82 @@ describe('Quick capture modal composition', () => {
     expect(tree.root.findAllByProps({ accessibilityLabel: 'More' }).length).toBeGreaterThan(0);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'Due Date: Tomorrow' })).toHaveLength(0);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'Area: Work' })).toHaveLength(0);
-    expect(tree.root.findAllByProps({ accessibilityLabel: 'Project: Launch' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Project: Project' })).toHaveLength(0);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'Priority: High' })).toHaveLength(0);
     expect(tree.root.findAllByType(Text).some((node) => node.props.children === 'More')).toBe(true);
+  });
+
+  it('shows a compact selected-project cue in collapsed capture', () => {
+    let tree!: ReturnType<typeof create>;
+    const longProjectName = 'Extremely Long Project Name That Should Not Crowd Quick Capture Controls';
+    const t = (key: string) => ({
+      'common.close': 'Close',
+      'common.more': 'More',
+      'common.save': 'Save',
+      'nav.addTask': 'Add Task',
+      'quickAdd.addAnother': 'Add another',
+      'quickAdd.audioRecord': 'Record',
+      'quickAdd.inputHint': 'Capture task title',
+      'quickAdd.inputLabel': 'Task title',
+      'taskEdit.contextsLabel': 'Contexts',
+      'taskEdit.projectLabel': 'Project',
+    })[key] ?? key;
+
+    act(() => {
+      tree = create(
+        <QuickCaptureSheetBody
+          addAnother={false}
+          areaLabel="No Area"
+          contextLabel="@computer"
+          dueDate={null}
+          dueLabel="Due Date"
+          dueTimeLabel="Change time"
+          handleClose={vi.fn()}
+          handleSave={vi.fn()}
+          insetsBottom={0}
+          inputRef={{ current: null }}
+          onOpenAreaPicker={vi.fn()}
+          onOpenContextPicker={vi.fn()}
+          onOpenDueDatePicker={vi.fn()}
+          onOpenDueTimePicker={vi.fn()}
+          onOpenPriorityPicker={vi.fn()}
+          onOpenProjectPicker={vi.fn()}
+          onQuickDueDateSelect={vi.fn()}
+          onResetArea={vi.fn()}
+          onResetContexts={vi.fn()}
+          onResetDueDate={vi.fn()}
+          onResetDueTime={vi.fn()}
+          onResetPriority={vi.fn()}
+          onResetProject={vi.fn()}
+          onToggleOptions={vi.fn()}
+          onToggleAddAnother={vi.fn()}
+          onToggleRecording={vi.fn()}
+          onValueChange={vi.fn()}
+          optionsExpanded={false}
+          prioritiesEnabled
+          priorityLabel="Priority"
+          projectLabel={longProjectName}
+          projectSelected
+          recording={false}
+          recordingBusy={false}
+          recordingReady={false}
+          sheetMaxHeight={500}
+          showDueTime={false}
+          t={t}
+          tc={tc}
+          value=""
+          visible
+        />
+      );
+    });
+
+    const projectChip = tree.root.findByProps({ accessibilityLabel: `Project: ${longProjectName}` });
+    const projectText = tree.root.findAllByType(Text).find((node) => node.props.children === longProjectName);
+    expect(projectChip).toBeTruthy();
+    expect(projectText?.props.numberOfLines).toBe(1);
+    expect(projectText?.props.ellipsizeMode).toBe('tail');
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Contexts: @computer' })).toHaveLength(0);
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'More' }).length).toBeGreaterThan(0);
   });
 
   it('bounds compact sheet text scaling so tablet controls cannot overlap', () => {
@@ -420,5 +494,69 @@ describe('Quick capture modal composition', () => {
     }
 
     expect(handleSave).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the input focused when keyboard submit saves and adds another', () => {
+    const handleSave = vi.fn();
+    const blur = vi.fn();
+    const inputRef = { current: { blur } } as unknown as React.RefObject<TextInput | null>;
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(
+        <QuickCaptureSheetBody
+          addAnother
+          areaLabel="No Area"
+          contextLabel="Contexts"
+          dueDate={null}
+          dueLabel="Due Date"
+          dueTimeLabel="Change time"
+          handleClose={vi.fn()}
+          handleSave={handleSave}
+          insetsBottom={0}
+          inputRef={inputRef}
+          onOpenAreaPicker={vi.fn()}
+          onOpenContextPicker={vi.fn()}
+          onOpenDueDatePicker={vi.fn()}
+          onOpenDueTimePicker={vi.fn()}
+          onOpenPriorityPicker={vi.fn()}
+          onOpenProjectPicker={vi.fn()}
+          onQuickDueDateSelect={vi.fn()}
+          onResetArea={vi.fn()}
+          onResetContexts={vi.fn()}
+          onResetDueDate={vi.fn()}
+          onResetDueTime={vi.fn()}
+          onResetPriority={vi.fn()}
+          onResetProject={vi.fn()}
+          onToggleOptions={vi.fn()}
+          onToggleAddAnother={vi.fn()}
+          onToggleRecording={vi.fn()}
+          onValueChange={vi.fn()}
+          optionsExpanded={false}
+          prioritiesEnabled
+          priorityLabel="Priority"
+          projectLabel="Project"
+          recording={false}
+          recordingBusy={false}
+          recordingReady={false}
+          sheetMaxHeight={500}
+          showDueTime={false}
+          t={(key) => key}
+          tc={tc}
+          value="Capture me"
+          visible
+        />
+      );
+    });
+
+    const input = tree.root.findByType(TextInput);
+    expect(input.props.blurOnSubmit).toBe(false);
+
+    act(() => {
+      input.props.onSubmitEditing();
+    });
+
+    expect(handleSave).toHaveBeenCalledOnce();
+    expect(blur).not.toHaveBeenCalled();
   });
 });

@@ -86,6 +86,7 @@ type ProjectDetailModalProps = {
     onProjectTaskSortByChange: (sortBy: Extract<TaskSortBy, 'default' | 'due'>) => void;
     onDownloadAttachment: (attachment: Attachment) => void | Promise<void>;
     onOpenAttachment: (attachment: Attachment) => void | Promise<void>;
+    onOpenProjectQuickAdd: (project: Project) => void;
     overlayVisible: boolean;
     presentationStyle: 'pageSheet' | 'fullScreen';
     projectTaskSortBy: Extract<TaskSortBy, 'default' | 'due'>;
@@ -506,6 +507,7 @@ export function ProjectDetailModal({
     onDownloadAttachment,
     onOpenAreaPicker,
     onOpenAttachment,
+    onOpenProjectQuickAdd,
     onOpenTagPicker,
     onRemoveProjectAttachment,
     deleteSection,
@@ -624,6 +626,65 @@ export function ProjectDetailModal({
         selectedProject?.status,
         showCompletedTasks,
     ]);
+    const addProjectTaskLabel = tFallback(t, 'nav.addTask', 'Add task');
+    const projectOrderLabel = tFallback(t, 'projects.reorderTasks', 'Order');
+    const hasProjectTaskOrderTargets = Boolean(
+        selectedProjectSections.length > 1
+        || (selectedProjectTasks ?? []).some((task) => (
+            !task.deletedAt && (taskListOptions.includeDone || task.status !== 'done')
+        ))
+    );
+    const openProjectQuickAdd = React.useCallback(() => {
+        if (!selectedProject || !taskListOptions.allowAdd) return;
+        onOpenProjectQuickAdd(selectedProject);
+    }, [onOpenProjectQuickAdd, selectedProject, taskListOptions.allowAdd]);
+    const projectTaskHeaderAccessory = selectedProject ? (
+        <View style={styles.projectTaskHeaderActions}>
+            {taskListOptions.enableProjectReorder && hasProjectTaskOrderTargets && !projectTaskReorderMode ? (
+                <TouchableOpacity
+                    accessibilityLabel={projectOrderLabel}
+                    accessibilityRole="button"
+                    onPress={() => setProjectTaskReorderMode(true)}
+                    style={[
+                        styles.projectTaskHeaderIconButton,
+                        {
+                            backgroundColor: tc.filterBg,
+                            borderColor: tc.border,
+                        },
+                    ]}
+                    testID="project-task-reorder-toggle"
+                >
+                    <Ionicons
+                        name="swap-vertical-outline"
+                        size={18}
+                        color={tc.secondaryText}
+                    />
+                </TouchableOpacity>
+            ) : null}
+            {taskListOptions.allowAdd && !projectTaskReorderMode ? (
+                <TouchableOpacity
+                    accessibilityLabel={addProjectTaskLabel}
+                    accessibilityRole="button"
+                    onPress={openProjectQuickAdd}
+                    style={[
+                        styles.projectTaskHeaderAddButton,
+                        { backgroundColor: tc.tint, borderColor: tc.tint },
+                    ]}
+                    testID="project-add-task-button"
+                >
+                    <Ionicons name="add" size={18} color={tc.onTint} />
+                    <Text
+                        style={[styles.projectTaskHeaderAddText, { color: tc.onTint }]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.82}
+                    >
+                        {addProjectTaskLabel}
+                    </Text>
+                </TouchableOpacity>
+            ) : null}
+        </View>
+    ) : null;
     const setSelectedProjectSequentialScope = (sequentialScope: Project['sequentialScope']) => {
         if (!selectedProject) return;
         updateProject(selectedProject.id, { sequentialScope });
@@ -1378,13 +1439,14 @@ export function ProjectDetailModal({
                                         statusFilter="all"
                                         title={selectedProject.title}
                                         filterSheetAccessory={projectTaskFilterAccessory}
+                                        headerAccessory={projectTaskHeaderAccessory}
                                         extraFilterActiveCount={projectTaskFilterActiveCount}
                                         onClearExtraFilters={clearProjectTaskFilters}
                                         showHeader={false}
                                         showTimeEstimateFilters={false}
                                         projectId={selectedProject.id}
                                         taskSource={selectedProjectTasks}
-                                        allowAdd={taskListOptions.allowAdd}
+                                        allowAdd={false}
                                         staticList
                                         staticListVirtualization={{
                                             scrollOffsetY: projectDetailScrollWindow.offsetY,

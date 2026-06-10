@@ -213,6 +213,38 @@ describe('CaptureScreen', () => {
     expect(routerMocks.replace).toHaveBeenCalledWith('/inbox');
   });
 
+  it('preserves safe status and project initial props from capture links', async () => {
+    routeParams.current = {
+      initialValue: encodeURIComponent('Project task'),
+      initialProps: encodeURIComponent(JSON.stringify({
+        projectId: 'project-1',
+        status: 'next',
+      })),
+    };
+    storeState.projects = [{
+      id: 'project-1',
+      title: 'Launch',
+      status: 'active',
+    }];
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<CaptureScreen />);
+    });
+
+    const saveButton = tree.root.findAllByType(TouchableOpacity)[2];
+
+    await act(async () => {
+      await saveButton.props.onPress();
+    });
+
+    expect(storeState.addTask).toHaveBeenCalledWith('Project task', {
+      status: 'next',
+      projectId: 'project-1',
+    });
+  });
+
   it('ignores unsupported URL-controlled initial props', async () => {
     routeParams.current = {
       initialValue: encodeURIComponent('Visible task'),

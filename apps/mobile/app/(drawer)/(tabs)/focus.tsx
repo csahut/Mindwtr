@@ -110,6 +110,7 @@ const DEFAULT_EXPANDED_SECTIONS = {
 };
 
 type TaskActionResult = { success?: boolean; error?: unknown } | void;
+type FocusExpandedSections = typeof DEFAULT_EXPANDED_SECTIONS;
 
 type FocusFilterChip = {
   id: string;
@@ -245,27 +246,44 @@ function buildFocusTaskGroups(
   });
 }
 
-const readPersistedNextActionsExpanded = (raw: string | null): boolean | null => {
+const readPersistedFocusExpandedSections = (raw: string | null): Partial<FocusExpandedSections> | null => {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as {
       expandedSections?: {
+        focus?: unknown;
+        next?: unknown;
         nextActions?: unknown;
+        reviewDue?: unknown;
+        reviewProjects?: unknown;
+        schedule?: unknown;
       };
     };
-    return typeof parsed.expandedSections?.nextActions === 'boolean'
-      ? parsed.expandedSections.nextActions
-      : null;
+    const persisted = parsed.expandedSections;
+    if (!persisted) return null;
+    const next: Partial<FocusExpandedSections> = {};
+    if (typeof persisted.focus === 'boolean') next.focus = persisted.focus;
+    if (typeof persisted.schedule === 'boolean') next.schedule = persisted.schedule;
+    const nextActionsExpanded = typeof persisted.next === 'boolean'
+      ? persisted.next
+      : persisted.nextActions;
+    if (typeof nextActionsExpanded === 'boolean') next.next = nextActionsExpanded;
+    if (typeof persisted.reviewDue === 'boolean') next.reviewDue = persisted.reviewDue;
+    if (typeof persisted.reviewProjects === 'boolean') next.reviewProjects = persisted.reviewProjects;
+    return Object.keys(next).length > 0 ? next : null;
   } catch {
     return null;
   }
 };
 
-const serializeFocusViewState = (expandedSections: typeof DEFAULT_EXPANDED_SECTIONS): string => JSON.stringify({
+const serializeFocusViewState = (expandedSections: FocusExpandedSections): string => JSON.stringify({
   expandedSections: {
+    focus: expandedSections.focus,
     schedule: expandedSections.schedule,
+    next: expandedSections.next,
     nextActions: expandedSections.next,
     reviewDue: expandedSections.reviewDue,
+    reviewProjects: expandedSections.reviewProjects,
   },
 });
 
@@ -306,7 +324,7 @@ export default function FocusScreen() {
   const [saveFilterName, setSaveFilterName] = useState('');
   const showFutureStarts = settings?.appearance?.showFutureStarts === true;
   const [expandedSections, setExpandedSections] = useState(DEFAULT_EXPANDED_SECTIONS);
-  const didToggleNextSectionRef = useRef(false);
+  const didToggleSectionRef = useRef(false);
   const lastOpenedFromNotificationRef = useRef<string | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pomodoroEnabled = settings?.features?.pomodoro === true;
@@ -730,12 +748,12 @@ export default function FocusScreen() {
     let active = true;
     AsyncStorage.getItem(FOCUS_VIEW_STATE_STORAGE_KEY)
       .then((raw) => {
-        if (!active || didToggleNextSectionRef.current) return;
-        const persistedNextExpanded = readPersistedNextActionsExpanded(raw);
-        if (typeof persistedNextExpanded !== 'boolean') return;
+        if (!active || didToggleSectionRef.current) return;
+        const persistedExpandedSections = readPersistedFocusExpandedSections(raw);
+        if (!persistedExpandedSections) return;
         setExpandedSections((current) => ({
           ...current,
-          next: persistedNextExpanded,
+          ...persistedExpandedSections,
         }));
       })
       .catch(() => {});
@@ -1179,17 +1197,13 @@ export default function FocusScreen() {
   }, [updateTask]);
 
   const toggleSection = useCallback((sectionType: FocusSectionType) => {
-    if (sectionType === 'next') {
-      didToggleNextSectionRef.current = true;
-    }
+    didToggleSectionRef.current = true;
     setExpandedSections((current) => {
       const next = {
         ...current,
         [sectionType]: !current[sectionType],
       };
-      if (sectionType === 'next') {
-        AsyncStorage.setItem(FOCUS_VIEW_STATE_STORAGE_KEY, serializeFocusViewState(next)).catch(() => {});
-      }
+      AsyncStorage.setItem(FOCUS_VIEW_STATE_STORAGE_KEY, serializeFocusViewState(next)).catch(() => {});
       return next;
     });
   }, []);
