@@ -1,4 +1,4 @@
-export const SQLITE_SCHEMA_VERSION = 8;
+export const SQLITE_SCHEMA_VERSION = 9;
 
 export const SQLITE_BASE_SCHEMA = `
 PRAGMA journal_mode = WAL;
@@ -82,6 +82,18 @@ CREATE TABLE IF NOT EXISTS areas (
   deletedAt TEXT,
   deletedAtBeforeProjectArchive TEXT,
   projectArchivedAt TEXT
+);
+
+CREATE TABLE IF NOT EXISTS people (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  note TEXT,
+  referenceLink TEXT,
+  rev INTEGER,
+  revBy TEXT,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  deletedAt TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sections (
@@ -218,6 +230,7 @@ CREATE INDEX IF NOT EXISTS idx_projects_dueDate ON projects(dueDate);
 CREATE INDEX IF NOT EXISTS idx_projects_updatedAt_rev ON projects(updatedAt, rev);
 CREATE INDEX IF NOT EXISTS idx_sections_updatedAt_rev ON sections(updatedAt, rev);
 CREATE INDEX IF NOT EXISTS idx_areas_updatedAt_rev ON areas(updatedAt, rev);
+CREATE INDEX IF NOT EXISTS idx_people_updatedAt_rev ON people(updatedAt, rev);
 CREATE INDEX IF NOT EXISTS idx_saved_filters_view ON saved_filters(view);
 `;
 

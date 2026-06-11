@@ -40,7 +40,7 @@ export type WriteLockRunner = {
     getPendingLockCount: () => number;
 };
 
-const DEFAULT_DATA: AppData = { tasks: [], projects: [], sections: [], areas: [], settings: {} };
+const DEFAULT_DATA: AppData = { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} };
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> => (
     typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -54,6 +54,7 @@ const toAppDataShape = (value: unknown): AppData | null => {
         projects: value.projects as AppData['projects'],
         sections: Array.isArray(value.sections) ? value.sections as AppData['sections'] : [],
         areas: Array.isArray(value.areas) ? value.areas as AppData['areas'] : [],
+        people: Array.isArray(value.people) ? value.people as AppData['people'] : [],
         settings: (isObjectRecord(value.settings) ? value.settings : {}) as AppData['settings'],
     };
 };

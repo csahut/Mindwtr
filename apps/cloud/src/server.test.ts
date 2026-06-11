@@ -996,6 +996,57 @@ describe('cloud server api', () => {
         expect(stored.tasks.map((task) => task.id)).toEqual(['server-only']);
     });
 
+    test('preserves people across /v1/data server-side merges', async () => {
+        const seedData: AppData = {
+            tasks: [],
+            projects: [],
+            sections: [],
+            areas: [],
+            people: [{
+                id: 'person-1',
+                name: 'Alex',
+                note: 'Design lead',
+                referenceLink: 'https://example.com/alex',
+                createdAt: '2026-01-01T00:00:00.000Z',
+                updatedAt: '2026-01-01T00:00:00.000Z',
+                rev: 1,
+                revBy: 'device-a',
+            }],
+            settings: {},
+        };
+        const seedResponse = await fetch(`${baseUrl}/v1/data`, {
+            method: 'PUT',
+            headers: {
+                ...authHeaders,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify(seedData),
+        });
+        expect(seedResponse.status).toBe(200);
+
+        const staleResponse = await fetch(`${baseUrl}/v1/data`, {
+            method: 'PUT',
+            headers: {
+                ...authHeaders,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+                tasks: [],
+                projects: [],
+                sections: [],
+                areas: [],
+                people: [],
+                settings: {},
+            } satisfies AppData),
+        });
+        expect(staleResponse.status).toBe(200);
+
+        const getResponse = await fetch(`${baseUrl}/v1/data`, { headers: authHeaders });
+        expect(getResponse.status).toBe(200);
+        const data = await getResponse.json() as AppData;
+        expect(data.people).toEqual(seedData.people);
+    });
+
     test('returns data metadata for HEAD /v1/data without a body', async () => {
         const seedResponse = await fetch(`${baseUrl}/v1/data`, {
             method: 'PUT',

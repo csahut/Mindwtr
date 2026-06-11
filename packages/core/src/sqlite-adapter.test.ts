@@ -107,7 +107,7 @@ describeSqlite('SqliteAdapter', () => {
         db.close();
     });
 
-    it('round-trips tasks, projects, areas, and settings', async () => {
+    it('round-trips tasks, projects, areas, people, and settings', async () => {
         const now = new Date().toISOString();
         const archivedAt = '2026-05-12T09:00:00.000Z';
         const data: AppData = {
@@ -190,6 +190,27 @@ describeSqlite('SqliteAdapter', () => {
                     revBy: 'device-desktop',
                 },
             ],
+            people: [
+                {
+                    id: 'person-1',
+                    name: 'Alex',
+                    note: 'Design lead',
+                    referenceLink: 'https://example.com/alex',
+                    rev: 6,
+                    revBy: 'device-desktop',
+                    createdAt: now,
+                    updatedAt: now,
+                },
+                {
+                    id: 'person-deleted',
+                    name: 'Jordan',
+                    rev: 7,
+                    revBy: 'device-mobile',
+                    createdAt: now,
+                    updatedAt: archivedAt,
+                    deletedAt: archivedAt,
+                },
+            ],
             settings: {
                 gtd: { autoArchiveDays: 7 },
                 savedFilters: [
@@ -213,6 +234,22 @@ describeSqlite('SqliteAdapter', () => {
         expect(loaded.projects).toHaveLength(1);
         expect(loaded.sections).toHaveLength(1);
         expect(loaded.areas).toHaveLength(1);
+        expect(loaded.people).toHaveLength(2);
+        expect(loaded.people?.[0]).toMatchObject({
+            id: 'person-1',
+            name: 'Alex',
+            note: 'Design lead',
+            referenceLink: 'https://example.com/alex',
+            rev: 6,
+            revBy: 'device-desktop',
+        });
+        expect(loaded.people?.[1]).toMatchObject({
+            id: 'person-deleted',
+            name: 'Jordan',
+            rev: 7,
+            revBy: 'device-mobile',
+            deletedAt: archivedAt,
+        });
         expect(loaded.settings.gtd?.autoArchiveDays).toBe(7);
         expect(loaded.settings.savedFilters?.[0]).toMatchObject({
             id: 'filter-1',
@@ -848,6 +885,22 @@ describeSqlite('SqliteAdapter', () => {
         const projectIndexes = allSql<{ name: string }>(db, 'PRAGMA index_list(projects)');
         expect(projectIndexes.map((row) => row.name)).toContain('idx_projects_dueDate');
 
+        const peopleColumns = allSql<{ name: string }>(db, 'PRAGMA table_info(people)');
+        const peopleColumnNames = peopleColumns.map((col) => col.name);
+        expect(peopleColumnNames).toEqual(expect.arrayContaining([
+            'id',
+            'name',
+            'note',
+            'referenceLink',
+            'rev',
+            'revBy',
+            'createdAt',
+            'updatedAt',
+            'deletedAt',
+        ]));
+        const peopleIndexes = allSql<{ name: string }>(db, 'PRAGMA index_list(people)');
+        expect(peopleIndexes.map((row) => row.name)).toContain('idx_people_updatedAt_rev');
+
         const sectionColumns = allSql<{ name: string }>(db, 'PRAGMA table_info(sections)');
         const sectionColumnNames = sectionColumns.map((col) => col.name);
         expect(sectionColumnNames).toContain('rev');
@@ -951,6 +1004,7 @@ describe('SqliteAdapter saveData pruning', () => {
                 createdAt: now,
                 updatedAt: now,
             })),
+            people: [],
             settings: {},
         };
 
@@ -960,7 +1014,8 @@ describe('SqliteAdapter saveData pruning', () => {
             .map(([sql]) => String(sql))
             .filter((sql) => sql.startsWith('CREATE TEMP TABLE temp_'));
         const tempNames = tempCreateCalls.map((sql) => sql.match(/CREATE TEMP TABLE (temp_[a-z0-9_]+)/)?.[1]);
-        expect(new Set(tempNames).size).toBe(5);
+        expect(new Set(tempNames).size).toBe(6);
+        expect(tempNames.some((name) => name?.startsWith('temp_people_ids_'))).toBe(true);
 
         const tempAreaInsertCalls = run.mock.calls.filter(([sql]) =>
             String(sql).startsWith('INSERT OR IGNORE INTO temp_areas_ids_')

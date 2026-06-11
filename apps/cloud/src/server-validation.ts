@@ -41,11 +41,13 @@ export function validateAppData(
     const sections = value.sections;
     const settings = value.settings;
     const areas = value.areas;
+    const people = value.people;
 
     if (!Array.isArray(tasks)) return { ok: false, error: 'Invalid data: tasks must be an array' };
     if (!Array.isArray(projects)) return { ok: false, error: 'Invalid data: projects must be an array' };
     if (sections !== undefined && !Array.isArray(sections)) return { ok: false, error: 'Invalid data: sections must be an array' };
     if (areas !== undefined && !Array.isArray(areas)) return { ok: false, error: 'Invalid data: areas must be an array' };
+    if (people !== undefined && !Array.isArray(people)) return { ok: false, error: 'Invalid data: people must be an array' };
     if (settings !== undefined && !isRecord(settings)) return { ok: false, error: 'Invalid data: settings must be an object' };
     if (tasks.length > MAX_ITEMS_PER_COLLECTION) return { ok: false, error: `Invalid data: tasks exceeds limit (${MAX_ITEMS_PER_COLLECTION})` };
     if (projects.length > MAX_ITEMS_PER_COLLECTION) return { ok: false, error: `Invalid data: projects exceeds limit (${MAX_ITEMS_PER_COLLECTION})` };
@@ -54,6 +56,9 @@ export function validateAppData(
     }
     if (Array.isArray(areas) && areas.length > MAX_ITEMS_PER_COLLECTION) {
         return { ok: false, error: `Invalid data: areas exceeds limit (${MAX_ITEMS_PER_COLLECTION})` };
+    }
+    if (Array.isArray(people) && people.length > MAX_ITEMS_PER_COLLECTION) {
+        return { ok: false, error: `Invalid data: people exceeds limit (${MAX_ITEMS_PER_COLLECTION})` };
     }
 
     for (const task of tasks) {
@@ -179,6 +184,32 @@ export function validateAppData(
             }
             if (area.deletedAt == null) {
                 activeAreaIds.add(area.id);
+            }
+        }
+    }
+
+    if (Array.isArray(people)) {
+        for (const person of people) {
+            if (!isRecord(person) || typeof person.id !== 'string' || typeof person.name !== 'string') {
+                return { ok: false, error: 'Invalid data: each person must be an object with string id and name' };
+            }
+            if (person.id.trim().length === 0 || person.name.trim().length === 0) {
+                return { ok: false, error: 'Invalid data: each person must include non-empty id and name' };
+            }
+            if (person.note !== undefined && person.note !== null && typeof person.note !== 'string') {
+                return { ok: false, error: 'Invalid data: person note must be a string when present' };
+            }
+            if (person.referenceLink !== undefined && person.referenceLink !== null && typeof person.referenceLink !== 'string') {
+                return { ok: false, error: 'Invalid data: person referenceLink must be a string when present' };
+            }
+            if (!isValidIsoTimestamp(person.createdAt)) {
+                return { ok: false, error: 'Invalid data: person createdAt must be a valid ISO timestamp' };
+            }
+            if (!isValidIsoTimestamp(person.updatedAt)) {
+                return { ok: false, error: 'Invalid data: person updatedAt must be a valid ISO timestamp' };
+            }
+            if (person.deletedAt != null && !isValidIsoTimestamp(person.deletedAt)) {
+                return { ok: false, error: 'Invalid data: person deletedAt must be a valid ISO timestamp when present' };
             }
         }
     }

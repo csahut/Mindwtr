@@ -144,6 +144,7 @@ const normalizeStoredAppData = (data: AppData): AppData => ({
     projects: Array.isArray(data.projects) ? data.projects : [],
     sections: Array.isArray(data.sections) ? data.sections : [],
     areas: Array.isArray(data.areas) ? data.areas : [],
+    people: Array.isArray(data.people) ? data.people : [],
     settings: isRecord(data.settings) ? data.settings : {},
 });
 
@@ -165,7 +166,7 @@ const validateStoredAppData = (
 };
 
 const loadExistingDataForMerge = (filePath: string, key: string): AppData | { error: Response } => {
-    if (!existsSync(filePath)) return { tasks: [], projects: [], sections: [], areas: [], settings: {} };
+    if (!existsSync(filePath)) return { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} };
     const rawData = readData(filePath);
     if (!rawData) {
         logWarn('Stored cloud data failed validation', { key, error: 'Invalid JSON' });
@@ -1304,7 +1305,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                             if (!existsSync(filePath)) {
                                 const namespaceResponse = ensureNamespaceWriteAllowed(key);
                                 if (namespaceResponse) return namespaceResponse;
-                                const emptyData: AppData = { tasks: [], projects: [], sections: [], areas: [], settings: {} };
+                                const emptyData: AppData = { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} };
                                 throwIfRequestAborted(requestAbortController.signal);
                                 if (!existsSync(filePath)) writeCloudData(filePath, emptyData);
                                 return jsonResponse(emptyData);
@@ -1367,6 +1368,7 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                                 projects: [],
                                 sections: [],
                                 areas: [],
+                                people: [],
                                 settings: {},
                             }, incomingData, { nowIso: mergeTimestamp });
                             const serverMergedRemoteData = !areSyncPayloadsEqual(mergeResult.data, incomingOnlyMerge.data);

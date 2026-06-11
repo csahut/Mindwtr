@@ -1,4 +1,4 @@
-import type { AppData, Area, Attachment, Project, SavedFilter, Task, Section } from './types';
+import type { AppData, Area, Attachment, Person, Project, SavedFilter, Task, Section } from './types';
 
 export type CalendarSyncEntry = {
     taskId: string;
@@ -213,7 +213,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 let tempIdTableCounter = 0;
 
-const createTempIdTableName = (table: 'tasks' | 'projects' | 'sections' | 'areas' | 'saved_filters'): string => {
+const createTempIdTableName = (table: 'tasks' | 'projects' | 'sections' | 'areas' | 'people' | 'saved_filters'): string => {
     tempIdTableCounter = (tempIdTableCounter + 1) % Number.MAX_SAFE_INTEGER;
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).slice(2, 10) || '0';
@@ -342,7 +342,7 @@ export class SqliteAdapter {
         this.client = client;
     }
 
-    private async loadAllRows(table: 'tasks' | 'projects' | 'sections' | 'areas'): Promise<Record<string, unknown>[]> {
+    private async loadAllRows(table: 'tasks' | 'projects' | 'sections' | 'areas' | 'people'): Promise<Record<string, unknown>[]> {
         const rows: Record<string, unknown>[] = [];
         try {
             let lastRowId = 0;
@@ -436,6 +436,7 @@ export class SqliteAdapter {
         await this.ensureProjectColumns();
         await this.ensureSectionColumns();
         await this.ensureAreaColumns();
+        await this.ensurePeopleTable();
         await this.ensureSavedFilterTable();
         if (this.client.exec) {
             await this.client.exec(SQLITE_FTS_SCHEMA);
@@ -711,6 +712,39 @@ export class SqliteAdapter {
         }
     }
 
+    private async ensurePeopleTable() {
+        await this.client.run(`
+            CREATE TABLE IF NOT EXISTS people (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              note TEXT,
+              referenceLink TEXT,
+              rev INTEGER,
+              revBy TEXT,
+              createdAt TEXT NOT NULL,
+              updatedAt TEXT NOT NULL,
+              deletedAt TEXT
+            )
+        `);
+        const columns = await this.client.all<{ name?: string }>('PRAGMA table_info(people)');
+        const names = new Set(columns.map((col) => col.name));
+        const definitions: Array<{ name: string; sql: string }> = [
+            { name: 'note', sql: 'ALTER TABLE people ADD COLUMN note TEXT' },
+            { name: 'referenceLink', sql: 'ALTER TABLE people ADD COLUMN referenceLink TEXT' },
+            { name: 'rev', sql: 'ALTER TABLE people ADD COLUMN rev INTEGER' },
+            { name: 'revBy', sql: 'ALTER TABLE people ADD COLUMN revBy TEXT' },
+            { name: 'createdAt', sql: 'ALTER TABLE people ADD COLUMN createdAt TEXT' },
+            { name: 'updatedAt', sql: 'ALTER TABLE people ADD COLUMN updatedAt TEXT' },
+            { name: 'deletedAt', sql: 'ALTER TABLE people ADD COLUMN deletedAt TEXT' },
+        ];
+        for (const definition of definitions) {
+            if (!names.has(definition.name)) {
+                await this.client.run(definition.sql);
+            }
+        }
+        await this.client.run('CREATE INDEX IF NOT EXISTS idx_people_updatedAt_rev ON people(updatedAt, rev)');
+    }
+
     private async ensureSavedFilterTable() {
         await this.client.run(`
             CREATE TABLE IF NOT EXISTS saved_filters (
@@ -953,11 +987,12 @@ export class SqliteAdapter {
 
     async getData(): Promise<AppData> {
         await this.ensureSchema();
-        const [tasksRows, projectsRows, sectionsRows, areasRows, settingsRow, savedFilterRows] = await Promise.all([
+        const [tasksRows, projectsRows, sectionsRows, areasRows, peopleRows, settingsRow, savedFilterRows] = await Promise.all([
             this.loadAllRows('tasks'),
             this.loadAllRows('projects'),
             this.loadAllRows('sections'),
             this.loadAllRows('areas'),
+            this.loadAllRows('people'),
             this.client.get<Record<string, unknown>>('SELECT data FROM settings WHERE id = 1'),
             this.client.all<Record<string, unknown>>('SELECT * FROM saved_filters ORDER BY createdAt, name'),
         ]);
@@ -989,6 +1024,27 @@ export class SqliteAdapter {
                 deletedAt: row.deletedAt as string | undefined,
             };
         });
+        const people: Person[] = peopleRows.map((row) => {
+            const createdAtRaw = typeof row.createdAt === 'string' && row.createdAt.trim().length > 0
+                ? row.createdAt
+                : undefined;
+            const updatedAtRaw = typeof row.updatedAt === 'string' && row.updatedAt.trim().length > 0
+                ? row.updatedAt
+                : undefined;
+            const createdAt = createdAtRaw ?? updatedAtRaw ?? nowIso;
+            const updatedAt = updatedAtRaw ?? createdAtRaw ?? nowIso;
+            return {
+                id: String(row.id),
+                name: String(row.name ?? ''),
+                note: row.note as string | undefined,
+                referenceLink: row.referenceLink as string | undefined,
+                rev: row.rev === null || row.rev === undefined ? undefined : Number(row.rev),
+                revBy: row.revBy as string | undefined,
+                createdAt,
+                updatedAt,
+                deletedAt: row.deletedAt as string | undefined,
+            };
+        });
 
         const settings = settingsRow?.data ? fromJson<AppData['settings']>(settingsRow.data, {}) : {};
         const savedFiltersFromTable = savedFilterRows
@@ -1000,7 +1056,7 @@ export class SqliteAdapter {
             settings.savedFilters = normalizeSavedFilters(settings.savedFilters);
         }
 
-        return { tasks, projects, sections, areas, settings };
+        return { tasks, projects, sections, areas, people, settings };
     }
 
     async queryTasks(options: TaskQueryOptions): Promise<Task[]> {
@@ -1140,7 +1196,7 @@ export class SqliteAdapter {
                 }
             };
 
-            const syncIds = async (table: 'tasks' | 'projects' | 'sections' | 'areas' | 'saved_filters', ids: string[]) => {
+            const syncIds = async (table: 'tasks' | 'projects' | 'sections' | 'areas' | 'people' | 'saved_filters', ids: string[]) => {
                 const tempTable = createTempIdTableName(table);
                 try {
                     await this.client.run(`CREATE TEMP TABLE ${tempTable} (id TEXT PRIMARY KEY)`);
@@ -1273,6 +1329,45 @@ export class SqliteAdapter {
                  deletedAt=excluded.deletedAt`,
             );
 
+            const people = Array.isArray(data.people) ? data.people : [];
+            await upsertBatch(
+                'people',
+                [
+                    'id',
+                    'name',
+                    'note',
+                    'referenceLink',
+                    'rev',
+                    'revBy',
+                    'createdAt',
+                    'updatedAt',
+                    'deletedAt',
+                ],
+                people.map((person) => {
+                    const createdAt = person.createdAt ?? person.updatedAt ?? nowIso;
+                    const updatedAt = person.updatedAt ?? person.createdAt ?? nowIso;
+                    return [
+                        person.id,
+                        person.name,
+                        person.note ?? null,
+                        person.referenceLink ?? null,
+                        person.rev ?? null,
+                        person.revBy ?? null,
+                        createdAt,
+                        updatedAt,
+                        person.deletedAt ?? null,
+                    ];
+                }),
+                `name=excluded.name,
+                 note=excluded.note,
+                 referenceLink=excluded.referenceLink,
+                 rev=excluded.rev,
+                 revBy=excluded.revBy,
+                 createdAt=excluded.createdAt,
+                 updatedAt=excluded.updatedAt,
+                 deletedAt=excluded.deletedAt`,
+            );
+
             await upsertBatch(
                 'sections',
                 [
@@ -1330,6 +1425,7 @@ export class SqliteAdapter {
             await syncIds('sections', data.sections.map((section) => section.id));
             await syncIds('projects', data.projects.map((project) => project.id));
             await syncIds('areas', data.areas.map((area) => area.id));
+            await syncIds('people', people.map((person) => person.id));
 
             const rawSavedFilters = data.settings?.savedFilters;
             const savedFilters = normalizeSavedFilters(rawSavedFilters);
