@@ -207,6 +207,17 @@ describe('iOS sync file bookmarks', () => {
       .resolves.toEqual(remote);
   });
 
+  it('falls back to direct file access when the bookmarked read returns null', async () => {
+    bookmarkMocks.supportsBookmarkedSyncFileIO.mockReturnValue(true);
+    bookmarkMocks.readBookmarkedSyncFileText.mockResolvedValue(null);
+    const remote = appData({ weekStart: 'sunday' });
+    expoFilesMock.set('file:///gdrive/Mindwtr/backup.json', JSON.stringify(remote));
+
+    const { readSyncFile } = await import('./storage-file');
+    await expect(readSyncFile('file:///gdrive/Mindwtr/backup.json', { bookmark: 'bm-token' }))
+      .resolves.toEqual(remote);
+  });
+
   it('falls back to direct file access when the bookmarked read fails', async () => {
     bookmarkMocks.supportsBookmarkedSyncFileIO.mockReturnValue(true);
     bookmarkMocks.readBookmarkedSyncFileText.mockRejectedValue(new Error('scope lost'));

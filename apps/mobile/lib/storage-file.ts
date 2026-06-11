@@ -543,9 +543,14 @@ export const readSyncFile = async (fileUri: string, options?: SyncFileAccessOpti
                     extra: { error: error instanceof Error ? error.message : String(error) },
                 });
             }
-            if (fileContent !== undefined) {
+            if (typeof fileContent === 'string') {
                 if (!fileContent) return null;
                 return parseAppData(fileContent);
+            }
+            if (fileContent === null) {
+                void logWarn('Bookmarked sync read returned no content; falling back to direct file access', {
+                    scope: 'sync',
+                });
             }
         }
 
