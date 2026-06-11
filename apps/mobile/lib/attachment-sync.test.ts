@@ -58,6 +58,14 @@ vi.mock('@mindwtr/core', () => ({
   globalProgressTracker: {
     updateProgress: vi.fn(),
   },
+  decodeUriSafe: vi.fn((value: string) => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }),
+  sleep: vi.fn().mockResolvedValue(undefined),
   webdavGetFile: vi.fn(),
   webdavFileExists: vi.fn(),
   webdavMakeDirectory: vi.fn(),
