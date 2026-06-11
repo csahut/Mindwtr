@@ -168,6 +168,10 @@ export type {
 } from './store-types';
 
 export {
+    withTimeout,
+} from './store-helpers';
+
+export {
     appendSyncHistory,
     CLOCK_SKEW_THRESHOLD_MS,
     filterDeleted,
@@ -220,6 +224,7 @@ export {
     normalizeWebdavUrl,
     persistExternalCalendars,
     sanitizeAppDataForRemote,
+    toStableSyncJson as toStableJson,
     toStableSyncJson,
 } from './sync-helpers';
 export type {
@@ -765,6 +770,7 @@ export {
 } from './cloudkit-attachments';
 
 export {
+    markAttachmentUnrecoverable,
     validateAttachmentForUpload,
 } from './attachment-validation';
 export type {
@@ -975,6 +981,23 @@ export {
     parseDropboxMetadataRev,
     resolveDropboxPath,
 } from './dropbox-sync-utils';
+
+export {
+    deleteDropboxFile,
+    downloadDropboxAppData,
+    downloadDropboxFile,
+    DropboxConflictError,
+    DropboxFileNotFoundError,
+    DropboxUnauthorizedError,
+    getDropboxAppDataMetadata,
+    isDropboxUnauthorizedError,
+    testDropboxAccess,
+    uploadDropboxAppData,
+    uploadDropboxFile,
+} from './dropbox';
+export type {
+    DropboxDownloadResult,
+} from './dropbox';
 
 export {
     BACKUP_FILE_PREFIX,

@@ -3,6 +3,7 @@ import {
     isSyncFilePath,
     normalizePath,
     normalizeSyncBackend,
+    toStableJson,
     type Attachment,
     type SyncBackend,
 } from '@mindwtr/core';
@@ -12,26 +13,6 @@ export const ATTACHMENTS_DIR_NAME = 'attachments';
 const importNodeCrypto = async (): Promise<typeof import('node:crypto')> => {
     const specifier = 'node:crypto';
     return import(/* @vite-ignore */ specifier) as Promise<typeof import('node:crypto')>;
-};
-
-export const toStableJson = (value: unknown): string => {
-    const normalize = (input: any): any => {
-        if (Array.isArray(input)) {
-            return input.map(normalize);
-        }
-        if (input && typeof input === 'object') {
-            const entries = Object.keys(input)
-                .sort()
-                .map((key) => [key, normalize(input[key])]);
-            const result: Record<string, any> = {};
-            for (const [key, val] of entries) {
-                result[key] = val;
-            }
-            return result;
-        }
-        return input;
-    };
-    return JSON.stringify(normalize(value));
 };
 
 export const hashString = async (value: string): Promise<string> => {
@@ -93,6 +74,7 @@ export {
     isSyncFilePath,
     normalizePath,
     normalizeSyncBackend,
+    toStableJson,
     type SyncBackend,
 };
 

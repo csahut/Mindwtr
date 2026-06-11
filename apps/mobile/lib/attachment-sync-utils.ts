@@ -5,8 +5,9 @@ import {
   computeSha256Hex,
   createWebdavDownloadBackoff,
   globalProgressTracker,
+  isDropboxUnauthorizedError,
+  markAttachmentUnrecoverable,
 } from '@mindwtr/core';
-import { DropboxUnauthorizedError } from './dropbox-sync';
 import {
   CLOUD_TOKEN_KEY,
   CLOUD_ALLOW_INSECURE_HTTP_KEY,
@@ -37,6 +38,8 @@ const webdavDownloadBackoff = createWebdavDownloadBackoff({
   errorBackoffMs: WEBDAV_ATTACHMENT_ERROR_BACKOFF_MS,
 });
 export const CLOUD_PROVIDER_DROPBOX = 'dropbox';
+
+export { markAttachmentUnrecoverable };
 
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const BASE64_LOOKUP = (() => {
@@ -78,32 +81,6 @@ export const clearWebdavDownloadBackoff = (attachmentId: string): void => {
 
 export const pruneWebdavDownloadBackoff = (): void => {
   webdavDownloadBackoff.prune();
-};
-
-export const markAttachmentUnrecoverable = (attachment: Attachment): boolean => {
-  const now = new Date().toISOString();
-  let mutated = false;
-  if (attachment.cloudKey !== undefined) {
-    attachment.cloudKey = undefined;
-    mutated = true;
-  }
-  if (attachment.fileHash !== undefined) {
-    attachment.fileHash = undefined;
-    mutated = true;
-  }
-  if (attachment.localStatus !== 'missing') {
-    attachment.localStatus = 'missing';
-    mutated = true;
-  }
-  if (!attachment.deletedAt) {
-    attachment.deletedAt = now;
-    mutated = true;
-  }
-  if (attachment.updatedAt !== now) {
-    attachment.updatedAt = now;
-    mutated = true;
-  }
-  return mutated;
 };
 
 export const readAttachmentBytesForUpload = async (
@@ -306,15 +283,6 @@ export const getDropboxClientId = async (): Promise<string> => {
   } catch {
     return '';
   }
-};
-
-const isDropboxUnauthorizedError = (error: unknown): boolean => {
-  if (error instanceof DropboxUnauthorizedError) return true;
-  const message = sanitizeLogMessage(error instanceof Error ? error.message : String(error)).toLowerCase();
-  return message.includes('http 401')
-    || message.includes('invalid_access_token')
-    || message.includes('expired_access_token')
-    || message.includes('unauthorized');
 };
 
 export const runDropboxAuthorized = async <T,>(

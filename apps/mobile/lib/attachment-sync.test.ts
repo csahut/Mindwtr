@@ -42,7 +42,19 @@ vi.mock('@mindwtr/core', () => ({
   cloudDeleteFile: vi.fn(),
   cloudPutFile: vi.fn(),
   isAbortError: vi.fn().mockReturnValue(false),
+  isDropboxUnauthorizedError: vi.fn((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.toLowerCase().includes('unauthorized') || message.includes('401');
+  }),
   computeSha256Hex: vi.fn().mockResolvedValue(null),
+  markAttachmentUnrecoverable: vi.fn((attachment: Attachment) => {
+    attachment.cloudKey = undefined;
+    attachment.fileHash = undefined;
+    attachment.localStatus = 'missing';
+    attachment.deletedAt = attachment.deletedAt || new Date().toISOString();
+    attachment.updatedAt = new Date().toISOString();
+    return true;
+  }),
   globalProgressTracker: {
     updateProgress: vi.fn(),
   },

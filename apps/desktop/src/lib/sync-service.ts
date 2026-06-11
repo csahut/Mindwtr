@@ -26,6 +26,7 @@ import {
     findPendingAttachmentUploads,
     injectExternalCalendars as injectExternalCalendarsForSync,
     persistExternalCalendars as persistExternalCalendarsForSync,
+    withTimeout,
     withRetry,
     isRetryableWebdavReadError,
     isWebdavInvalidJsonError,
@@ -306,18 +307,6 @@ async function persistLocalDataForSync(data: AppData): Promise<void> {
 
 const DROPBOX_REDIRECT_URI_FALLBACK = 'http://127.0.0.1:53682/oauth/dropbox/callback';
 const DROPBOX_TEST_TIMEOUT_MS = 15_000;
-
-const withTimeout = async <T>(promise: Promise<T>, ms: number, message: string): Promise<T> => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(message)), ms);
-    });
-    try {
-        return await Promise.race([promise, timeout]);
-    } finally {
-        if (timer) clearTimeout(timer);
-    }
-};
 
 async function getTauriFetch(): Promise<typeof fetch | undefined> {
     return syncServiceDependencies.getTauriFetch();
