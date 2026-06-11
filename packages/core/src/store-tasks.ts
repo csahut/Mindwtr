@@ -420,6 +420,25 @@ const reserveProjectOrderForPreparedUpdates = ({
     };
 };
 
+const createTaskQueryMatcher = (
+    options: TaskQueryOptions,
+    { checkVisibility }: { checkVisibility: boolean }
+): ((task: Task) => boolean) => {
+    const statusFilter = options.status;
+    const excludeStatuses = options.excludeStatuses ?? [];
+    const includeArchived = options.includeArchived === true;
+    const includeDeleted = options.includeDeleted === true;
+    const projectId = options.projectId;
+
+    return (task) => {
+        if (checkVisibility && !isTaskVisible(task, { includeArchived, includeDeleted })) return false;
+        if (statusFilter && statusFilter !== 'all' && task.status !== statusFilter) return false;
+        if (excludeStatuses.length > 0 && excludeStatuses.includes(task.status)) return false;
+        if (projectId && task.projectId !== projectId) return false;
+        return true;
+    };
+};
+
 export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackImmediateSave }: TaskActionContext): TaskActions => ({
     /**
      * Add a new task to the store and persist to storage.
@@ -959,32 +978,19 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
         if (storage.queryTasks) {
             return storage.queryTasks(options);
         }
-        const tasks = get()._allTasks;
+        const includeArchived = options.includeArchived === true;
+        const includeDeleted = options.includeDeleted === true;
+        if (!includeArchived && !includeDeleted) {
             const statusFilter = options.status;
-            const excludeStatuses = options.excludeStatuses ?? [];
-            const includeArchived = options.includeArchived === true;
-            const includeDeleted = options.includeDeleted === true;
-            if (!includeArchived && !includeDeleted) {
-                const state = get();
-                const derived = state.getDerivedState();
-                const indexedTasks = options.projectId
-                    ? derived.tasksByProjectId.get(options.projectId) ?? []
-                    : statusFilter && statusFilter !== 'all'
-                        ? derived.activeTasksByStatus.get(statusFilter) ?? []
-                        : state.tasks;
-                return indexedTasks.filter((task) => {
-                    if (statusFilter && statusFilter !== 'all' && task.status !== statusFilter) return false;
-                    if (excludeStatuses.length > 0 && excludeStatuses.includes(task.status)) return false;
-                    if (options.projectId && task.projectId !== options.projectId) return false;
-                    return true;
-                });
-            }
-            return tasks.filter((task) => {
-                if (!isTaskVisible(task, { includeArchived, includeDeleted })) return false;
-            if (statusFilter && statusFilter !== 'all' && task.status !== statusFilter) return false;
-            if (excludeStatuses.length > 0 && excludeStatuses.includes(task.status)) return false;
-            if (options.projectId && task.projectId !== options.projectId) return false;
-            return true;
-        });
+            const state = get();
+            const derived = state.getDerivedState();
+            const indexedTasks = options.projectId
+                ? derived.tasksByProjectId.get(options.projectId) ?? []
+                : statusFilter && statusFilter !== 'all'
+                    ? derived.activeTasksByStatus.get(statusFilter) ?? []
+                    : state.tasks;
+            return indexedTasks.filter(createTaskQueryMatcher(options, { checkVisibility: false }));
+        }
+        return get()._allTasks.filter(createTaskQueryMatcher(options, { checkVisibility: true }));
     },
 });
