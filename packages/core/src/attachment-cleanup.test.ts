@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
     applyAttachmentCleanupResult,
     findDeletedAttachmentsForFileCleanup,
+    findLiveAttachmentResourceReferences,
     findOrphanedAttachments,
+    isAttachmentCloudResourceReferenced,
+    isAttachmentLocalResourceReferenced,
     removeAttachmentsByIdFromData,
     removeOrphanedAttachmentsFromData,
 } from './attachment-cleanup';
@@ -166,6 +169,114 @@ describe('findDeletedAttachmentsForFileCleanup', () => {
 
         const deleted = findDeletedAttachmentsForFileCleanup(data);
         expect(deleted.map((a) => a.id)).toEqual(['a1']);
+    });
+});
+
+describe('findLiveAttachmentResourceReferences', () => {
+    it('tracks live local URIs and cloud keys while ignoring deleted records', () => {
+        const data = buildData();
+        data.tasks.push({
+            id: 'live-task',
+            title: 'Live',
+            status: 'inbox',
+            contexts: [],
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            attachments: [
+                {
+                    id: 'live',
+                    kind: 'file',
+                    title: 'live',
+                    uri: 'file:///tmp/shared',
+                    cloudKey: 'attachments/shared.txt',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                },
+                {
+                    id: 'deleted',
+                    kind: 'file',
+                    title: 'deleted',
+                    uri: '/tmp/deleted',
+                    cloudKey: 'attachments/deleted.txt',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                    deletedAt: '2026-01-02T00:00:00.000Z',
+                },
+            ],
+        });
+        data.projects.push({
+            id: 'deleted-project',
+            title: 'Deleted Project',
+            status: 'active',
+            color: '#000000',
+            order: 0,
+            tagIds: [],
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            deletedAt: '2026-01-02T00:00:00.000Z',
+            attachments: [
+                {
+                    id: 'deleted-parent',
+                    kind: 'file',
+                    title: 'deleted-parent',
+                    uri: '/tmp/deleted-parent',
+                    cloudKey: 'attachments/deleted-parent.txt',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                },
+            ],
+        });
+
+        const references = findLiveAttachmentResourceReferences(data);
+        expect(Array.from(references.localUris)).toEqual(['/tmp/shared']);
+        expect(Array.from(references.cloudKeys)).toEqual(['attachments/shared.txt']);
+    });
+
+    it('detects cleanup targets that share a live local URI or cloud key', () => {
+        const data = buildData();
+        data.tasks.push({
+            id: 'live-task',
+            title: 'Live',
+            status: 'inbox',
+            contexts: [],
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            attachments: [
+                {
+                    id: 'live',
+                    kind: 'file',
+                    title: 'live',
+                    uri: '/tmp/shared',
+                    cloudKey: 'attachments/shared.txt',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                },
+            ],
+        });
+
+        const references = findLiveAttachmentResourceReferences(data);
+        expect(isAttachmentLocalResourceReferenced({
+            id: 'orphan',
+            kind: 'file',
+            title: 'orphan',
+            uri: 'file:///tmp/shared',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+        }, references)).toBe(true);
+        expect(isAttachmentCloudResourceReferenced({
+            cloudKey: 'attachments/shared.txt',
+        }, references)).toBe(true);
+        expect(isAttachmentLocalResourceReferenced({
+            id: 'other',
+            kind: 'file',
+            title: 'other',
+            uri: '/tmp/other',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+        }, references)).toBe(false);
+        expect(isAttachmentCloudResourceReferenced({
+            cloudKey: 'attachments/other.txt',
+        }, references)).toBe(false);
     });
 });
 

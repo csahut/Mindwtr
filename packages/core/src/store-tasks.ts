@@ -811,6 +811,9 @@ export const createTaskActions = ({ set, get, getStorage, debouncedSave, trackIm
                 createdAt: now,
                 updatedAt: now,
                 deletedAt: undefined,
+                cloudKey: undefined,
+                fileHash: undefined,
+                localStatus: undefined,
             }));
             const projectOrderReserver = createProjectOrderReserver(state._allTasks);
             const duplicatedOrder = sourceTask.projectId

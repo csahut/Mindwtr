@@ -53,6 +53,57 @@ export function findDeletedAttachmentsForFileCleanup(appData: AppData): Attachme
     return Array.from(deleted.values());
 }
 
+export type LiveAttachmentResourceReferences = {
+    localUris: ReadonlySet<string>;
+    cloudKeys: ReadonlySet<string>;
+};
+
+export function normalizeAttachmentCleanupUri(uri?: string): string | undefined {
+    if (!uri) return undefined;
+    if (/^https?:\/\//i.test(uri) || uri.startsWith('content://')) return undefined;
+    return uri.replace(/^file:\/\//i, '');
+}
+
+export function findLiveAttachmentResourceReferences(appData: AppData): LiveAttachmentResourceReferences {
+    const localUris = new Set<string>();
+    const cloudKeys = new Set<string>();
+
+    const collect = (attachments: readonly Attachment[] | undefined, parentDeleted: boolean) => {
+        if (parentDeleted) return;
+        for (const attachment of attachments || []) {
+            if (attachment.deletedAt) continue;
+            const localUri = normalizeAttachmentCleanupUri(attachment.uri);
+            if (localUri) localUris.add(localUri);
+            if (attachment.cloudKey) cloudKeys.add(attachment.cloudKey);
+        }
+    };
+
+    for (const task of appData.tasks) {
+        collect(task.attachments, Boolean(task.deletedAt));
+    }
+
+    for (const project of appData.projects) {
+        collect(project.attachments, Boolean(project.deletedAt));
+    }
+
+    return { localUris, cloudKeys };
+}
+
+export function isAttachmentLocalResourceReferenced(
+    attachment: Attachment,
+    references: LiveAttachmentResourceReferences,
+): boolean {
+    const localUri = normalizeAttachmentCleanupUri(attachment.uri);
+    return Boolean(localUri && references.localUris.has(localUri));
+}
+
+export function isAttachmentCloudResourceReferenced(
+    attachment: Pick<Attachment, 'cloudKey'>,
+    references: LiveAttachmentResourceReferences,
+): boolean {
+    return Boolean(attachment.cloudKey && references.cloudKeys.has(attachment.cloudKey));
+}
+
 export function removeOrphanedAttachmentsFromData(appData: AppData): AppData {
     const orphanedIds = new Set(findOrphanedAttachments(appData).map((attachment) => attachment.id));
 

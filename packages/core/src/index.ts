@@ -810,13 +810,18 @@ export type {
 export {
     applyAttachmentCleanupResult,
     findDeletedAttachmentsForFileCleanup,
+    findLiveAttachmentResourceReferences,
     findOrphanedAttachments,
+    isAttachmentCloudResourceReferenced,
+    isAttachmentLocalResourceReferenced,
+    normalizeAttachmentCleanupUri,
     removeAttachmentsByIdFromData,
     removeOrphanedAttachmentsFromData,
 } from './attachment-cleanup';
 export type {
     AttachmentCleanupApplyResult,
     CleanupResult,
+    LiveAttachmentResourceReferences,
 } from './attachment-cleanup';
 
 export {

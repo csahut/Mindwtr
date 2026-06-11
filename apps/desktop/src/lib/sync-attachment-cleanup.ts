@@ -5,8 +5,11 @@ import {
     type PendingRemoteAttachmentDelete,
     cloudDeleteFile,
     findDeletedAttachmentsForFileCleanup,
+    findLiveAttachmentResourceReferences,
     findOrphanedAttachments,
     getErrorStatus,
+    isAttachmentCloudResourceReferenced,
+    isAttachmentLocalResourceReferenced,
     LEGACY_SYNC_FILE_NAME,
     type CloudProvider,
     SYNC_FILE_NAME,
@@ -96,6 +99,7 @@ export const cleanupOrphanedAttachments = async (
     const previousPendingRemoteDeletes = normalizePendingRemoteDeletes(appData.settings.attachments?.pendingRemoteDeletes);
     const previousPendingByCloudKey = new Map(previousPendingRemoteDeletes.map((item) => [item.cloudKey, item]));
     const cleanupTargets = new Map<string, Attachment>();
+    const liveResourceReferences = findLiveAttachmentResourceReferences(appData);
     const maybeYield = createCooperativeYield(4);
 
     for (const attachment of orphaned) cleanupTargets.set(attachment.id, attachment);
@@ -105,6 +109,7 @@ export const cleanupOrphanedAttachments = async (
     for (const attachment of cleanupTargets.values()) {
         await maybeYield();
         if (!attachment.cloudKey) continue;
+        if (isAttachmentCloudResourceReferenced(attachment, liveResourceReferences)) continue;
         remoteCleanupTargets.set(attachment.cloudKey, {
             cloudKey: attachment.cloudKey,
             title: attachment.title || attachment.cloudKey,
@@ -112,6 +117,7 @@ export const cleanupOrphanedAttachments = async (
     }
     for (const pending of previousPendingRemoteDeletes) {
         await maybeYield();
+        if (isAttachmentCloudResourceReferenced({ cloudKey: pending.cloudKey }, liveResourceReferences)) continue;
         remoteCleanupTargets.set(pending.cloudKey, {
             cloudKey: pending.cloudKey,
             title: pending.title || pending.cloudKey,
@@ -177,6 +183,7 @@ export const cleanupOrphanedAttachments = async (
 
     for (const attachment of cleanupTargets.values()) {
         await maybeYield();
+        if (isAttachmentLocalResourceReferenced(attachment, liveResourceReferences)) continue;
         await deleteAttachmentFile(attachment, deps);
     }
 

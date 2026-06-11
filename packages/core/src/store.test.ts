@@ -321,6 +321,19 @@ describe('TaskStore', () => {
                 { id: 'c1', title: 'Pack charger', isCompleted: true },
                 { id: 'c2', title: 'Print agenda', isCompleted: false },
             ],
+            attachments: [
+                {
+                    id: 'a1',
+                    kind: 'file',
+                    title: 'Agenda',
+                    uri: '/tmp/agenda.pdf',
+                    cloudKey: 'attachments/a1.pdf',
+                    fileHash: 'hash-a1',
+                    localStatus: 'available',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                },
+            ],
         });
         expect(addResult.success).toBe(true);
 
@@ -338,6 +351,23 @@ describe('TaskStore', () => {
             { title: 'Print agenda', isCompleted: false },
         ]);
         expect(duplicatedTask?.checklist?.map((item) => item.id)).not.toEqual(['c1', 'c2']);
+        expect(duplicatedTask?.attachments?.map((attachment) => ({
+            id: attachment.id,
+            title: attachment.title,
+            uri: attachment.uri,
+            cloudKey: attachment.cloudKey,
+            fileHash: attachment.fileHash,
+            localStatus: attachment.localStatus,
+        }))).toEqual([
+            {
+                id: expect.not.stringMatching(/^a1$/),
+                title: 'Agenda',
+                uri: '/tmp/agenda.pdf',
+                cloudKey: undefined,
+                fileHash: undefined,
+                localStatus: undefined,
+            },
+        ]);
     });
 
     it('rejects promoting a fourth task into today focus', async () => {
