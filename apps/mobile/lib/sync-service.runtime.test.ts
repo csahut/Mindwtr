@@ -78,6 +78,7 @@ const storageFileMocks = vi.hoisted(() => ({
 
 const syncPathBookmarkMocks = vi.hoisted(() => ({
   resolveSyncPathBookmark: vi.fn(),
+  isSyncPathBookmarksAvailable: vi.fn(() => false),
 }));
 
 const logMocks = vi.hoisted(() => ({
@@ -188,6 +189,7 @@ vi.mock('./storage-file', () => ({
 
 vi.mock('./sync-path-bookmarks', () => ({
   resolveSyncPathBookmark: syncPathBookmarkMocks.resolveSyncPathBookmark,
+  isSyncPathBookmarksAvailable: syncPathBookmarkMocks.isSyncPathBookmarksAvailable,
 }));
 
 vi.mock('./app-log', () => ({
@@ -263,6 +265,7 @@ describe('mobile sync-service runtime', () => {
     storageFileMocks.resolveSyncFileUri.mockImplementation(async (uri: string) => uri);
     storageFileMocks.writeSyncFile.mockResolvedValue(undefined);
     syncPathBookmarkMocks.resolveSyncPathBookmark.mockResolvedValue(null);
+    syncPathBookmarkMocks.isSyncPathBookmarksAvailable.mockReturnValue(false);
 
     attachmentSyncMocks.syncCloudAttachments.mockResolvedValue(false);
     attachmentSyncMocks.syncDropboxAttachments.mockResolvedValue(false);
@@ -720,15 +723,71 @@ describe('mobile sync-service runtime', () => {
       };
       return values[key] ?? null;
     });
-    syncPathBookmarkMocks.resolveSyncPathBookmark.mockResolvedValue('file:///resolved/MindWtr');
+    syncPathBookmarkMocks.resolveSyncPathBookmark.mockResolvedValue({
+      uri: 'file:///resolved/MindWtr',
+      refreshedBookmark: null,
+    });
 
     const result = await syncServiceModule.performMobileSync('file:///stale/MindWtr/data.json');
 
     expect(result.success).toBe(true);
     expect(syncPathBookmarkMocks.resolveSyncPathBookmark).toHaveBeenCalledWith('bookmark-token');
     expect(asyncStorageMocks.setItem).toHaveBeenCalledWith('@mindwtr_sync_path', 'file:///resolved/MindWtr/data.json');
-    expect(storageFileMocks.readSyncFile).toHaveBeenCalledWith('file:///resolved/MindWtr/data.json');
-    expect(storageFileMocks.writeSyncFile).toHaveBeenCalledWith('file:///resolved/MindWtr/data.json', expect.any(Object));
+    expect(storageFileMocks.readSyncFile).toHaveBeenCalledWith(
+      'file:///resolved/MindWtr/data.json',
+      { bookmark: 'bookmark-token' }
+    );
+    expect(storageFileMocks.writeSyncFile).toHaveBeenCalledWith(
+      'file:///resolved/MindWtr/data.json',
+      expect.any(Object),
+      { bookmark: 'bookmark-token' }
+    );
+  });
+
+  it('persists a refreshed bookmark when the stored one is stale', async () => {
+    (Platform as { OS: string }).OS = 'ios';
+    asyncStorageMocks.getItem.mockImplementation(async (key: string) => {
+      const values: Record<string, string | null> = {
+        '@mindwtr_sync_backend': 'file',
+        '@mindwtr_sync_path': 'file:///resolved/MindWtr/data.json',
+        '@mindwtr_sync_path_bookmark': 'stale-token',
+      };
+      return values[key] ?? null;
+    });
+    syncPathBookmarkMocks.resolveSyncPathBookmark.mockResolvedValue({
+      uri: 'file:///resolved/MindWtr/data.json',
+      refreshedBookmark: 'fresh-token',
+    });
+
+    const result = await syncServiceModule.performMobileSync();
+
+    expect(result.success).toBe(true);
+    expect(asyncStorageMocks.setItem).toHaveBeenCalledWith('@mindwtr_sync_path_bookmark', 'fresh-token');
+    expect(storageFileMocks.writeSyncFile).toHaveBeenCalledWith(
+      'file:///resolved/MindWtr/data.json',
+      expect.any(Object),
+      { bookmark: 'fresh-token' }
+    );
+  });
+
+  it('fails with a re-select prompt when the stored bookmark can no longer be resolved', async () => {
+    (Platform as { OS: string }).OS = 'ios';
+    asyncStorageMocks.getItem.mockImplementation(async (key: string) => {
+      const values: Record<string, string | null> = {
+        '@mindwtr_sync_backend': 'file',
+        '@mindwtr_sync_path': 'file:///stale/MindWtr/data.json',
+        '@mindwtr_sync_path_bookmark': 'dead-token',
+      };
+      return values[key] ?? null;
+    });
+    syncPathBookmarkMocks.resolveSyncPathBookmark.mockResolvedValue(null);
+    syncPathBookmarkMocks.isSyncPathBookmarksAvailable.mockReturnValue(true);
+
+    const result = await syncServiceModule.performMobileSync();
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/re-select/i);
+    expect(storageFileMocks.readSyncFile).not.toHaveBeenCalled();
   });
 
   it('returns a queued retry result when fresher local edits abort the merge', async () => {

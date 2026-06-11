@@ -5,7 +5,7 @@ import { AppData, MergeStats, createSyncOrchestrator, runPreSyncAttachmentPhase,
 import { mobileStorage } from './storage-adapter';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
 import { readSyncFile, resolveSyncFileUri, writeSyncFile } from './storage-file';
-import { resolveSyncPathBookmark } from './sync-path-bookmarks';
+import { isSyncPathBookmarksAvailable, resolveSyncPathBookmark } from './sync-path-bookmarks';
 import { getBaseSyncUrl, getCloudBaseUrl, syncCloudAttachments, syncCloudKitAttachments, syncDropboxAttachments, syncFileAttachments, syncWebdavAttachments, cleanupAttachmentTempFiles, hasPendingAttachmentSyncWork } from './attachment-sync';
 import { runMobileAttachmentCleanup } from './sync-attachment-cleanup';
 import { getExternalCalendars, saveExternalCalendars } from './external-calendar';
@@ -198,15 +198,34 @@ const getPathLeaf = (path: string): string => {
   return lastSlash >= 0 ? stripped.slice(lastSlash + 1) : stripped;
 };
 
-const resolveBookmarkedFileSyncPath = async (syncPath: string | null): Promise<string | null> => {
-  if (Platform.OS !== 'ios') return syncPath;
+const SYNC_BOOKMARK_EXPIRED_MESSAGE =
+  'Sync location access expired. Please re-select the sync folder or file in Settings -> Data & Sync.';
+
+const resolveBookmarkedFileSyncPath = async (
+  syncPath: string | null
+): Promise<{ path: string | null; bookmark: string | null }> => {
+  if (Platform.OS !== 'ios') return { path: syncPath, bookmark: null };
 
   const bookmark = (await getCachedConfigValue(SYNC_PATH_BOOKMARK_KEY))?.trim() ?? null;
-  if (!bookmark) return syncPath;
+  if (!bookmark) return { path: syncPath, bookmark: null };
 
-  const bookmarkUri = await resolveSyncPathBookmark(bookmark);
-  if (!bookmarkUri) return syncPath;
+  const resolved = await resolveSyncPathBookmark(bookmark);
+  if (!resolved?.uri) {
+    if (isSyncPathBookmarksAvailable()) {
+      throw new Error(SYNC_BOOKMARK_EXPIRED_MESSAGE);
+    }
+    return { path: syncPath, bookmark };
+  }
 
+  let activeBookmark = bookmark;
+  if (resolved.refreshedBookmark && resolved.refreshedBookmark !== bookmark) {
+    await AsyncStorage.setItem(SYNC_PATH_BOOKMARK_KEY, resolved.refreshedBookmark);
+    syncConfigCache.set(SYNC_PATH_BOOKMARK_KEY, { value: resolved.refreshedBookmark, readAt: Date.now() });
+    activeBookmark = resolved.refreshedBookmark;
+    logSyncInfo('Refreshed stale iOS sync-path bookmark');
+  }
+
+  const bookmarkUri = resolved.uri;
   let resolvedPath = bookmarkUri;
   if (syncPath && isLikelyFilePath(syncPath) && !isLikelyFilePath(bookmarkUri)) {
     const leafName = getPathLeaf(syncPath) || SYNC_FILE_NAME;
@@ -222,7 +241,7 @@ const resolveBookmarkedFileSyncPath = async (syncPath: string | null): Promise<s
     });
   }
 
-  return resolvedPath;
+  return { path: resolvedPath, bookmark: activeBookmark };
 };
 
 const getSupportedBackend = (rawBackend: string | null): SyncBackend =>
@@ -481,6 +500,7 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
       let dropboxClientId = '';
       let dropboxLastRev: string | null = null;
       let fileSyncPath: string | null = null;
+      let fileSyncBookmark: string | null = null;
       let remoteDataForCompare: AppData | null = null;
       let lastRemoteWriteFingerprint: string | null = null;
       let lastRemoteWriteMergedServerData = false;
@@ -494,7 +514,9 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
       if (backend === 'file') {
         const configuredSyncPath = (await getCachedConfigValue(SYNC_PATH_KEY))?.trim() ?? null;
         fileSyncPath = syncPathOverride || configuredSyncPath;
-        fileSyncPath = await resolveBookmarkedFileSyncPath(fileSyncPath);
+        const bookmarkResolution = await resolveBookmarkedFileSyncPath(fileSyncPath);
+        fileSyncPath = bookmarkResolution.path;
+        fileSyncBookmark = bookmarkResolution.bookmark;
         if (!fileSyncPath) {
           return { success: true };
         }
@@ -747,7 +769,7 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
         if (!fileSyncPath) {
           throw new Error('No sync folder configured');
         }
-        const data = await readSyncFile(fileSyncPath);
+        const data = await readSyncFile(fileSyncPath, { bookmark: fileSyncBookmark });
         remoteDataForCompare = data ?? null;
         return data;
       };
@@ -899,7 +921,7 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
           return;
         }
         if (!fileSyncPath) throw new Error('No sync folder configured');
-        await writeSyncFile(fileSyncPath, sanitized);
+        await writeSyncFile(fileSyncPath, sanitized, { bookmark: fileSyncBookmark });
         remoteDataForCompare = sanitized;
       };
 
