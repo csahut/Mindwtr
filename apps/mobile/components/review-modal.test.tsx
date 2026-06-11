@@ -152,6 +152,7 @@ vi.mock('lucide-react-native', () => {
         Tag: icon('Tag'),
         FolderOpen: icon('FolderOpen'),
         Lightbulb: icon('Lightbulb'),
+        Play: icon('Play'),
         CheckCircle2: icon('CheckCircle2'),
         PartyPopper: icon('PartyPopper'),
     };
@@ -163,6 +164,14 @@ vi.mock('./swipeable-task-item', () => ({
 
 vi.mock('./task-edit-modal', () => ({
     TaskEditModal: (props: any) => React.createElement('TaskEditModal', props),
+}));
+
+vi.mock('./inbox-processing-modal', () => ({
+    InboxProcessingModal: (props: any) => React.createElement('InboxProcessingModal', props),
+}));
+
+vi.mock('./ErrorBoundary', () => ({
+    ErrorBoundary: (props: any) => React.createElement(React.Fragment, null, props.children),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -198,6 +207,9 @@ describe('ReviewModal', () => {
             tree.root.findAll((node) => flattenText(node.props?.children).includes(text)).length > 0;
 
         expect(hasText('Inbox')).toBe(true);
+        expect(
+            tree.root.findAll((node) => node.props?.accessibilityLabel === 'inbox.processButton').length,
+        ).toBeGreaterThan(0);
 
         const nextLabel = tree.root.find((node) => flattenText(node.props?.children) === 'Next →');
         const nextButton = nextLabel.parent;

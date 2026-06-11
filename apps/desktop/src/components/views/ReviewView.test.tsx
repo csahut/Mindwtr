@@ -205,6 +205,7 @@ describe('ReviewView', () => {
         await waitForExternalCalendarIdle();
         expect(getByRole('heading', { level: 1, name: 'Process Inbox' })).toBeInTheDocument();
         expect(getByText('Inbox Zero Goal')).toBeInTheDocument();
+        expect(getByRole('button', { name: 'Process Inbox (1)' })).toBeInTheDocument();
 
         fireEvent.click(getByText('Next Step'));
         const aiVisible = queryByText('AI insight');

@@ -3,6 +3,7 @@ import {
     createAIProvider,
     DEFAULT_AREA_COLOR,
     getStaleItems,
+    getUsedTaskTokens,
     isDueForReview,
     isTaskInActiveProject,
     parseQuickAddDateCommands,
@@ -22,6 +23,7 @@ import { Archive, ArrowRight, Calendar, Check, CheckSquare, ChevronLeft, Layers,
 import { TaskItem } from '../../TaskItem';
 import { ModalPortal } from '../../ModalPortal';
 import { PromptModal } from '../../PromptModal';
+import { InboxProcessor } from '../InboxProcessor';
 import { cn } from '../../../lib/utils';
 import { useLanguage } from '../../../contexts/language-context';
 import { buildAIConfig, isAIKeyRequired, loadAIKey } from '../../../lib/ai-config';
@@ -57,15 +59,19 @@ type WeeklyReviewGuideModalProps = {
 
 export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps) {
     const [currentStep, setCurrentStep] = useState<ReviewStep>('inbox');
+    const [isProcessing, setIsProcessing] = useState(false);
     const [expandedExternalDays, setExpandedExternalDays] = useState<Set<string>>(new Set());
     const [expandedContextGroups, setExpandedContextGroups] = useState<Set<string>>(new Set());
     const [projectTaskPrompt, setProjectTaskPrompt] = useState<{ projectId: string; projectTitle: string } | null>(null);
-    const { tasks, projects, areas, settings, batchUpdateTasks } = useTaskStore(
+    const { tasks, projects, areas, settings, addProject, updateTask, deleteTask, batchUpdateTasks } = useTaskStore(
         (state) => ({
             tasks: state.tasks,
             projects: state.projects,
             areas: state.areas,
             settings: state.settings,
+            addProject: state.addProject,
+            updateTask: state.updateTask,
+            deleteTask: state.deleteTask,
             batchUpdateTasks: state.batchUpdateTasks,
         }),
         shallow
@@ -74,6 +80,11 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
     const showToast = useUiStore((state) => state.showToast);
     const areaById = useMemo(() => new Map(areas.map((area) => [area.id, area])), [areas]);
     const projectMap = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
+    const activeTasks = useMemo(
+        () => tasks.filter((task) => !task.deletedAt && task.status !== 'reference' && isTaskInActiveProject(task, projectMap)),
+        [projectMap, tasks],
+    );
+    const allContexts = useMemo(() => getUsedTaskTokens(activeTasks, (task) => task.contexts, { prefix: '@' }), [activeTasks]);
     const { t } = useLanguage();
     const [aiSuggestions, setAiSuggestions] = useState<ReviewSuggestion[]>([]);
     const [aiSelectedIds, setAiSelectedIds] = useState<Set<string>>(new Set());
@@ -251,6 +262,12 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
             setCurrentStep(activeSteps[0]?.id ?? 'completed');
         }
     }, [activeSteps, currentStep]);
+
+    useEffect(() => {
+        if (displayedStep !== 'inbox' && isProcessing) {
+            setIsProcessing(false);
+        }
+    }, [displayedStep, isProcessing]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -560,6 +577,20 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                                 <span className="font-bold text-foreground">{inboxTasks.length}</span> {t('review.inboxZeroDesc')}
                             </p>
                         </div>
+                        <InboxProcessor
+                            t={t}
+                            isInbox
+                            tasks={tasks}
+                            projects={projects}
+                            areas={areas}
+                            settings={settings}
+                            addProject={addProject}
+                            updateTask={updateTask}
+                            deleteTask={deleteTask}
+                            allContexts={allContexts}
+                            isProcessing={isProcessing}
+                            setIsProcessing={setIsProcessing}
+                        />
                         <div className="space-y-2">
                             {inboxTasks.length === 0 ? (
                                 <div className="text-center py-12 text-muted-foreground">

@@ -250,6 +250,20 @@ export const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
     },
+    processButton: {
+        alignSelf: 'flex-start',
+        borderRadius: 999,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    processButtonText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
+    },
     projectItem: {
         padding: 12,
         borderRadius: 8,

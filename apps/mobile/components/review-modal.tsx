@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { safeFormatDate, safeParseDate, type Task } from '@mindwtr/core';
@@ -10,6 +10,7 @@ import {
     Inbox,
     Lightbulb,
     PartyPopper,
+    Play,
     Sparkles,
     Tag,
     X,
@@ -19,6 +20,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '../contexts/language-context';
 import { SwipeableTaskItem } from './swipeable-task-item';
 import { TaskEditModal } from './task-edit-modal';
+import { InboxProcessingModal } from './inbox-processing-modal';
+import { ErrorBoundary } from './ErrorBoundary';
 import {
     type CalendarTaskReviewEntry,
     type ContextReviewGroup,
@@ -36,6 +39,7 @@ export const checkReviewTime = () => true;
 
 export function ReviewModal({ visible, onClose }: ReviewModalProps) {
     const { t } = useLanguage();
+    const [showInboxProcessing, setShowInboxProcessing] = useState(false);
     const {
         aiEnabled,
         aiError,
@@ -95,6 +99,12 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
     } = useReviewModalController({ visible, onClose });
     const closeLabel = t('common.close');
     const closeText = closeLabel && closeLabel !== 'common.close' ? closeLabel : 'Close';
+
+    useEffect(() => {
+        if (!visible && showInboxProcessing) {
+            setShowInboxProcessing(false);
+        }
+    }, [showInboxProcessing, visible]);
 
     const renderStepRail = () => (
         <ScrollView
@@ -339,6 +349,20 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                                 {labels.inboxGuide}
                             </Text>
                         </View>
+                        {inboxTasks.length > 0 && (
+                            <TouchableOpacity
+                                style={[styles.processButton, { backgroundColor: tc.tint }]}
+                                onPress={() => setShowInboxProcessing(true)}
+                                hitSlop={8}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('inbox.processButton')}
+                            >
+                                <Play size={14} color="#FFFFFF" strokeWidth={2.5} fill="#FFFFFF" />
+                                <Text style={styles.processButtonText}>
+                                    {t('inbox.processButton')}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
                         {inboxTasks.length === 0 ? (
                             <View style={styles.emptyState}>
                                 <CheckCircle2 size={48} color={tc.secondaryText} strokeWidth={1.5} style={styles.emptyIcon} />
@@ -708,6 +732,13 @@ export function ReviewModal({ visible, onClose }: ReviewModalProps) {
                     onContextNavigate={handleNavigateToToken}
                     onTagNavigate={handleNavigateToToken}
                 />
+
+                <ErrorBoundary>
+                    <InboxProcessingModal
+                        visible={visible && showInboxProcessing}
+                        onClose={() => setShowInboxProcessing(false)}
+                    />
+                </ErrorBoundary>
 
                 <Modal
                     visible={Boolean(projectTaskPrompt)}
