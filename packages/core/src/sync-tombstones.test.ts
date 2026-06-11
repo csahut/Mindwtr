@@ -119,7 +119,7 @@ describe('purgeExpiredTombstones', () => {
         expect(result.data.areas.map((area) => area.id)).toEqual(['area-recent']);
     });
 
-    it('keeps pending remote attachment deletes until a successful remote delete removes them', () => {
+    it('prunes expired pending remote attachment deletes while keeping recent failures', () => {
         const data: AppData = {
             tasks: [],
             projects: [],
@@ -129,8 +129,12 @@ describe('purgeExpiredTombstones', () => {
                 attachments: {
                     pendingRemoteDeletes: [
                         {
-                            cloudKey: 'attachments/private/photo.jpg',
+                            cloudKey: 'attachments/private/expired.jpg',
                             lastErrorAt: '2025-01-01T00:00:00.000Z',
+                        },
+                        {
+                            cloudKey: 'attachments/private/recent.jpg',
+                            lastErrorAt: '2026-04-01T00:00:00.000Z',
                         },
                     ],
                 },
@@ -139,8 +143,13 @@ describe('purgeExpiredTombstones', () => {
 
         const result = purgeExpiredTombstones(data, nowIso);
 
-        expect(result.removedPendingRemoteDeletes).toBe(0);
-        expect(result.data.settings.attachments?.pendingRemoteDeletes).toEqual(data.settings.attachments?.pendingRemoteDeletes);
+        expect(result.removedPendingRemoteDeletes).toBe(1);
+        expect(result.data.settings.attachments?.pendingRemoteDeletes).toEqual([
+            {
+                cloudKey: 'attachments/private/recent.jpg',
+                lastErrorAt: '2026-04-01T00:00:00.000Z',
+            },
+        ]);
     });
 
     it('purges expired saved filter tombstones from settings', () => {
