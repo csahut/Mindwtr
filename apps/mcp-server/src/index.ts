@@ -227,7 +227,14 @@ const restoreTaskSchema = z.object({
 
 const listProjectsSchema = z.object({});
 const listAreasSchema = z.object({});
+const listPeopleSchema = z.object({
+  includeDeleted: z.boolean().optional(),
+});
 const getProjectSchema = z.object({
+  id: z.string(),
+  includeDeleted: z.boolean().optional(),
+});
+const getPersonSchema = z.object({
   id: z.string(),
   includeDeleted: z.boolean().optional(),
 });
@@ -300,6 +307,25 @@ const updateAreaSchema = z.object({
   icon: z.string().nullable().optional(),
 });
 const deleteAreaSchema = z.object({
+  id: z.string(),
+});
+const addPersonSchema = z.object({
+  name: z.string().min(1).max(200),
+  note: z.string().nullable().optional(),
+  referenceLink: z.string().nullable().optional(),
+});
+const updatePersonSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(200).optional(),
+  note: z.string().nullable().optional(),
+  referenceLink: z.string().nullable().optional(),
+});
+const renamePersonSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(200),
+  updateTasks: z.boolean().optional(),
+});
+const deletePersonSchema = z.object({
   id: z.string(),
 });
 
@@ -383,6 +409,30 @@ export const registerMindwtrTools = (server: McpServer, service: MindwtrService,
     withMcpErrorHandling('mindwtr_list_areas', async () => {
       const areas = await service.listAreas();
       return createMcpTextResponse({ areas });
+    }),
+  );
+
+  server.registerTool(
+    'mindwtr_list_people',
+    {
+      description: 'List managed people from the local Mindwtr SQLite database.',
+      inputSchema: listPeopleSchema,
+    },
+    withMcpErrorHandling('mindwtr_list_people', async (input) => {
+      const people = await service.listPeople(input);
+      return createMcpTextResponse({ people });
+    }),
+  );
+
+  server.registerTool(
+    'mindwtr_get_person',
+    {
+      description: 'Get a single managed person by ID from the local Mindwtr SQLite database.',
+      inputSchema: getPersonSchema,
+    },
+    withMcpErrorHandling('mindwtr_get_person', async (input) => {
+      const person = await service.getPerson({ id: input.id, includeDeleted: input.includeDeleted });
+      return createMcpTextResponse({ person });
     }),
   );
 
@@ -568,6 +618,54 @@ export const registerMindwtrTools = (server: McpServer, service: MindwtrService,
     withReadonlyMcpErrorHandling('mindwtr_delete_area', async (input) => {
       const area = await service.deleteArea(input.id);
       return createMcpTextResponse({ area });
+    }),
+  );
+
+  server.registerTool(
+    'mindwtr_add_person',
+    {
+      description: 'Add a managed person to the local Mindwtr SQLite database.',
+      inputSchema: addPersonSchema,
+    },
+    withReadonlyMcpErrorHandling('mindwtr_add_person', async (input) => {
+      const person = await service.addPerson(input);
+      return createMcpTextResponse({ person });
+    }),
+  );
+
+  server.registerTool(
+    'mindwtr_update_person',
+    {
+      description: 'Update managed person metadata in the local Mindwtr SQLite database.',
+      inputSchema: updatePersonSchema,
+    },
+    withReadonlyMcpErrorHandling('mindwtr_update_person', async (input) => {
+      const person = await service.updatePerson(input);
+      return createMcpTextResponse({ person });
+    }),
+  );
+
+  server.registerTool(
+    'mindwtr_rename_person',
+    {
+      description: 'Rename a managed person. By default, matching task assignees are updated too.',
+      inputSchema: renamePersonSchema,
+    },
+    withReadonlyMcpErrorHandling('mindwtr_rename_person', async (input) => {
+      const person = await service.renamePerson(input);
+      return createMcpTextResponse({ person });
+    }),
+  );
+
+  server.registerTool(
+    'mindwtr_delete_person',
+    {
+      description: 'Soft-delete a managed person in the local Mindwtr SQLite database.',
+      inputSchema: deletePersonSchema,
+    },
+    withReadonlyMcpErrorHandling('mindwtr_delete_person', async (input) => {
+      const person = await service.deletePerson(input.id);
+      return createMcpTextResponse({ person });
     }),
   );
 };

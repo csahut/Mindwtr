@@ -1,4 +1,4 @@
-import type { Area, Project, Section, Task } from './queries.js';
+import type { Area, Person, Project, Section, Task } from './queries.js';
 import { ensureMindwtrDbPath, type DbOptions } from './db.js';
 
 type CoreStore = {
@@ -7,6 +7,7 @@ type CoreStore = {
     _allProjects: Project[];
     _allSections: Section[];
     _allAreas: Area[];
+    _allPeople: Person[];
     fetchData: () => Promise<void>;
     addTask: (title: string, initialProps?: Partial<Task>) => Promise<CoreActionResult>;
     updateTask: (id: string, updates: Partial<Task>) => Promise<CoreActionResult>;
@@ -21,6 +22,10 @@ type CoreStore = {
     addArea: (name: string, initialProps?: Partial<Area>) => Promise<Area | null>;
     updateArea: (id: string, updates: Partial<Area>) => Promise<CoreActionResult>;
     deleteArea: (id: string) => Promise<CoreActionResult>;
+    addPerson: (name: string, initialProps?: Partial<Person>) => Promise<Person | null>;
+    updatePerson: (id: string, updates: Partial<Person>) => Promise<CoreActionResult>;
+    renamePerson: (id: string, name: string, options?: { updateTasks?: boolean }) => Promise<CoreActionResult>;
+    deletePerson: (id: string) => Promise<CoreActionResult>;
   };
 };
 
@@ -56,6 +61,10 @@ type CoreService = {
   addArea: (input: { name: string; props?: Partial<Area> }) => Promise<Area>;
   updateArea: (input: { id: string; updates: Partial<Area> }) => Promise<Area>;
   deleteArea: (id: string) => Promise<Area>;
+  addPerson: (input: { name: string; props?: Partial<Person> }) => Promise<Person>;
+  updatePerson: (input: { id: string; updates: Partial<Person> }) => Promise<Person>;
+  renamePerson: (input: { id: string; name: string; updateTasks?: boolean }) => Promise<Person>;
+  deletePerson: (id: string) => Promise<Person>;
 };
 
 let coreService: CoreService | null = null;
@@ -289,6 +298,43 @@ const ensureCoreReady = async (options: DbOptions) => {
         const updated = core.useTaskStore.getState()._allAreas.find((area) => area.id === id);
         if (!updated) throw new Error(`Area not found after delete: ${id}`);
         return updated as Area;
+      },
+      addPerson: async ({ name, props }) => {
+        const state = core.useTaskStore.getState();
+        await state.fetchData();
+        const created = await state.addPerson(name, props);
+        if (!created) throw new Error('Failed to create person.');
+        await core.flushPendingSave();
+        const saved = core.useTaskStore.getState()._allPeople.find((person) => person.id === created.id);
+        if (!saved) throw new Error(`Person not found after create: ${created.id}`);
+        return saved as Person;
+      },
+      updatePerson: async ({ id, updates }) => {
+        const state = core.useTaskStore.getState();
+        await state.fetchData();
+        ensureActionSucceeded('update person', await state.updatePerson(id, updates));
+        await core.flushPendingSave();
+        const updated = core.useTaskStore.getState()._allPeople.find((person) => person.id === id);
+        if (!updated) throw new Error(`Person not found after update: ${id}`);
+        return updated as Person;
+      },
+      renamePerson: async ({ id, name, updateTasks }) => {
+        const state = core.useTaskStore.getState();
+        await state.fetchData();
+        ensureActionSucceeded('rename person', await state.renamePerson(id, name, { updateTasks }));
+        await core.flushPendingSave();
+        const updated = core.useTaskStore.getState()._allPeople.find((person) => person.id === id);
+        if (!updated) throw new Error(`Person not found after rename: ${id}`);
+        return updated as Person;
+      },
+      deletePerson: async (id) => {
+        const state = core.useTaskStore.getState();
+        await state.fetchData();
+        ensureActionSucceeded('delete person', await state.deletePerson(id));
+        await core.flushPendingSave();
+        const updated = core.useTaskStore.getState()._allPeople.find((person) => person.id === id);
+        if (!updated) throw new Error(`Person not found after delete: ${id}`);
+        return updated as Person;
       },
     };
   })();

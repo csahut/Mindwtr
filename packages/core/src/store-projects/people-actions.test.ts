@@ -103,4 +103,34 @@ describe('people actions', () => {
         expect(saved.people?.find((item) => item.id === person.id)?.deletedAt).toBe(BASE_NOW);
         expect(saved.tasks.find((item) => item.id === taskResult.id)?.assignedTo).toBe('Jordan');
     });
+
+    it('clears person note and reference link when explicitly updated to undefined', async () => {
+        const { addPerson, updatePerson } = useTaskStore.getState();
+        const person = await addPerson('Casey', {
+            note: 'Ops lead',
+            referenceLink: 'https://example.com/casey',
+        });
+        expect(person).not.toBeNull();
+        if (!person) return;
+
+        const result = await updatePerson(person.id, {
+            note: undefined,
+            referenceLink: undefined,
+        });
+        await flushPendingSave();
+
+        expect(result).toEqual({ success: true });
+        const state = useTaskStore.getState();
+        expect(state.people.find((item) => item.id === person.id)).toMatchObject({
+            name: 'Casey',
+            updatedAt: BASE_NOW,
+        });
+        expect(state.people.find((item) => item.id === person.id)?.note).toBeUndefined();
+        expect(state.people.find((item) => item.id === person.id)?.referenceLink).toBeUndefined();
+
+        const saved = latestSavedData();
+        const savedPerson = saved.people?.find((item) => item.id === person.id);
+        expect(savedPerson?.note).toBeUndefined();
+        expect(savedPerson?.referenceLink).toBeUndefined();
+    });
 });

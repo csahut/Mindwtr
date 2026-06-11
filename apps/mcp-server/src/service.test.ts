@@ -31,8 +31,10 @@ describe('mcp service', () => {
       listTasks: () => [{ id: 't1', title: 'Task', status: 'inbox', createdAt: '2026-01-01', updatedAt: '2026-01-01' }],
       listProjects: () => [{ id: 'p1', title: 'Project' }],
       listAreas: () => [{ id: 'a1', name: 'Area' }],
+      listPeople: () => [{ id: 'person1', name: 'Alex' }],
       getTask: () => ({ id: 't1', title: 'Task', status: 'inbox', createdAt: '2026-01-01', updatedAt: '2026-01-01' }),
       getProject: () => ({ id: 'p1', title: 'Project' }),
+      getPerson: () => ({ id: 'person1', name: 'Alex' }),
       parseQuickAdd: () => ({ title: '', props: {} }),
       runCoreService: async (_options: any, fn: any) =>
         fn({
@@ -47,6 +49,10 @@ describe('mcp service', () => {
           addArea: async () => ({ id: 'a1', name: 'Area' }),
           updateArea: async () => ({ id: 'a1', name: 'Area' }),
           deleteArea: async () => ({ id: 'a1', name: 'Area', deletedAt: '2026-01-02' }),
+          addPerson: async () => ({ id: 'person1', name: 'Alex' }),
+          updatePerson: async () => ({ id: 'person1', name: 'Alex' }),
+          renamePerson: async () => ({ id: 'person1', name: 'Alexandra' }),
+          deletePerson: async () => ({ id: 'person1', name: 'Alex', deletedAt: '2026-01-02' }),
         }),
     };
     const service = createService({ readonly: true }, deps as any);
@@ -54,14 +60,18 @@ describe('mcp service', () => {
     const tasks = await service.listTasks({});
     const projects = await service.listProjects();
     const areas = await service.listAreas();
+    const people = await service.listPeople();
     const task = await service.getTask({ id: 't1' });
     const project = await service.getProject({ id: 'p1' });
+    const person = await service.getPerson({ id: 'person1' });
 
     expect(tasks).toHaveLength(1);
     expect(projects).toHaveLength(1);
     expect(areas).toHaveLength(1);
+    expect(people).toHaveLength(1);
     expect(task.id).toBe('t1');
     expect(project.id).toBe('p1');
+    expect(person.id).toBe('person1');
   });
 
   test('uses quick-add parser and forwards merged props to core addTask', async () => {
@@ -480,6 +490,7 @@ describe('mcp service', () => {
           projects: [],
           sections: [],
           areas: [],
+          people: [],
           settings: {},
         },
         null,
@@ -502,6 +513,25 @@ describe('mcp service', () => {
         status: 'waiting',
         contexts: ['@desk'],
       });
+      const person = await service.addPerson({
+        name: 'Alex',
+        note: 'Design lead',
+      });
+      const waitingTask = await service.addTask({
+        title: 'Waiting on draft',
+        status: 'waiting',
+        assignedTo: 'Alex',
+      });
+      const renamedPerson = await service.renamePerson({
+        id: person.id,
+        name: 'Alexandra',
+        updateTasks: true,
+      });
+      const updatedPerson = await service.updatePerson({
+        id: person.id,
+        note: null,
+        referenceLink: 'https://example.com/alexandra',
+      });
 
       const updatedProject = await service.updateProject({
         id: project.id,
@@ -523,7 +553,10 @@ describe('mcp service', () => {
       const tasks = await service.listTasks({ status: 'all' });
       const projects = await service.listProjects();
       const sections = await service.listSections({ projectId: project.id });
+      const people = await service.listPeople();
       const persistedUpdatedTask = await service.getTask({ id: task.id });
+      const persistedWaitingTask = await service.getTask({ id: waitingTask.id });
+      const persistedPerson = await service.getPerson({ id: person.id });
       const persistedTask = tasks.find((item) => item.id === task.id);
       const persistedProject = projects.find((item) => item.id === project.id);
 
@@ -535,6 +568,9 @@ describe('mcp service', () => {
       expect(updatedSection.title).toBe('Home Errands');
       expect(updatedSection.order).toBe(2);
       expect(deletedSection.deletedAt).toBeTruthy();
+      expect(renamedPerson.name).toBe('Alexandra');
+      expect(updatedPerson.note).toBeUndefined();
+      expect(updatedPerson.referenceLink).toBe('https://example.com/alexandra');
 
       expect(persistedTask).toBeTruthy();
       expect(persistedTask?.title).toBe('Buy milk');
@@ -545,12 +581,17 @@ describe('mcp service', () => {
       expect(persistedTask?.tags).toEqual(['#weekly']);
       expect(persistedUpdatedTask.status).toBe('waiting');
       expect(persistedUpdatedTask.contexts).toEqual(['@desk']);
+      expect(persistedWaitingTask.assignedTo).toBe('Alexandra');
 
       expect(persistedProject).toBeTruthy();
       expect(persistedProject?.title).toBe('Household');
       expect(persistedProject?.status).toBe('waiting');
       expect(persistedProject?.supportNotes).toBe('Track home-related work here.');
       expect(sections.find((item) => item.id === section.id)).toBeUndefined();
+      expect(people).toHaveLength(1);
+      expect(persistedPerson.name).toBe('Alexandra');
+      expect(persistedPerson.note).toBeUndefined();
+      expect(persistedPerson.referenceLink).toBe('https://example.com/alexandra');
     } finally {
       await service.close();
     }

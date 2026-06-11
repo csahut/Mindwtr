@@ -41,6 +41,7 @@ const normalizeBootstrapData = (core: CoreModule, raw: unknown): AppData => {
     projects: Array.isArray(record.projects) ? (record.projects as AppData['projects']) : [],
     sections: Array.isArray(record.sections) ? (record.sections as AppData['sections']) : [],
     areas: Array.isArray(record.areas) ? (record.areas as AppData['areas']) : [],
+    people: Array.isArray(record.people) ? (record.people as AppData['people']) : [],
     settings: isRecord(record.settings) ? (record.settings as AppData['settings']) : {},
   });
 };

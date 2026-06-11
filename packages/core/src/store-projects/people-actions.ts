@@ -102,12 +102,14 @@ export const createPeopleActions = ({
                 invalidName = true;
                 return state;
             }
+            const hasNoteUpdate = Object.prototype.hasOwnProperty.call(updates, 'note');
+            const hasReferenceLinkUpdate = Object.prototype.hasOwnProperty.call(updates, 'referenceLink');
             const now = new Date().toISOString();
             const normalizedUpdates: Partial<Person> = {
                 ...updates,
                 name: nextName,
-                note: updates.note !== undefined ? normalizePersonNote(updates.note) : person.note,
-                referenceLink: updates.referenceLink !== undefined ? normalizePersonReferenceLink(updates.referenceLink) : person.referenceLink,
+                note: hasNoteUpdate ? normalizePersonNote(updates.note) : person.note,
+                referenceLink: hasReferenceLinkUpdate ? normalizePersonReferenceLink(updates.referenceLink) : person.referenceLink,
             };
             const nextAllPeople = state._allPeople.map((item) => (
                 item.id === id

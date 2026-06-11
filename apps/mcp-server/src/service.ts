@@ -4,6 +4,7 @@ import {
   normalizeTaskStatus,
   TASK_STATUS_SET,
   type Area as CoreArea,
+  type Person as CorePerson,
   type Project as CoreProject,
   type Section as CoreSection,
 } from '@mindwtr/core';
@@ -21,17 +22,22 @@ import {
   getTask,
   getProject,
   getSection,
+  getPerson,
   listAreas,
+  listPeople,
   listProjects,
   listSections,
   listTasks,
   type AddTaskInput,
   type Area,
   type GetSectionInput,
+  type GetPersonInput,
   type GetTaskInput,
   type GetProjectInput,
+  type ListPeopleInput,
   type ListSectionsInput,
   type ListTasksInput,
+  type Person,
   type Project,
   type Section,
   type Task,
@@ -57,9 +63,11 @@ type ServiceDeps = {
   listProjects: typeof listProjects;
   listSections: typeof listSections;
   listAreas: typeof listAreas;
+  listPeople: typeof listPeople;
   getTask: typeof getTask;
   getProject: typeof getProject;
   getSection: typeof getSection;
+  getPerson: typeof getPerson;
   parseQuickAdd: typeof parseQuickAdd;
   runCoreService: typeof runCoreService;
 };
@@ -71,9 +79,11 @@ const defaultServiceDeps: ServiceDeps = {
   listProjects,
   listSections,
   listAreas,
+  listPeople,
   getTask,
   getProject,
   getSection,
+  getPerson,
   parseQuickAdd,
   runCoreService,
 };
@@ -202,6 +212,25 @@ export type UpdateAreaInput = {
   icon?: string | null;
 };
 
+export type AddPersonInput = {
+  name: string;
+  note?: string | null;
+  referenceLink?: string | null;
+};
+
+export type UpdatePersonInput = {
+  id: string;
+  name?: string;
+  note?: string | null;
+  referenceLink?: string | null;
+};
+
+export type RenamePersonInput = {
+  id: string;
+  name: string;
+  updateTasks?: boolean;
+};
+
 export type AddSectionInput = {
   projectId: string;
   title: string;
@@ -240,6 +269,17 @@ const validateAreaName = (name: string): string => {
   return trimmed;
 };
 
+const validatePersonName = (name: string): string => {
+  const trimmed = name.trim().replace(/\s+/g, ' ');
+  if (!trimmed) {
+    throw new ValidationError('Person name is required');
+  }
+  if (trimmed.length > MAX_AREA_NAME_LENGTH) {
+    throw new ValidationError(`Person name too long (max ${MAX_AREA_NAME_LENGTH} characters)`);
+  }
+  return trimmed;
+};
+
 const validateSectionTitle = (title: string): string => {
   const trimmed = title.trim();
   if (!trimmed) {
@@ -256,9 +296,11 @@ export type MindwtrService = {
   listProjects: () => Promise<Project[]>;
   listSections: (input?: ListSectionsInput) => Promise<Section[]>;
   listAreas: () => Promise<Area[]>;
+  listPeople: (input?: ListPeopleInput) => Promise<Person[]>;
   getTask: (input: GetTaskInput) => Promise<TaskRow>;
   getProject: (input: GetProjectInput) => Promise<Project>;
   getSection: (input: GetSectionInput) => Promise<Section>;
+  getPerson: (input: GetPersonInput) => Promise<Person>;
   addTask: (input: AddTaskInput) => Promise<Task>;
   updateTask: (input: UpdateTaskInput) => Promise<Task>;
   completeTask: (id: string) => Promise<Task>;
@@ -273,6 +315,10 @@ export type MindwtrService = {
   addArea: (input: AddAreaInput) => Promise<Area>;
   updateArea: (input: UpdateAreaInput) => Promise<Area>;
   deleteArea: (id: string) => Promise<Area>;
+  addPerson: (input: AddPersonInput) => Promise<Person>;
+  updatePerson: (input: UpdatePersonInput) => Promise<Person>;
+  renamePerson: (input: RenamePersonInput) => Promise<Person>;
+  deletePerson: (id: string) => Promise<Person>;
   close: () => Promise<void>;
 };
 
@@ -283,9 +329,11 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
     listProjects: async () => withDb((db) => deps.listProjects(db)),
     listSections: async (input = {}) => withDb((db) => deps.listSections(db, input)),
     listAreas: async () => withDb((db) => deps.listAreas(db)),
+    listPeople: async (input = {}) => withDb((db) => deps.listPeople(db, input)),
     getTask: async (input) => withDb((db) => deps.getTask(db, input)),
     getProject: async (input) => withDb((db) => deps.getProject(db, input)),
     getSection: async (input) => withDb((db) => deps.getSection(db, input)),
+    getPerson: async (input) => withDb((db) => deps.getPerson(db, input)),
     addTask: async (input) => {
       const normalizedInput = validateAddTaskInput(input);
       return await deps.runCoreService(options, async (core) => {
@@ -416,6 +464,34 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
         return core.updateArea({ id: input.id, updates });
       }),
     deleteArea: async (id) => deps.runCoreService(options, (core) => core.deleteArea(id)),
+    addPerson: async (input) =>
+      deps.runCoreService(options, async (core) => {
+        const name = validatePersonName(input.name);
+        const props: Partial<CorePerson> = {};
+        if (input.note !== undefined) props.note = input.note ?? undefined;
+        if (input.referenceLink !== undefined) props.referenceLink = input.referenceLink ?? undefined;
+        return core.addPerson({
+          name,
+          props,
+        });
+      }),
+    updatePerson: async (input) =>
+      deps.runCoreService(options, async (core) => {
+        const updates: Partial<CorePerson> = {};
+        if (input.name !== undefined) updates.name = validatePersonName(input.name);
+        if (input.note !== undefined) updates.note = input.note ?? undefined;
+        if (input.referenceLink !== undefined) updates.referenceLink = input.referenceLink ?? undefined;
+        return core.updatePerson({ id: input.id, updates });
+      }),
+    renamePerson: async (input) =>
+      deps.runCoreService(options, async (core) => {
+        return core.renamePerson({
+          id: input.id,
+          name: validatePersonName(input.name),
+          updateTasks: input.updateTasks,
+        });
+      }),
+    deletePerson: async (id) => deps.runCoreService(options, (core) => core.deletePerson(id)),
     close,
   };
 };

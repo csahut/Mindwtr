@@ -9,6 +9,7 @@ import {
   taskToSqliteRow,
   type AppData as CoreAppData,
   type Area as CoreArea,
+  type Person as CorePerson,
   type Project as CoreProject,
   type Section as CoreSection,
   type Task as CoreTask,
@@ -25,6 +26,7 @@ export type TaskStatus = CoreTaskStatus;
 export type Task = CoreTask;
 export type Project = CoreProject & { orderNum?: number };
 export type Area = CoreArea;
+export type Person = CorePerson;
 export type Section = CoreSection;
 export type ProjectRef = Pick<CoreProject, 'id' | 'title'>;
 
@@ -484,6 +486,82 @@ export function listAreas(db: DbClient): Area[] {
   const { selectColumns } = getAreaColumns(db);
   const rows = db.prepare(`SELECT ${selectColumns.join(', ')} FROM areas WHERE deletedAt IS NULL ORDER BY orderNum ASC, updatedAt DESC`).all();
   return rows.map(mapAreaRow);
+}
+
+const BASE_PERSON_COLUMNS = [
+  'id',
+  'name',
+  'note',
+  'referenceLink',
+  'rev',
+  'revBy',
+  'createdAt',
+  'updatedAt',
+  'deletedAt',
+];
+
+const peopleColumnsCache = new WeakMap<DbClient, { exists: boolean; selectColumns: string[] }>();
+
+const getPeopleColumns = (db: DbClient) => {
+  const cached = peopleColumnsCache.get(db);
+  if (cached) return cached;
+  try {
+    const columns = db.prepare('PRAGMA table_info(people)').all();
+    const names = new Set<string>(columns.map((col: any) => String(col.name)));
+    const exists = names.size > 0;
+    const selectColumns = BASE_PERSON_COLUMNS.filter((name) => names.has(name));
+    const resolved = { exists, selectColumns: selectColumns.length > 0 ? selectColumns : BASE_PERSON_COLUMNS };
+    peopleColumnsCache.set(db, resolved);
+    return resolved;
+  } catch {
+    const fallback = { exists: false, selectColumns: BASE_PERSON_COLUMNS };
+    peopleColumnsCache.set(db, fallback);
+    return fallback;
+  }
+};
+
+const mapPersonRow = (row: any): Person => ({
+  id: row.id,
+  name: row.name,
+  note: row.note ?? undefined,
+  referenceLink: row.referenceLink ?? undefined,
+  rev: row.rev ?? undefined,
+  revBy: row.revBy ?? undefined,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
+  deletedAt: row.deletedAt ?? undefined,
+});
+
+export type ListPeopleInput = {
+  includeDeleted?: boolean;
+};
+
+export function listPeople(db: DbClient, input: ListPeopleInput = {}): Person[] {
+  const { exists, selectColumns } = getPeopleColumns(db);
+  if (!exists) return [];
+  const where = input.includeDeleted ? '' : ' WHERE deletedAt IS NULL';
+  const rows = db
+    .prepare(`SELECT ${selectColumns.join(', ')} FROM people${where} ORDER BY lower(name) ASC, updatedAt DESC`)
+    .all();
+  return rows.map(mapPersonRow);
+}
+
+export type GetPersonInput = { id: string; includeDeleted?: boolean };
+
+export function getPerson(db: DbClient, input: GetPersonInput): Person {
+  const { exists, selectColumns } = getPeopleColumns(db);
+  if (!exists) {
+    throw new NotFoundError(`Person not found: ${input.id}`);
+  }
+  const where = ['id = ?'];
+  if (!input.includeDeleted) {
+    where.push('deletedAt IS NULL');
+  }
+  const row = db.prepare(`SELECT ${selectColumns.join(', ')} FROM people WHERE ${where.join(' AND ')}`).get(input.id);
+  if (!row) {
+    throw new NotFoundError(`Person not found: ${input.id}`);
+  }
+  return mapPersonRow(row);
 }
 
 const runInTransaction = <T>(db: DbClient, fn: () => T): T => {

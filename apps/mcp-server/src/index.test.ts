@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { NotFoundError } from './errors.js';
 import { parseArgs, parseBooleanFlag, registerMindwtrTools, resolveServerModeFlags } from './index.js';
-import type { Area, Project, Section, Task } from './queries.js';
+import type { Area, Person, Project, Section, Task } from './queries.js';
 import type { MindwtrService } from './service.js';
 
 type RegisteredTool = {
@@ -65,14 +65,24 @@ const mockArea = (overrides: Partial<Area> = {}): Area => ({
   ...overrides,
 });
 
+const mockPerson = (overrides: Partial<Person> = {}): Person => ({
+  id: 'person1',
+  name: 'Alex',
+  createdAt: iso,
+  updatedAt: iso,
+  ...overrides,
+});
+
 const createMockService = (): MindwtrService => ({
   listTasks: async () => [mockTask()],
   listProjects: async () => [mockProject()],
   listSections: async () => [mockSection()],
   listAreas: async () => [mockArea()],
+  listPeople: async () => [mockPerson()],
   getTask: async () => mockTask(),
   getProject: async () => mockProject(),
   getSection: async () => mockSection(),
+  getPerson: async () => mockPerson(),
   addTask: async () => mockTask(),
   updateTask: async () => mockTask(),
   completeTask: async () => mockTask(),
@@ -87,6 +97,10 @@ const createMockService = (): MindwtrService => ({
   addArea: async () => mockArea(),
   updateArea: async () => mockArea(),
   deleteArea: async () => mockArea(),
+  addPerson: async () => mockPerson(),
+  updatePerson: async () => mockPerson(),
+  renamePerson: async () => mockPerson(),
+  deletePerson: async () => mockPerson({ deletedAt: iso }),
   close: async () => undefined,
 });
 
@@ -134,7 +148,7 @@ describe('mcp server index', () => {
   test('registers all mindwtr tools', () => {
     const { server, tools } = createMockServer();
     registerMindwtrTools(server, createMockService(), false);
-    expect(tools.size).toBe(21);
+    expect(tools.size).toBe(27);
     expect(tools.has('mindwtr_list_tasks')).toBe(true);
     expect(tools.has('mindwtr_add_task')).toBe(true);
     expect(tools.has('mindwtr_restore_task')).toBe(true);
@@ -145,8 +159,14 @@ describe('mcp server index', () => {
     expect(tools.has('mindwtr_update_section')).toBe(true);
     expect(tools.has('mindwtr_delete_section')).toBe(true);
     expect(tools.has('mindwtr_list_areas')).toBe(true);
+    expect(tools.has('mindwtr_list_people')).toBe(true);
+    expect(tools.has('mindwtr_get_person')).toBe(true);
     expect(tools.has('mindwtr_add_project')).toBe(true);
     expect(tools.has('mindwtr_delete_area')).toBe(true);
+    expect(tools.has('mindwtr_add_person')).toBe(true);
+    expect(tools.has('mindwtr_update_person')).toBe(true);
+    expect(tools.has('mindwtr_rename_person')).toBe(true);
+    expect(tools.has('mindwtr_delete_person')).toBe(true);
   });
 
   test('delegates section tools to the service', async () => {
@@ -192,6 +212,75 @@ describe('mcp server index', () => {
 
     await tools.get('mindwtr_delete_section')?.handler({ id: 's1' });
     expect(deletedId).toBe('s1');
+  });
+
+  test('delegates people tools to the service', async () => {
+    const { server, tools } = createMockServer();
+    let listInput: unknown;
+    let getInput: unknown;
+    let addInput: unknown;
+    let updateInput: unknown;
+    let renameInput: unknown;
+    let deletedId = '';
+    registerMindwtrTools(
+      server,
+      {
+        ...createMockService(),
+        listPeople: async (input) => {
+          listInput = input;
+          return [mockPerson()];
+        },
+        getPerson: async (input) => {
+          getInput = input;
+          return mockPerson({ id: input.id });
+        },
+        addPerson: async (input) => {
+          addInput = input;
+          return mockPerson({ name: input.name, note: input.note ?? undefined });
+        },
+        updatePerson: async (input) => {
+          updateInput = input;
+          return mockPerson({ id: input.id, note: input.note ?? undefined });
+        },
+        renamePerson: async (input) => {
+          renameInput = input;
+          return mockPerson({ id: input.id, name: input.name });
+        },
+        deletePerson: async (id) => {
+          deletedId = id;
+          return mockPerson({ id, deletedAt: iso });
+        },
+      },
+      false
+    );
+
+    await tools.get('mindwtr_list_people')?.handler({ includeDeleted: true });
+    expect(listInput as Record<string, unknown>).toMatchObject({ includeDeleted: true });
+
+    await tools.get('mindwtr_get_person')?.handler({ id: 'person1', includeDeleted: true });
+    expect(getInput as Record<string, unknown>).toMatchObject({ id: 'person1', includeDeleted: true });
+
+    const addResult = await tools.get('mindwtr_add_person')?.handler({ name: 'Alex', note: 'Design lead' });
+    expect(addInput as Record<string, unknown>).toMatchObject({ name: 'Alex', note: 'Design lead' });
+    const addPayload = JSON.parse(addResult?.content[0]?.text || '{}');
+    expect(addPayload.person).toMatchObject({ name: 'Alex', note: 'Design lead' });
+
+    await tools.get('mindwtr_update_person')?.handler({ id: 'person1', note: null, referenceLink: 'https://example.com/alex' });
+    expect(updateInput as Record<string, unknown>).toMatchObject({
+      id: 'person1',
+      note: null,
+      referenceLink: 'https://example.com/alex',
+    });
+
+    await tools.get('mindwtr_rename_person')?.handler({ id: 'person1', name: 'Alexandra', updateTasks: false });
+    expect(renameInput as Record<string, unknown>).toMatchObject({
+      id: 'person1',
+      name: 'Alexandra',
+      updateTasks: false,
+    });
+
+    await tools.get('mindwtr_delete_person')?.handler({ id: 'person1' });
+    expect(deletedId).toBe('person1');
   });
 
   test('blocks write tools when readonly', async () => {

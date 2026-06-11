@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { addTask, deleteTask, listTasks, parseQuickAdd, updateTask, type ProjectRef } from './queries.js';
+import { addTask, deleteTask, getPerson, listPeople, listTasks, parseQuickAdd, updateTask, type ProjectRef } from './queries.js';
 import type { DbClient } from './db.js';
 
 const createMockDb = (
     rows: any[] = [],
-    options: { hasTasksFts?: boolean } = {},
+    options: { hasTasksFts?: boolean; hasPeopleTable?: boolean } = {},
 ): { db: DbClient; calls: { sql: string; params: any[] }[] } => {
     const calls: { sql: string; params: any[] }[] = [];
     const db: DbClient = {
@@ -43,6 +43,20 @@ const createMockDb = (
                         { name: 'updatedAt' },
                         { name: 'deletedAt' },
                         { name: 'purgedAt' },
+                    ];
+                }
+                if (sql.startsWith('PRAGMA table_info(people)')) {
+                    if (options.hasPeopleTable === false) return [];
+                    return [
+                        { name: 'id' },
+                        { name: 'name' },
+                        { name: 'note' },
+                        { name: 'referenceLink' },
+                        { name: 'rev' },
+                        { name: 'revBy' },
+                        { name: 'createdAt' },
+                        { name: 'updatedAt' },
+                        { name: 'deletedAt' },
                     ];
                 }
                 if (sql.includes("FROM sqlite_master")) {
@@ -358,5 +372,46 @@ describe('mcp queries', () => {
         expect(task.projectId).toBe('p1');
         expect(task.sectionId).toBe('s1');
         expect(task.areaId).toBe('a1');
+    });
+
+    test('listPeople maps active managed people from sqlite rows', () => {
+        const now = '2026-02-01T00:00:00.000Z';
+        const { db, calls } = createMockDb([
+            {
+                id: 'person1',
+                name: 'Alex',
+                note: 'Design lead',
+                referenceLink: 'https://example.com/alex',
+                rev: 2,
+                revBy: 'device-a',
+                createdAt: now,
+                updatedAt: now,
+            },
+        ]);
+
+        const people = listPeople(db);
+
+        expect(people).toEqual([
+            {
+                id: 'person1',
+                name: 'Alex',
+                note: 'Design lead',
+                referenceLink: 'https://example.com/alex',
+                rev: 2,
+                revBy: 'device-a',
+                createdAt: now,
+                updatedAt: now,
+                deletedAt: undefined,
+            },
+        ]);
+        const queryCall = calls.find((call) => call.sql.startsWith('SELECT') && call.sql.includes('FROM people'));
+        expect(queryCall?.sql).toContain('WHERE deletedAt IS NULL');
+    });
+
+    test('getPerson reports not found when the people table is absent', () => {
+        const { db } = createMockDb([], { hasPeopleTable: false });
+
+        expect(() => getPerson(db, { id: 'person1' })).toThrow('Person not found: person1');
+        expect(listPeople(db)).toEqual([]);
     });
 });
