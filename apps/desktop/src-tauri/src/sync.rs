@@ -10,6 +10,15 @@ pub(crate) struct RemoteJsonWriteResult {
     server_merged_remote_data: Option<bool>,
 }
 
+const NATIVE_HTTP_TIMEOUT_SECS: u64 = 30;
+
+fn blocking_http_client() -> Result<reqwest::blocking::Client, String> {
+    reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(NATIVE_HTTP_TIMEOUT_SECS))
+        .build()
+        .map_err(|error| format!("Failed to create HTTP client: {error}"))
+}
+
 fn header_value_to_string(headers: &reqwest::header::HeaderMap, name: &str) -> Option<String> {
     headers
         .get(name)
@@ -264,7 +273,7 @@ fn exchange_dropbox_auth_code(
     verifier: &str,
     redirect_uri: &str,
 ) -> Result<DropboxTokenBundle, String> {
-    let client = reqwest::blocking::Client::new();
+    let client = blocking_http_client()?;
     let response = client
         .post(DROPBOX_TOKEN_ENDPOINT)
         .header("Content-Type", "application/x-www-form-urlencoded")
@@ -308,7 +317,7 @@ fn exchange_dropbox_auth_code(
 }
 
 fn refresh_dropbox_token(client_id: &str, refresh_token: &str) -> Result<(String, i64), String> {
-    let client = reqwest::blocking::Client::new();
+    let client = blocking_http_client()?;
     let response = client
         .post(DROPBOX_TOKEN_ENDPOINT)
         .header("Content-Type", "application/x-www-form-urlencoded")
@@ -812,7 +821,7 @@ fn webdav_get_json_blocking(app: &tauri::AppHandle) -> Result<Value, String> {
     .or(config.webdav_password.clone())
     .ok_or_else(|| "WebDAV password not configured".to_string())?;
 
-    let client = reqwest::blocking::Client::new();
+    let client = blocking_http_client()?;
     let response = client
         .get(url)
         .basic_auth(username, Some(password))
@@ -867,7 +876,7 @@ fn webdav_put_json_blocking(
 
     let payload = serde_json::to_string_pretty(&data)
         .map_err(|e| format!("Failed to encode WebDAV payload: {e}"))?;
-    let client = reqwest::blocking::Client::new();
+    let client = blocking_http_client()?;
     let send_put = || {
         client
             .put(url.clone())
@@ -944,7 +953,7 @@ fn cloud_get_json_blocking(app: &tauri::AppHandle) -> Result<Value, String> {
     assert_cloud_url_allowed(&url, allow_insecure_http)?;
 
     let token = read_cloud_token(app, &config);
-    let client = reqwest::blocking::Client::new();
+    let client = blocking_http_client()?;
     let response = cloud_request_builder(&client, reqwest::Method::GET, &url, &token)
         .send()
         .map_err(|e| format!("Cloud request failed: {e}"))?;
@@ -990,7 +999,7 @@ fn cloud_put_json_blocking(
     let token = read_cloud_token(app, &config);
     let payload = serde_json::to_string_pretty(data)
         .map_err(|e| format!("Failed to encode Cloud payload: {e}"))?;
-    let client = reqwest::blocking::Client::new();
+    let client = blocking_http_client()?;
     let response = cloud_request_builder(&client, reqwest::Method::PUT, &url, &token)
         .header("Content-Type", "application/json")
         .body(payload)
@@ -1199,7 +1208,11 @@ pub(crate) async fn disconnect_dropbox(
         let normalized_client_id = normalize_dropbox_client_id(&client_id)?;
         if let Ok(Some(tokens)) = read_dropbox_tokens(&app) {
             if tokens.client_id == normalized_client_id && !tokens.access_token.trim().is_empty() {
-                let _ = reqwest::blocking::Client::new()
+                let Ok(client) = blocking_http_client() else {
+                    clear_dropbox_tokens(&app)?;
+                    return Ok::<(), String>(());
+                };
+                let _ = client
                     .post(DROPBOX_REVOKE_ENDPOINT)
                     .bearer_auth(tokens.access_token)
                     .send();
