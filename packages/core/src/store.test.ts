@@ -846,6 +846,52 @@ describe('TaskStore', () => {
         expect(state._tasksById.get(visibleTask.id)).toBe(visibleTask);
     });
 
+    it('preserves tombstones when production compat setState writes only visible tasks', () => {
+        const originalNodeEnv = process.env.NODE_ENV;
+        const visibleTask = createStoreTask('task-visible');
+        const deletedTask = createStoreTask('task-deleted', {
+            deletedAt: '2026-04-02T00:00:00.000Z',
+        });
+        useTaskStore.setState({
+            tasks: [visibleTask],
+            _allTasks: [visibleTask, deletedTask],
+        });
+
+        try {
+            process.env.NODE_ENV = 'production';
+            const updatedVisibleTask = createStoreTask('task-visible', {
+                title: 'Updated visible task',
+                updatedAt: '2026-04-03T00:00:00.000Z',
+            });
+            useTaskStore.setState({ tasks: [updatedVisibleTask] });
+
+            const state = useTaskStore.getState();
+            expect(state.tasks).toEqual([updatedVisibleTask]);
+            expect(state._allTasks.map((task) => task.id).sort()).toEqual(['task-deleted', 'task-visible']);
+            expect(state._tasksById.get('task-visible')).toBe(updatedVisibleTask);
+            expect(state._tasksById.get('task-deleted')).toBe(deletedTask);
+        } finally {
+            process.env.NODE_ENV = originalNodeEnv;
+        }
+    });
+
+    it('keeps visible-only production compat setState inserts when all tasks is empty', () => {
+        const originalNodeEnv = process.env.NODE_ENV;
+        const visibleTask = createStoreTask('task-visible');
+
+        try {
+            process.env.NODE_ENV = 'production';
+            useTaskStore.setState({ tasks: [visibleTask] });
+
+            const state = useTaskStore.getState();
+            expect(state.tasks).toEqual([visibleTask]);
+            expect(state._allTasks).toEqual([visibleTask]);
+            expect(state._tasksById.get('task-visible')).toBe(visibleTask);
+        } finally {
+            process.env.NODE_ENV = originalNodeEnv;
+        }
+    });
+
     it('keeps derived context and tag lists scoped to used tokens', () => {
         const { addTask } = useTaskStore.getState();
         addTask('Token Task', {
