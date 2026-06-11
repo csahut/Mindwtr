@@ -926,6 +926,76 @@ describe('cloud server api', () => {
         expect(await response.text()).toBe('');
     });
 
+    test('returns post-write metadata for PUT /v1/data', async () => {
+        const response = await fetch(`${baseUrl}/v1/data`, {
+            method: 'PUT',
+            headers: {
+                ...authHeaders,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+                tasks: [],
+                projects: [],
+                sections: [],
+                areas: [],
+                settings: {},
+            } satisfies AppData),
+        });
+
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.ok).toBe(true);
+        expect(body.etag).toMatch(/^W\/"mindwtr-/);
+        expect(body.remoteFingerprint).toBe(`cloud:v1:etag=${body.etag}`);
+        expect(body.serverMergedRemoteData).toBe(false);
+        expect(body.contentLength).toBeTruthy();
+        expect(response.headers.get('etag')).toBe(body.etag);
+        expect(response.headers.get('access-control-expose-headers')).toContain('ETag');
+    });
+
+    test('marks PUT /v1/data when existing server data contributes to the stored merge', async () => {
+        const seedData: AppData = {
+            tasks: [makeTestTask({ id: 'server-only', title: 'Server Only' })],
+            projects: [],
+            sections: [],
+            areas: [],
+            settings: {},
+        };
+        const seedResponse = await fetch(`${baseUrl}/v1/data`, {
+            method: 'PUT',
+            headers: {
+                ...authHeaders,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify(seedData),
+        });
+        expect(seedResponse.status).toBe(200);
+
+        const staleResponse = await fetch(`${baseUrl}/v1/data`, {
+            method: 'PUT',
+            headers: {
+                ...authHeaders,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+                tasks: [],
+                projects: [],
+                sections: [],
+                areas: [],
+                settings: {},
+            } satisfies AppData),
+        });
+
+        expect(staleResponse.status).toBe(200);
+        const body = await staleResponse.json();
+        expect(body.serverMergedRemoteData).toBe(true);
+        expect(body.remoteFingerprint).toBe(`cloud:v1:etag=${body.etag}`);
+
+        const getResponse = await fetch(`${baseUrl}/v1/data`, { headers: authHeaders });
+        const stored = await getResponse.json() as AppData;
+        expect(stored.tasks.map((task) => task.id)).toEqual(['server-only']);
+    });
+
     test('returns data metadata for HEAD /v1/data without a body', async () => {
         const seedResponse = await fetch(`${baseUrl}/v1/data`, {
             method: 'PUT',

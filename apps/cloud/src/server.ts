@@ -3,6 +3,8 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSy
 import { join, relative } from 'path';
 import {
     applyTaskUpdates,
+    areSyncPayloadsEqual,
+    buildHttpRemoteFileFingerprint,
     filterNotDeleted,
     generateUUID,
     mergeAppDataWithStats,
@@ -83,6 +85,7 @@ import {
 import {
     __serverDataCacheTestUtils,
     dataMetadataResponse,
+    getDataFileMetadata,
     isTrustedValidatedDataFile,
     jsonFileResponse,
     loadAppData,
@@ -1344,15 +1347,41 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                             if ('error' in existingDataResult) return existingDataResult.error;
                             const existingData = existingDataResult;
                             const incomingData = validated.data;
+                            const mergeTimestamp = resolveServerMergeTimestamp(existingData, incomingData);
                             const mergeResult = mergeAppDataWithStats(existingData, incomingData, {
-                                nowIso: resolveServerMergeTimestamp(existingData, incomingData),
+                                nowIso: mergeTimestamp,
                             });
                             throwIfRequestAborted(requestAbortController.signal);
                             writeCloudData(filePath, mergeResult.data);
+                            const metadata = getDataFileMetadata(filePath);
+                            const contentLength = String(metadata.size);
+                            const remoteFingerprint = buildHttpRemoteFileFingerprint('cloud', {
+                                etag: metadata.etag,
+                                lastModified: metadata.lastModified,
+                                contentLength,
+                            });
+                            const incomingOnlyMerge = mergeAppDataWithStats({
+                                tasks: [],
+                                projects: [],
+                                sections: [],
+                                areas: [],
+                                settings: {},
+                            }, incomingData, { nowIso: mergeTimestamp });
+                            const serverMergedRemoteData = !areSyncPayloadsEqual(mergeResult.data, incomingOnlyMerge.data);
                             return jsonResponse({
                                 ok: true,
                                 stats: mergeResult.stats,
                                 clockSkewWarning: mergeResult.clockSkewWarning ?? null,
+                                remoteFingerprint,
+                                etag: metadata.etag,
+                                lastModified: metadata.lastModified,
+                                contentLength,
+                                serverMergedRemoteData,
+                            }, {
+                                headers: {
+                                    ETag: metadata.etag,
+                                    'Last-Modified': metadata.lastModified,
+                                },
                             });
                         });
                     }

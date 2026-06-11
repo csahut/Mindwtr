@@ -726,7 +726,7 @@ describe('desktop sync-service runtime', () => {
             areas: [],
             settings: {},
         };
-        const remoteFingerprint = 'webdav:v1:etag="fast":mtime=:len=2';
+        const remoteFingerprint = 'webdav:v1:etag="fast"';
         const scope = computeStableValueFingerprint({
             backend: 'webdav',
             url: 'https://sync.example.com/data.json',
@@ -803,8 +803,8 @@ describe('desktop sync-service runtime', () => {
                 theme: 'dark',
             },
         };
-        const cachedRemoteFingerprint = 'webdav:v1:etag="old":mtime=:len=2';
-        const freshRemoteFingerprint = 'webdav:v1:etag="new":mtime=:len=2';
+        const cachedRemoteFingerprint = 'webdav:v1:etag="old"';
+        const freshRemoteFingerprint = 'webdav:v1:etag="new"';
         const scope = computeStableValueFingerprint({
             backend: 'webdav',
             url: 'https://sync.example.com/data.json',

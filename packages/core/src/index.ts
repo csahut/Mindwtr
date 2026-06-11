@@ -336,6 +336,7 @@ export {
     sortFocusNextActions,
     sortTasks,
     sortTasksBy,
+    sortTasksByBoardOrder,
     sortTasksBySavedPreference,
     splitCompletedTasks,
     STATUS_COLORS,
@@ -715,6 +716,7 @@ export {
 } from './webdav';
 export type {
     RemoteFileMetadata,
+    RemoteJsonWriteResult,
     WebDavOptions,
 } from './webdav';
 
@@ -727,6 +729,7 @@ export {
     cloudPutJson,
 } from './cloud';
 export type {
+    CloudJsonWriteResult,
     CloudOptions,
 } from './cloud';
 

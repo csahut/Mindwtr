@@ -18,6 +18,7 @@ import {
     normalizeWebdavUrl,
     normalizeCloudUrl,
     sanitizeAppDataForRemote,
+    buildHttpRemoteFileFingerprint,
     computeSyncPayloadFingerprint,
     areSyncPayloadsEqual,
     assertNoPendingAttachmentUploads,
@@ -46,8 +47,10 @@ import {
     isSupportedLanguage,
     LEGACY_SYNC_FILE_NAME,
     SYNC_FILE_NAME,
+    type CloudJsonWriteResult,
     type CloudProvider,
     type PendingAttachmentUpload,
+    type RemoteJsonWriteResult,
 } from '@mindwtr/core';
 import { isTauriRuntime } from './runtime';
 import { getTauriHttpFetch } from './tauri-http';
@@ -379,6 +382,8 @@ type SyncExecutionContext = {
     preSyncedLocalData: AppData | null;
     wroteLocal: boolean;
     remoteDataForCompare: AppData | null;
+    lastRemoteWriteFingerprint: string | null;
+    lastRemoteWriteMergedServerData: boolean;
     webdavRemoteCorrupted: boolean;
     webdavConfig: WebDavConfig | null;
     cloudProvider: CloudProvider;
@@ -389,6 +394,28 @@ type SyncExecutionContext = {
     syncPath: string;
     fileBaseDir: string;
     hadAttachmentWarning: boolean;
+};
+
+type RemoteWriteResultLike = Partial<RemoteJsonWriteResult & CloudJsonWriteResult>;
+
+const normalizeRemoteWriteResult = (
+    source: 'cloud' | 'webdav',
+    result: RemoteWriteResultLike | boolean | null | undefined,
+): { fingerprint: string | null; serverMergedRemoteData: boolean } => {
+    if (!result || typeof result !== 'object') {
+        return { fingerprint: null, serverMergedRemoteData: false };
+    }
+    const fingerprint = typeof result.fingerprint === 'string' && result.fingerprint.trim()
+        ? result.fingerprint
+        : buildHttpRemoteFileFingerprint(source, {
+            etag: typeof result.etag === 'string' ? result.etag : null,
+            lastModified: typeof result.lastModified === 'string' ? result.lastModified : null,
+            contentLength: typeof result.contentLength === 'string' ? result.contentLength : null,
+        });
+    return {
+        fingerprint,
+        serverMergedRemoteData: result.serverMergedRemoteData === true,
+    };
 };
 
 type SyncRunDependencies = {
@@ -907,6 +934,8 @@ export class SyncService {
             preSyncedLocalData: null,
             wroteLocal: false,
             remoteDataForCompare: null,
+            lastRemoteWriteFingerprint: null,
+            lastRemoteWriteMergedServerData: false,
             webdavRemoteCorrupted: false,
             webdavConfig: null,
             cloudProvider: 'selfhosted',
@@ -1022,10 +1051,13 @@ export class SyncService {
         const scope = buildFastSyncScope(context);
         if (!scope || hasPendingSyncSideEffects(data)) return;
         if (getStoreState().lastDataChangeAt > context.localSnapshotChangeAt) return;
+        if (context.lastRemoteWriteMergedServerData) return;
 
         let remoteFingerprint: string | null = null;
         if (context.backend === 'cloud' && context.cloudProvider === 'dropbox' && context.dropboxDataRev) {
             remoteFingerprint = `dropbox:v1:rev=${context.dropboxDataRev}`;
+        } else if (context.lastRemoteWriteFingerprint) {
+            remoteFingerprint = context.lastRemoteWriteFingerprint;
         } else {
             try {
                 remoteFingerprint = await SyncService.readRemoteFingerprintForFastCheck(run);
@@ -1346,6 +1378,8 @@ export class SyncService {
     private static async writeRemoteDataByBackend(run: SyncRun, data: AppData): Promise<void> {
         const { context } = run;
         run.ensureNetworkStillAvailable();
+        context.lastRemoteWriteFingerprint = null;
+        context.lastRemoteWriteMergedServerData = false;
         if (context.backend === 'cloudkit') {
             logPendingAttachmentUploads(
                 'CloudKit sync has local-only file attachments',
@@ -1385,7 +1419,9 @@ export class SyncService {
                 if (context.webdavRemoteCorrupted) {
                     logSyncInfo('Repairing corrupted WebDAV data.json with current merged data');
                 }
-                await tauriInvoke('webdav_put_json', { data: sanitized });
+                const result = await tauriInvoke<RemoteJsonWriteResult | boolean>('webdav_put_json', { data: sanitized });
+                const writeResult = normalizeRemoteWriteResult('webdav', result);
+                context.lastRemoteWriteFingerprint = writeResult.fingerprint;
                 context.remoteDataForCompare = sanitized;
                 context.webdavRemoteCorrupted = false;
                 return;
@@ -1397,12 +1433,14 @@ export class SyncService {
             if (context.webdavRemoteCorrupted) {
                 logSyncInfo('Repairing corrupted WebDAV data.json with current merged data');
             }
-            await webdavPutJson(normalizedUrl, sanitized, {
+            const result = await webdavPutJson(normalizedUrl, sanitized, {
                 allowInsecureHttp: config.allowInsecureHttp,
                 username,
                 password: password || '',
                 fetcher,
             });
+            const writeResult = normalizeRemoteWriteResult('webdav', result);
+            context.lastRemoteWriteFingerprint = writeResult.fingerprint;
             context.remoteDataForCompare = sanitized;
             context.webdavRemoteCorrupted = false;
             return;
@@ -1415,17 +1453,33 @@ export class SyncService {
                 const normalizedUrl = normalizeCloudUrl(url);
                 context.syncUrl = normalizedUrl;
                 if (isTauriRuntimeEnv()) {
-                    await tauriInvoke('cloud_put_json', { data: sanitized });
-                    context.remoteDataForCompare = sanitized;
+                    const result = await tauriInvoke<CloudJsonWriteResult | boolean>('cloud_put_json', { data: sanitized });
+                    const writeResult = normalizeRemoteWriteResult('cloud', result);
+                    context.lastRemoteWriteFingerprint = writeResult.fingerprint;
+                    context.lastRemoteWriteMergedServerData = writeResult.serverMergedRemoteData;
+                    if (writeResult.serverMergedRemoteData) {
+                        context.remoteDataForCompare = null;
+                        run.requestFollowUp();
+                    } else {
+                        context.remoteDataForCompare = sanitized;
+                    }
                     return;
                 }
                 const fetcher = run.createFetchWithAbort((await getTauriFetch()) ?? fetch);
-                await cloudPutJson(normalizedUrl, sanitized, {
+                const result = await cloudPutJson(normalizedUrl, sanitized, {
                     allowInsecureHttp: config.allowInsecureHttp,
                     token,
                     fetcher,
                 });
-                context.remoteDataForCompare = sanitized;
+                const writeResult = normalizeRemoteWriteResult('cloud', result);
+                context.lastRemoteWriteFingerprint = writeResult.fingerprint;
+                context.lastRemoteWriteMergedServerData = writeResult.serverMergedRemoteData;
+                if (writeResult.serverMergedRemoteData) {
+                    context.remoteDataForCompare = null;
+                    run.requestFollowUp();
+                } else {
+                    context.remoteDataForCompare = sanitized;
+                }
                 return;
             }
             if (!context.dropboxAppKey) {

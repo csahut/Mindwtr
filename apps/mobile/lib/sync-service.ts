@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { AppData, Attachment, MergeStats, createSyncOrchestrator, runPreSyncAttachmentPhase, useTaskStore, webdavGetJson, webdavHeadFile, webdavPutJson, cloudGetJson, cloudHeadJson, cloudPutJson, flushPendingSave, performSyncCycle, applyAttachmentCleanupResult, findDeletedAttachmentsForFileCleanup, findLiveAttachmentResourceReferences, findOrphanedAttachments, isAttachmentCloudResourceReferenced, isAttachmentLocalResourceReferenced, webdavDeleteFile, cloudDeleteFile, CLOCK_SKEW_THRESHOLD_MS, appendSyncHistory, withRetry, isRetryableWebdavReadError, isWebdavInvalidJsonError, normalizeWebdavUrl, normalizeCloudUrl, sanitizeAppDataForRemote, computeStableValueFingerprint, computeSyncPayloadFingerprint, areSyncPayloadsEqual, assertNoPendingAttachmentUploads, buildFastSyncScope, buildMergeSummaryLog, buildPendingAttachmentUploadLogExtra, findPendingAttachmentUploads, hasPendingSyncSideEffects, injectExternalCalendars as injectExternalCalendarsForSync, persistExternalCalendars as persistExternalCalendarsForSync, mergeAppData, cloneAppData, LocalSyncAbort, getInMemoryAppDataSnapshot, shouldRunAttachmentCleanup, createAbortableFetch, normalizeCloudProvider as normalizeCoreCloudProvider, getErrorStatus, isDropboxUnauthorizedError, parseFastSyncState, serializeFastSyncState, decodeUriSafe, SYNC_FILE_NAME, CLOUD_PROVIDER_DROPBOX, CLOUD_PROVIDER_SELF_HOSTED, type CloudProvider, type FastSyncState, type PendingAttachmentUpload, type PendingRemoteAttachmentDelete } from '@mindwtr/core';
+import { AppData, Attachment, MergeStats, createSyncOrchestrator, runPreSyncAttachmentPhase, useTaskStore, webdavGetJson, webdavHeadFile, webdavPutJson, cloudGetJson, cloudHeadJson, cloudPutJson, flushPendingSave, performSyncCycle, applyAttachmentCleanupResult, findDeletedAttachmentsForFileCleanup, findLiveAttachmentResourceReferences, findOrphanedAttachments, isAttachmentCloudResourceReferenced, isAttachmentLocalResourceReferenced, webdavDeleteFile, cloudDeleteFile, CLOCK_SKEW_THRESHOLD_MS, appendSyncHistory, withRetry, isRetryableWebdavReadError, isWebdavInvalidJsonError, normalizeWebdavUrl, normalizeCloudUrl, sanitizeAppDataForRemote, buildHttpRemoteFileFingerprint, computeStableValueFingerprint, computeSyncPayloadFingerprint, areSyncPayloadsEqual, assertNoPendingAttachmentUploads, buildFastSyncScope, buildMergeSummaryLog, buildPendingAttachmentUploadLogExtra, findPendingAttachmentUploads, hasPendingSyncSideEffects, injectExternalCalendars as injectExternalCalendarsForSync, persistExternalCalendars as persistExternalCalendarsForSync, mergeAppData, cloneAppData, LocalSyncAbort, getInMemoryAppDataSnapshot, shouldRunAttachmentCleanup, createAbortableFetch, normalizeCloudProvider as normalizeCoreCloudProvider, getErrorStatus, isDropboxUnauthorizedError, parseFastSyncState, serializeFastSyncState, decodeUriSafe, SYNC_FILE_NAME, CLOUD_PROVIDER_DROPBOX, CLOUD_PROVIDER_SELF_HOSTED, type CloudJsonWriteResult, type CloudProvider, type FastSyncState, type PendingAttachmentUpload, type PendingRemoteAttachmentDelete, type RemoteJsonWriteResult } from '@mindwtr/core';
 import { mobileStorage } from './storage-adapter';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
 import { readSyncFile, resolveSyncFileUri, writeSyncFile } from './storage-file';
@@ -48,6 +48,28 @@ const ATTACHMENT_CLEANUP_BATCH_LIMIT = 25;
 const SYNC_CONFIG_CACHE_TTL_MS = 30_000;
 const FAST_SYNC_STATE_KEY = '@mindwtr_fast_sync_state_v1';
 const syncConfigCache = new Map<string, { value: string | null; readAt: number }>();
+
+type RemoteWriteResultLike = Partial<RemoteJsonWriteResult & CloudJsonWriteResult>;
+
+const normalizeRemoteWriteResult = (
+  source: 'cloud' | 'webdav',
+  result: RemoteWriteResultLike | null | undefined
+): { fingerprint: string | null; serverMergedRemoteData: boolean } => {
+  if (!result || typeof result !== 'object') {
+    return { fingerprint: null, serverMergedRemoteData: false };
+  }
+  const fingerprint = typeof result.fingerprint === 'string' && result.fingerprint.trim()
+    ? result.fingerprint
+    : buildHttpRemoteFileFingerprint(source, {
+      etag: typeof result.etag === 'string' ? result.etag : null,
+      lastModified: typeof result.lastModified === 'string' ? result.lastModified : null,
+      contentLength: typeof result.contentLength === 'string' ? result.contentLength : null,
+    });
+  return {
+    fingerprint,
+    serverMergedRemoteData: result.serverMergedRemoteData === true,
+  };
+};
 const IOS_TEMP_INBOX_PATH_PATTERN = /\/tmp\/[^/]*-Inbox\//i;
 const INVALID_CONFIG_CHAR_PATTERN = /[\u0000-\u001F\u007F]/;
 type MobileSyncActivityState = 'idle' | 'syncing';
@@ -471,6 +493,8 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
       let dropboxLastRev: string | null = null;
       let fileSyncPath: string | null = null;
       let remoteDataForCompare: AppData | null = null;
+      let lastRemoteWriteFingerprint: string | null = null;
+      let lastRemoteWriteMergedServerData = false;
       let localDataCache: { changeAt: number; data: AppData } | null = null;
       let readCheckRemoteData: AppData | null | undefined;
       let webdavRemoteCorrupted = false;
@@ -792,6 +816,8 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
 
       const writeRemoteDataByBackend = async (data: AppData): Promise<void> => {
         await ensureNetworkStillAvailable();
+        lastRemoteWriteFingerprint = null;
+        lastRemoteWriteMergedServerData = false;
         logPendingAttachmentUploads(
           'Remote write blocked by pending attachment uploads',
           backend,
@@ -812,8 +838,9 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
           if (webdavRemoteCorrupted) {
             logSyncInfo('Repairing corrupted WebDAV data.json with current merged data');
           }
+          let result: RemoteJsonWriteResult;
           try {
-            await withRetry(
+            result = await withRetry(
               () =>
                 webdavPutJson(webdavConfig.url, sanitized, {
                   ...getMobileWebDavRequestOptions(webdavConfig.allowInsecureHttp),
@@ -828,6 +855,8 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
             handleWebdavRateLimit(error);
             throw error;
           }
+          const writeResult = normalizeRemoteWriteResult('webdav', result);
+          lastRemoteWriteFingerprint = writeResult.fingerprint;
           remoteDataForCompare = sanitized;
           webdavRemoteCorrupted = false;
           return;
@@ -858,13 +887,21 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
             }
           }
           if (!cloudConfig?.url) throw new Error('Self-hosted URL not configured');
-          await cloudPutJson(cloudConfig.url, sanitized, {
+          const result = await cloudPutJson(cloudConfig.url, sanitized, {
             ...getMobileCloudRequestOptions(cloudConfig.allowInsecureHttp),
             token: cloudConfig.token,
             timeoutMs: DEFAULT_SYNC_TIMEOUT_MS,
             fetcher: fetchWithAbort,
           });
-          remoteDataForCompare = sanitized;
+          const writeResult = normalizeRemoteWriteResult('cloud', result);
+          lastRemoteWriteFingerprint = writeResult.fingerprint;
+          lastRemoteWriteMergedServerData = writeResult.serverMergedRemoteData;
+          if (writeResult.serverMergedRemoteData) {
+            remoteDataForCompare = null;
+            requestFollowUp(syncPathOverride);
+          } else {
+            remoteDataForCompare = sanitized;
+          }
           return;
         }
         if (backend === 'cloudkit') {
@@ -934,9 +971,12 @@ const mobileSyncOrchestrator = createSyncOrchestrator<string | undefined, Mobile
       ): Promise<void> => {
         if (!fastSyncScope || hasPendingSyncSideEffects(data)) return;
         if (useTaskStore.getState().lastDataChangeAt > localSnapshotChangeAt) return;
+        if (lastRemoteWriteMergedServerData) return;
         let remoteFingerprint: string | null = null;
         if (backend === 'cloud' && cloudProvider === CLOUD_PROVIDER_DROPBOX && dropboxLastRev) {
           remoteFingerprint = `dropbox:v1:rev=${dropboxLastRev}`;
+        } else if (lastRemoteWriteFingerprint) {
+          remoteFingerprint = lastRemoteWriteFingerprint;
         } else {
           if (options.allowRemoteFingerprintRead === false) return;
           try {

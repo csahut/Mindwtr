@@ -1,5 +1,59 @@
 use crate::*;
 
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RemoteJsonWriteResult {
+    fingerprint: Option<String>,
+    etag: Option<String>,
+    last_modified: Option<String>,
+    content_length: Option<String>,
+    server_merged_remote_data: Option<bool>,
+}
+
+fn header_value_to_string(headers: &reqwest::header::HeaderMap, name: &str) -> Option<String> {
+    headers
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.to_string())
+}
+
+fn remote_json_write_result_from_headers(headers: &reqwest::header::HeaderMap) -> RemoteJsonWriteResult {
+    RemoteJsonWriteResult {
+        fingerprint: None,
+        etag: header_value_to_string(headers, "etag"),
+        last_modified: header_value_to_string(headers, "last-modified"),
+        content_length: header_value_to_string(headers, "content-length"),
+        server_merged_remote_data: None,
+    }
+}
+
+fn apply_cloud_write_response_body(result: &mut RemoteJsonWriteResult, body: &str) {
+    let normalized_body = body.trim_start_matches('\u{feff}').trim();
+    if normalized_body.is_empty() {
+        return;
+    }
+    let Ok(parsed) = serde_json::from_str::<Value>(normalized_body) else {
+        return;
+    };
+    if let Some(value) = parsed.get("remoteFingerprint").and_then(Value::as_str) {
+        if !value.trim().is_empty() {
+            result.fingerprint = Some(value.to_string());
+        }
+    }
+    if let Some(value) = parsed.get("etag").and_then(Value::as_str) {
+        result.etag = Some(value.to_string());
+    }
+    if let Some(value) = parsed.get("lastModified").and_then(Value::as_str) {
+        result.last_modified = Some(value.to_string());
+    }
+    if let Some(value) = parsed.get("contentLength").and_then(Value::as_str) {
+        result.content_length = Some(value.to_string());
+    }
+    if let Some(value) = parsed.get("serverMergedRemoteData").and_then(Value::as_bool) {
+        result.server_merged_remote_data = Some(value);
+    }
+}
+
 fn now_unix_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -791,7 +845,10 @@ pub(crate) async fn webdav_get_json(app: tauri::AppHandle) -> Result<Value, Stri
         .map_err(|e| e.to_string())?
 }
 
-fn webdav_put_json_blocking(app: &tauri::AppHandle, data: &Value) -> Result<bool, String> {
+fn webdav_put_json_blocking(
+    app: &tauri::AppHandle,
+    data: &Value,
+) -> Result<RemoteJsonWriteResult, String> {
     let config = read_config(app);
     let url = normalize_webdav_url(&config.webdav_url.unwrap_or_default());
     if url.trim().is_empty() {
@@ -838,11 +895,14 @@ fn webdav_put_json_blocking(app: &tauri::AppHandle, data: &Value) -> Result<bool
     if !response.status().is_success() {
         return Err(format!("WebDAV error: {}", response.status()));
     }
-    Ok(true)
+    Ok(remote_json_write_result_from_headers(response.headers()))
 }
 
 #[tauri::command]
-pub(crate) async fn webdav_put_json(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
+pub(crate) async fn webdav_put_json(
+    app: tauri::AppHandle,
+    data: Value,
+) -> Result<RemoteJsonWriteResult, String> {
     tauri::async_runtime::spawn_blocking(move || webdav_put_json_blocking(&app, &data))
         .await
         .map_err(|e| e.to_string())?
@@ -915,7 +975,10 @@ pub(crate) async fn cloud_get_json(app: tauri::AppHandle) -> Result<Value, Strin
         .map_err(|e| e.to_string())?
 }
 
-fn cloud_put_json_blocking(app: &tauri::AppHandle, data: &Value) -> Result<bool, String> {
+fn cloud_put_json_blocking(
+    app: &tauri::AppHandle,
+    data: &Value,
+) -> Result<RemoteJsonWriteResult, String> {
     let config = read_config(app);
     let url = normalize_cloud_url(&config.cloud_url.clone().unwrap_or_default());
     if url.trim().is_empty() {
@@ -941,11 +1004,18 @@ fn cloud_put_json_blocking(app: &tauri::AppHandle, data: &Value) -> Result<bool,
             response.status().canonical_reason().unwrap_or_default()
         ));
     }
-    Ok(true)
+    let mut result = remote_json_write_result_from_headers(response.headers());
+    if let Ok(body) = response.text() {
+        apply_cloud_write_response_body(&mut result, &body);
+    }
+    Ok(result)
 }
 
 #[tauri::command]
-pub(crate) async fn cloud_put_json(app: tauri::AppHandle, data: Value) -> Result<bool, String> {
+pub(crate) async fn cloud_put_json(
+    app: tauri::AppHandle,
+    data: Value,
+) -> Result<RemoteJsonWriteResult, String> {
     tauri::async_runtime::spawn_blocking(move || cloud_put_json_blocking(&app, &data))
         .await
         .map_err(|e| e.to_string())?

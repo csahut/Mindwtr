@@ -30,6 +30,8 @@ export type RemoteFileMetadata = {
     contentLength: string | null;
 };
 
+export type RemoteJsonWriteResult = RemoteFileMetadata;
+
 const MAX_WEBDAV_MKCOL_DEPTH = 32;
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -115,7 +117,7 @@ export const buildHttpRemoteFileFingerprint = (
     const lastModified = metadata.lastModified?.trim() || '';
     const contentLength = metadata.contentLength?.trim() || '';
     if (etag) {
-        return `${source}:v1:etag=${etag}:mtime=${lastModified}:len=${contentLength}`;
+        return `${source}:v1:etag=${etag}`;
     }
     if (lastModified && contentLength) {
         if (options.allowWeakFingerprint === false) {
@@ -354,7 +356,7 @@ export async function webdavPutJson(
     url: string,
     data: unknown,
     options: WebDavOptions = {}
-): Promise<void> {
+): Promise<RemoteJsonWriteResult> {
     assertWebdavUrl(url, options);
     const fetcher = options.fetcher ?? fetch;
     const headers = buildHeaders(options);
@@ -387,6 +389,10 @@ export async function webdavPutJson(
         (error as { status?: number }).status = res.status;
         throw error;
     }
+    return metadataFromHeaders('webdav', res.headers, {
+        allowWeakFingerprint: options.allowWeakFingerprint,
+        warnOnceKey: getWebdavWeakFingerprintWarningKey(url),
+    });
 }
 
 export async function webdavMakeDirectory(
