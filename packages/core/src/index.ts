@@ -179,7 +179,6 @@ export {
 export {
     appendSyncHistory,
     CLOCK_SKEW_THRESHOLD_MS,
-    filterDeleted,
     mergeAppData,
     mergeAppDataWithStats,
     normalizeAppData,
@@ -315,9 +314,7 @@ export type {
 
 export {
     buildTaskUpdatesFromSpeechResult,
-    extractWaitingPerson,
     FOCUS_NEXT_DUE_SOON_WINDOW_DAYS,
-    buildTasksByProjectId,
     FOCUS_ELIGIBILITY_ACTIVE_STATUSES,
     getChecklistProgress,
     getProjectDeadlineBoosts,

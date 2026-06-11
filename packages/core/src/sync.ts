@@ -40,7 +40,6 @@ import {
     toComparableValue,
 } from './sync-signatures';
 import { purgeExpiredTombstones } from './sync-tombstones';
-import { filterNotDeleted } from './sync-helpers';
 import { nextRevision, SYNC_BACKUP_RESTORE_REV_BY } from './sync-revision';
 import { summarizeMergeStats } from './sync-log-utils';
 
@@ -702,10 +701,6 @@ function mergeAreas(
         return normalized;
     });
     return { merged, stats: result.stats };
-}
-
-export function filterDeleted<T extends { deletedAt?: string }>(items: T[]): T[] {
-    return filterNotDeleted(items);
 }
 
 const getClockSkewWarning = (stats: MergeResult['stats']): ClockSkewWarning | undefined => {
