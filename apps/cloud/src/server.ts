@@ -259,6 +259,376 @@ function finalizeCloudDataForWrite(data: AppData, nowIso: string): AppData | { e
     return repaired;
 }
 
+type CloudEntity = {
+    id: string;
+    deletedAt?: string;
+    updatedAt: string;
+    rev?: number;
+    revBy?: string;
+};
+type EntityCollectionKey = 'projects' | 'sections' | 'areas';
+type EntityItemKey = 'project' | 'section' | 'area';
+
+type EntityRouteDefinition<T extends CloudEntity> = {
+    path: string;
+    collectionKey: EntityCollectionKey;
+    itemKey: EntityItemKey;
+    listKey: EntityCollectionKey;
+    label: string;
+    invalidIdMessage: string;
+    listItems: (data: AppData, url: URL) => T[];
+    createEntity: (body: Record<string, unknown>, data: AppData, nowIso: string) => T | Response;
+    patchEntity: (body: Record<string, unknown>, existing: T, data: AppData, nowIso: string) => T | Response;
+};
+
+type EntityRouteContext = {
+    key: string;
+    filePath: string;
+    maxBodyBytes: number;
+    signal: AbortSignal;
+    withWriteLock: ReturnType<typeof createWriteLockRunner>;
+};
+
+type EntityBodyResult =
+    | { ok: true; body: Record<string, unknown> }
+    | { ok: false; response: Response };
+
+const isResponse = (value: unknown): value is Response => value instanceof Response;
+
+const readEntityObjectBody = async (
+    req: Request,
+    maxBodyBytes: number,
+    signal: AbortSignal
+): Promise<EntityBodyResult> => {
+    const body = await readJsonBody(req, maxBodyBytes, signal);
+    if (isBodyReadError(body)) {
+        const err = body.__mindwtrError;
+        return {
+            ok: false,
+            response: errorResponse(String(err?.message || 'Payload too large'), Number(err?.status) || 413),
+        };
+    }
+    const bodyRecord = readObjectBody(body);
+    if (!bodyRecord) return { ok: false, response: errorResponse('Invalid JSON body') };
+    return { ok: true, body: bodyRecord };
+};
+
+const getEntityCollection = <T extends CloudEntity>(data: AppData, route: EntityRouteDefinition<T>): T[] =>
+    data[route.collectionKey] as unknown as T[];
+
+const handleEntityRoute = async <T extends CloudEntity>(
+    route: EntityRouteDefinition<T>,
+    req: Request,
+    pathname: string,
+    url: URL,
+    context: EntityRouteContext
+): Promise<Response | null> => {
+    if (req.method === 'GET' && pathname === route.path) {
+        throwIfRequestAborted(context.signal);
+        const pagination = parsePagination(url.searchParams);
+        if ('error' in pagination) return errorResponse(pagination.error, 400);
+        const data = loadAppData(context.filePath);
+        const items = route.listItems(data, url);
+        const total = items.length;
+        return jsonResponse({
+            [route.listKey]: items.slice(pagination.offset, pagination.offset + pagination.limit),
+            total,
+            limit: pagination.limit,
+            offset: pagination.offset,
+        });
+    }
+
+    if (req.method === 'POST' && pathname === route.path) {
+        const bodyResult = await readEntityObjectBody(req, context.maxBodyBytes, context.signal);
+        if (!bodyResult.ok) return bodyResult.response;
+
+        return await context.withWriteLock(context.key, async () => {
+            throwIfRequestAborted(context.signal);
+            const data = loadAppData(context.filePath);
+            const nowIso = new Date().toISOString();
+            const entity = route.createEntity(bodyResult.body, data, nowIso);
+            if (isResponse(entity)) return entity;
+            getEntityCollection(data, route).push(entity);
+            const finalized = finalizeCloudDataForWrite(data, nowIso);
+            if ('error' in finalized) return finalized.error;
+            throwIfRequestAborted(context.signal);
+            writeCloudData(context.filePath, finalized);
+            return jsonResponse({ [route.itemKey]: entity }, { status: 201 });
+        });
+    }
+
+    const entityMatch = pathname.match(new RegExp(`^${route.path}/([^/]+)$`));
+    if (!entityMatch) return null;
+    const entityId = parseEntityRouteId(entityMatch[1]);
+    if (!entityId) return errorResponse(route.invalidIdMessage, 400);
+
+    if (req.method === 'GET') {
+        const data = loadAppData(context.filePath);
+        const entity = getEntityCollection(data, route).find((item) => item.id === entityId && !item.deletedAt);
+        if (!entity) return errorResponse(`${route.label} not found`, 404);
+        return jsonResponse({ [route.itemKey]: entity });
+    }
+
+    if (req.method === 'PATCH') {
+        const bodyResult = await readEntityObjectBody(req, context.maxBodyBytes, context.signal);
+        if (!bodyResult.ok) return bodyResult.response;
+
+        return await context.withWriteLock(context.key, async () => {
+            throwIfRequestAborted(context.signal);
+            const data = loadAppData(context.filePath);
+            const collection = getEntityCollection(data, route);
+            const idx = collection.findIndex((item) => item.id === entityId && !item.deletedAt);
+            if (idx < 0) return errorResponse(`${route.label} not found`, 404);
+            const nowIso = new Date().toISOString();
+            const updated = route.patchEntity(bodyResult.body, collection[idx], data, nowIso);
+            if (isResponse(updated)) return updated;
+            collection[idx] = updated;
+            const finalized = finalizeCloudDataForWrite(data, nowIso);
+            if ('error' in finalized) return finalized.error;
+            throwIfRequestAborted(context.signal);
+            writeCloudData(context.filePath, finalized);
+            const entity = getEntityCollection(finalized, route).find((item) => item.id === entityId);
+            return jsonResponse({ [route.itemKey]: entity });
+        });
+    }
+
+    if (req.method === 'DELETE') {
+        return await context.withWriteLock(context.key, async () => {
+            throwIfRequestAborted(context.signal);
+            const data = loadAppData(context.filePath);
+            const collection = getEntityCollection(data, route);
+            const idx = collection.findIndex((item) => item.id === entityId && !item.deletedAt);
+            if (idx < 0) return errorResponse(`${route.label} not found`, 404);
+            const nowIso = new Date().toISOString();
+            const existing = collection[idx];
+            collection[idx] = {
+                ...existing,
+                deletedAt: nowIso,
+                updatedAt: nowIso,
+                rev: normalizeRevision(existing.rev) + 1,
+                revBy: CLOUD_API_REV_BY,
+            };
+            const finalized = finalizeCloudDataForWrite(data, nowIso);
+            if ('error' in finalized) return finalized.error;
+            throwIfRequestAborted(context.signal);
+            writeCloudData(context.filePath, finalized);
+            return jsonResponse({ ok: true });
+        });
+    }
+
+    return null;
+};
+
+const ENTITY_ROUTES: Array<EntityRouteDefinition<any>> = [
+    {
+        path: '/v1/projects',
+        collectionKey: 'projects',
+        itemKey: 'project',
+        listKey: 'projects',
+        label: 'Project',
+        invalidIdMessage: 'Invalid project id',
+        listItems: (data, url) => (
+            url.searchParams.get('deleted') === '1' ? data.projects : filterNotDeleted(data.projects)
+        ),
+        createEntity: (bodyRecord, data, nowIso): Project | Response => {
+            const rawProps = isRecord(bodyRecord.props) ? bodyRecord.props : {};
+            const validatedProps = validateProjectCreationProps(rawProps);
+            if (!validatedProps.ok) return errorResponse(validatedProps.error, 400);
+            const title = typeof bodyRecord.title === 'string' ? bodyRecord.title.trim() : '';
+            if (!title) return errorResponse('Missing project title');
+            if (title.length > MAX_TASK_TITLE_LENGTH) {
+                return errorResponse(`Project title too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
+            }
+            const props = validatedProps.props as Record<string, unknown>;
+            if (props.areaId !== undefined && typeof props.areaId !== 'string') return errorResponse('Invalid area id', 400);
+            const areaId = typeof props.areaId === 'string' ? props.areaId.trim() : '';
+            if (areaId && !data.areas.some((area) => area.id === areaId && !area.deletedAt)) {
+                return errorResponse('Area not found', 404);
+            }
+            const rawStatus = props.status;
+            const status = rawStatus === undefined ? 'active' : asProjectStatus(rawStatus);
+            if (!status) return errorResponse('Invalid project status', 400);
+            const rawOrder = props.order;
+            const rawTagIds = props.tagIds;
+            const {
+                status: _status,
+                color: rawColor,
+                order: _order,
+                tagIds: _tagIds,
+                areaId: _areaId,
+                ...restProps
+            } = props;
+            return {
+                id: generateUUID(),
+                title,
+                ...restProps,
+                areaId: areaId || undefined,
+                status,
+                color: typeof rawColor === 'string' && rawColor.trim() ? rawColor : '#6B7280',
+                order: typeof rawOrder === 'number' && Number.isFinite(rawOrder) ? rawOrder : nextOrder(data.projects),
+                tagIds: Array.isArray(rawTagIds) ? rawTagIds.filter((item): item is string => typeof item === 'string') : [],
+                createdAt: nowIso,
+                updatedAt: nowIso,
+                rev: 1,
+                revBy: CLOUD_API_REV_BY,
+            };
+        },
+        patchEntity: (bodyRecord, existing: Project, data, nowIso): Project | Response => {
+            const validatedPatch = validateProjectPatchProps(bodyRecord);
+            if (!validatedPatch.ok) return errorResponse(validatedPatch.error, 400);
+            const updates = validatedPatch.props;
+            if (typeof updates.title === 'string' && !updates.title.trim()) return errorResponse('Missing project title');
+            if (typeof updates.title === 'string' && updates.title.length > MAX_TASK_TITLE_LENGTH) {
+                return errorResponse(`Project title too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
+            }
+            if (updates.status !== undefined && !asProjectStatus(updates.status)) return errorResponse('Invalid project status', 400);
+            if (updates.areaId !== undefined && updates.areaId !== null && typeof updates.areaId !== 'string') {
+                return errorResponse('Invalid area id', 400);
+            }
+            if (typeof updates.areaId === 'string' && updates.areaId.trim() === '') return errorResponse('Invalid area id', 400);
+            const areaId = updates.areaId === null
+                ? null
+                : typeof updates.areaId === 'string'
+                    ? updates.areaId.trim()
+                    : undefined;
+            if (areaId && !data.areas.some((area) => area.id === areaId && !area.deletedAt)) {
+                return errorResponse('Area not found', 404);
+            }
+            return {
+                ...existing,
+                ...updates,
+                title: typeof updates.title === 'string' ? updates.title.trim() : existing.title,
+                areaId: areaId !== undefined ? areaId ?? undefined : existing.areaId,
+                updatedAt: nowIso,
+                rev: normalizeRevision(existing.rev) + 1,
+                revBy: CLOUD_API_REV_BY,
+            };
+        },
+    },
+    {
+        path: '/v1/sections',
+        collectionKey: 'sections',
+        itemKey: 'section',
+        listKey: 'sections',
+        label: 'Section',
+        invalidIdMessage: 'Invalid section id',
+        listItems: (data, url) => {
+            let sections = url.searchParams.get('deleted') === '1' ? data.sections : filterNotDeleted(data.sections);
+            const projectId = url.searchParams.get('projectId');
+            if (projectId) sections = sections.filter((section) => section.projectId === projectId);
+            return sections;
+        },
+        createEntity: (bodyRecord, data, nowIso): Section | Response => {
+            const rawProps = isRecord(bodyRecord.props) ? bodyRecord.props : {};
+            const validatedProps = validateSectionCreationProps(rawProps);
+            if (!validatedProps.ok) return errorResponse(validatedProps.error, 400);
+            const title = typeof bodyRecord.title === 'string' ? bodyRecord.title.trim() : '';
+            const projectId = typeof bodyRecord.projectId === 'string' ? bodyRecord.projectId.trim() : '';
+            if (!title) return errorResponse('Missing section title');
+            if (title.length > MAX_TASK_TITLE_LENGTH) {
+                return errorResponse(`Section title too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
+            }
+            if (!projectId) return errorResponse('Missing project id');
+            if (!data.projects.some((project) => project.id === projectId && !project.deletedAt)) {
+                return errorResponse('Project not found', 404);
+            }
+            const props = validatedProps.props as Record<string, unknown>;
+            const rawOrder = props.order;
+            const { order: _order, ...restProps } = props;
+            return {
+                id: generateUUID(),
+                projectId,
+                title,
+                ...restProps,
+                order: typeof rawOrder === 'number' && Number.isFinite(rawOrder)
+                    ? rawOrder
+                    : nextOrder(data.sections.filter((item) => item.projectId === projectId)),
+                createdAt: nowIso,
+                updatedAt: nowIso,
+                rev: 1,
+                revBy: CLOUD_API_REV_BY,
+            };
+        },
+        patchEntity: (bodyRecord, existing: Section, data, nowIso): Section | Response => {
+            const validatedPatch = validateSectionPatchProps(bodyRecord);
+            if (!validatedPatch.ok) return errorResponse(validatedPatch.error, 400);
+            const updates = validatedPatch.props;
+            if (typeof updates.title === 'string' && !updates.title.trim()) return errorResponse('Missing section title');
+            if (typeof updates.title === 'string' && updates.title.length > MAX_TASK_TITLE_LENGTH) {
+                return errorResponse(`Section title too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
+            }
+            if (updates.projectId !== undefined && typeof updates.projectId !== 'string') {
+                return errorResponse('Invalid project id', 400);
+            }
+            const projectId = typeof updates.projectId === 'string' ? updates.projectId.trim() : existing.projectId;
+            if (!projectId) return errorResponse('Missing project id');
+            if (!data.projects.some((project) => project.id === projectId && !project.deletedAt)) {
+                return errorResponse('Project not found', 404);
+            }
+            return {
+                ...existing,
+                ...updates,
+                projectId,
+                title: typeof updates.title === 'string' ? updates.title.trim() : existing.title,
+                updatedAt: nowIso,
+                rev: normalizeRevision(existing.rev) + 1,
+                revBy: CLOUD_API_REV_BY,
+            };
+        },
+    },
+    {
+        path: '/v1/areas',
+        collectionKey: 'areas',
+        itemKey: 'area',
+        listKey: 'areas',
+        label: 'Area',
+        invalidIdMessage: 'Invalid area id',
+        listItems: (data, url) => (
+            url.searchParams.get('deleted') === '1' ? data.areas : filterNotDeleted(data.areas)
+        ),
+        createEntity: (bodyRecord, data, nowIso): Area | Response => {
+            const rawProps = isRecord(bodyRecord.props) ? bodyRecord.props : {};
+            const validatedProps = validateAreaCreationProps(rawProps);
+            if (!validatedProps.ok) return errorResponse(validatedProps.error, 400);
+            const name = typeof bodyRecord.name === 'string' ? bodyRecord.name.trim() : '';
+            if (!name) return errorResponse('Missing area name');
+            if (name.length > MAX_TASK_TITLE_LENGTH) {
+                return errorResponse(`Area name too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
+            }
+            const props = validatedProps.props as Record<string, unknown>;
+            const rawOrder = props.order;
+            const { order: _order, ...restProps } = props;
+            return {
+                id: generateUUID(),
+                name,
+                ...restProps,
+                order: typeof rawOrder === 'number' && Number.isFinite(rawOrder) ? rawOrder : nextOrder(data.areas),
+                createdAt: nowIso,
+                updatedAt: nowIso,
+                rev: 1,
+                revBy: CLOUD_API_REV_BY,
+            };
+        },
+        patchEntity: (bodyRecord, existing: Area, _data, nowIso): Area | Response => {
+            const validatedPatch = validateAreaPatchProps(bodyRecord);
+            if (!validatedPatch.ok) return errorResponse(validatedPatch.error, 400);
+            const updates = validatedPatch.props;
+            if (typeof updates.name === 'string' && !updates.name.trim()) return errorResponse('Missing area name');
+            if (typeof updates.name === 'string' && updates.name.length > MAX_TASK_TITLE_LENGTH) {
+                return errorResponse(`Area name too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
+            }
+            return {
+                ...existing,
+                ...updates,
+                name: typeof updates.name === 'string' ? updates.name.trim() : existing.name,
+                updatedAt: nowIso,
+                rev: normalizeRevision(existing.rev) + 1,
+                revBy: CLOUD_API_REV_BY,
+            };
+        },
+    },
+];
+
 function namespaceExists(dataDir: string, key: string): boolean {
     return existsSync(join(dataDir, `${key}.json`)) || existsSync(join(dataDir, key));
 }
@@ -850,439 +1220,15 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
                         }
                     }
 
-                    if (req.method === 'GET' && pathname === '/v1/projects') {
-                        throwIfRequestAborted(requestAbortController.signal);
-                        const pagination = parsePagination(url.searchParams);
-                        if ('error' in pagination) return errorResponse(pagination.error, 400);
-                        const data = loadAppData(filePath);
-                        const projects = url.searchParams.get('deleted') === '1' ? data.projects : filterNotDeleted(data.projects);
-                        const total = projects.length;
-                        const pageProjects = projects.slice(pagination.offset, pagination.offset + pagination.limit);
-                        return jsonResponse({
-                            projects: pageProjects,
-                            total,
-                            limit: pagination.limit,
-                            offset: pagination.offset,
+                    for (const entityRoute of ENTITY_ROUTES) {
+                        const entityRouteResponse = await handleEntityRoute(entityRoute, req, pathname, url, {
+                            key,
+                            filePath,
+                            maxBodyBytes,
+                            signal: requestAbortController.signal,
+                            withWriteLock,
                         });
-                    }
-
-                    if (req.method === 'POST' && pathname === '/v1/projects') {
-                        const body = await readJsonBody(req, maxBodyBytes, requestAbortController.signal);
-                        if (isBodyReadError(body)) {
-                            const err = body.__mindwtrError;
-                            return errorResponse(String(err?.message || 'Payload too large'), Number(err?.status) || 413);
-                        }
-                        const bodyRecord = readObjectBody(body);
-                        if (!bodyRecord) return errorResponse('Invalid JSON body');
-                        const rawProps = isRecord(bodyRecord.props) ? bodyRecord.props : {};
-                        const validatedProps = validateProjectCreationProps(rawProps);
-                        if (!validatedProps.ok) return errorResponse(validatedProps.error, 400);
-                        const title = typeof bodyRecord.title === 'string' ? bodyRecord.title.trim() : '';
-                        if (!title) return errorResponse('Missing project title');
-                        if (title.length > MAX_TASK_TITLE_LENGTH) return errorResponse(`Project title too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
-                        const props = validatedProps.props as Record<string, unknown>;
-                        if (props.areaId !== undefined && typeof props.areaId !== 'string') return errorResponse('Invalid area id', 400);
-
-                        return await withWriteLock(key, async () => {
-                            throwIfRequestAborted(requestAbortController.signal);
-                            const data = loadAppData(filePath);
-                            const nowIso = new Date().toISOString();
-                            const areaId = typeof props.areaId === 'string' ? props.areaId.trim() : '';
-                            if (areaId && !data.areas.some((area) => area.id === areaId && !area.deletedAt)) {
-                                return errorResponse('Area not found', 404);
-                            }
-                            const rawStatus = props.status;
-                            const status = rawStatus === undefined ? 'active' : asProjectStatus(rawStatus);
-                            if (!status) return errorResponse('Invalid project status', 400);
-                            const rawOrder = props.order;
-                            const rawTagIds = props.tagIds;
-                            const {
-                                status: _status,
-                                color: rawColor,
-                                order: _order,
-                                tagIds: _tagIds,
-                                areaId: _areaId,
-                                ...restProps
-                            } = props;
-                            const project: Project = {
-                                id: generateUUID(),
-                                title,
-                                ...restProps,
-                                areaId: areaId || undefined,
-                                status,
-                                color: typeof rawColor === 'string' && rawColor.trim() ? rawColor : '#6B7280',
-                                order: typeof rawOrder === 'number' && Number.isFinite(rawOrder) ? rawOrder : nextOrder(data.projects),
-                                tagIds: Array.isArray(rawTagIds) ? rawTagIds.filter((item): item is string => typeof item === 'string') : [],
-                                createdAt: nowIso,
-                                updatedAt: nowIso,
-                                rev: 1,
-                                revBy: CLOUD_API_REV_BY,
-                            };
-                            data.projects.push(project);
-                            const finalized = finalizeCloudDataForWrite(data, nowIso);
-                            if ('error' in finalized) return finalized.error;
-                            throwIfRequestAborted(requestAbortController.signal);
-                            writeCloudData(filePath, finalized);
-                            return jsonResponse({ project }, { status: 201 });
-                        });
-                    }
-
-                    const projectMatch = pathname.match(/^\/v1\/projects\/([^/]+)$/);
-                    if (projectMatch) {
-                        const projectId = parseEntityRouteId(projectMatch[1]);
-                        if (!projectId) return errorResponse('Invalid project id', 400);
-
-                        if (req.method === 'GET') {
-                            const data = loadAppData(filePath);
-                            const project = data.projects.find((item) => item.id === projectId && !item.deletedAt);
-                            if (!project) return errorResponse('Project not found', 404);
-                            return jsonResponse({ project });
-                        }
-
-                        if (req.method === 'PATCH') {
-                            const body = await readJsonBody(req, maxBodyBytes, requestAbortController.signal);
-                            if (isBodyReadError(body)) {
-                                const err = body.__mindwtrError;
-                                return errorResponse(String(err?.message || 'Payload too large'), Number(err?.status) || 413);
-                            }
-                            if (!readObjectBody(body)) return errorResponse('Invalid JSON body');
-                            const validatedPatch = validateProjectPatchProps(body);
-                            if (!validatedPatch.ok) return errorResponse(validatedPatch.error, 400);
-                            const updates = validatedPatch.props;
-                            if (typeof updates.title === 'string' && !updates.title.trim()) return errorResponse('Missing project title');
-                            if (typeof updates.title === 'string' && updates.title.length > MAX_TASK_TITLE_LENGTH) {
-                                return errorResponse(`Project title too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
-                            }
-                            if (updates.status !== undefined && !asProjectStatus(updates.status)) return errorResponse('Invalid project status', 400);
-                            if (updates.areaId !== undefined && updates.areaId !== null && typeof updates.areaId !== 'string') return errorResponse('Invalid area id', 400);
-                            if (typeof updates.areaId === 'string' && updates.areaId.trim() === '') return errorResponse('Invalid area id', 400);
-
-                            return await withWriteLock(key, async () => {
-                                throwIfRequestAborted(requestAbortController.signal);
-                                const data = loadAppData(filePath);
-                                const idx = data.projects.findIndex((item) => item.id === projectId && !item.deletedAt);
-                                if (idx < 0) return errorResponse('Project not found', 404);
-                                const areaId = updates.areaId === null
-                                    ? null
-                                    : typeof updates.areaId === 'string'
-                                        ? updates.areaId.trim()
-                                        : undefined;
-                                if (areaId && !data.areas.some((area) => area.id === areaId && !area.deletedAt)) {
-                                    return errorResponse('Area not found', 404);
-                                }
-                                const nowIso = new Date().toISOString();
-                                const existing = data.projects[idx];
-                                data.projects[idx] = {
-                                    ...existing,
-                                    ...updates,
-                                    title: typeof updates.title === 'string' ? updates.title.trim() : existing.title,
-                                    areaId: areaId !== undefined ? areaId ?? undefined : existing.areaId,
-                                    updatedAt: nowIso,
-                                    rev: normalizeRevision(existing.rev) + 1,
-                                    revBy: CLOUD_API_REV_BY,
-                                };
-                                const finalized = finalizeCloudDataForWrite(data, nowIso);
-                                if ('error' in finalized) return finalized.error;
-                                writeCloudData(filePath, finalized);
-                                const project = finalized.projects.find((item) => item.id === projectId);
-                                return jsonResponse({ project });
-                            });
-                        }
-
-                        if (req.method === 'DELETE') {
-                            return await withWriteLock(key, async () => {
-                                throwIfRequestAborted(requestAbortController.signal);
-                                const data = loadAppData(filePath);
-                                const idx = data.projects.findIndex((item) => item.id === projectId && !item.deletedAt);
-                                if (idx < 0) return errorResponse('Project not found', 404);
-                                const nowIso = new Date().toISOString();
-                                const existing = data.projects[idx];
-                                data.projects[idx] = {
-                                    ...existing,
-                                    deletedAt: nowIso,
-                                    updatedAt: nowIso,
-                                    rev: normalizeRevision(existing.rev) + 1,
-                                    revBy: CLOUD_API_REV_BY,
-                                };
-                                const finalized = finalizeCloudDataForWrite(data, nowIso);
-                                if ('error' in finalized) return finalized.error;
-                                writeCloudData(filePath, finalized);
-                                return jsonResponse({ ok: true });
-                            });
-                        }
-                    }
-
-                    if (req.method === 'GET' && pathname === '/v1/sections') {
-                        throwIfRequestAborted(requestAbortController.signal);
-                        const pagination = parsePagination(url.searchParams);
-                        if ('error' in pagination) return errorResponse(pagination.error, 400);
-                        const data = loadAppData(filePath);
-                        let sections = url.searchParams.get('deleted') === '1' ? data.sections : filterNotDeleted(data.sections);
-                        const projectId = url.searchParams.get('projectId');
-                        if (projectId) sections = sections.filter((section) => section.projectId === projectId);
-                        const total = sections.length;
-                        return jsonResponse({
-                            sections: sections.slice(pagination.offset, pagination.offset + pagination.limit),
-                            total,
-                            limit: pagination.limit,
-                            offset: pagination.offset,
-                        });
-                    }
-
-                    if (req.method === 'POST' && pathname === '/v1/sections') {
-                        const body = await readJsonBody(req, maxBodyBytes, requestAbortController.signal);
-                        if (isBodyReadError(body)) {
-                            const err = body.__mindwtrError;
-                            return errorResponse(String(err?.message || 'Payload too large'), Number(err?.status) || 413);
-                        }
-                        const bodyRecord = readObjectBody(body);
-                        if (!bodyRecord) return errorResponse('Invalid JSON body');
-                        const rawProps = isRecord(bodyRecord.props) ? bodyRecord.props : {};
-                        const validatedProps = validateSectionCreationProps(rawProps);
-                        if (!validatedProps.ok) return errorResponse(validatedProps.error, 400);
-                        const title = typeof bodyRecord.title === 'string' ? bodyRecord.title.trim() : '';
-                        const projectId = typeof bodyRecord.projectId === 'string' ? bodyRecord.projectId.trim() : '';
-                        if (!title) return errorResponse('Missing section title');
-                        if (title.length > MAX_TASK_TITLE_LENGTH) return errorResponse(`Section title too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
-                        if (!projectId) return errorResponse('Missing project id');
-
-                        return await withWriteLock(key, async () => {
-                            throwIfRequestAborted(requestAbortController.signal);
-                            const data = loadAppData(filePath);
-                            if (!data.projects.some((project) => project.id === projectId && !project.deletedAt)) {
-                                return errorResponse('Project not found', 404);
-                            }
-                            const nowIso = new Date().toISOString();
-                            const props = validatedProps.props as Record<string, unknown>;
-                            const rawOrder = props.order;
-                            const { order: _order, ...restProps } = props;
-                            const section: Section = {
-                                id: generateUUID(),
-                                projectId,
-                                title,
-                                ...restProps,
-                                order: typeof rawOrder === 'number' && Number.isFinite(rawOrder)
-                                    ? rawOrder
-                                    : nextOrder(data.sections.filter((item) => item.projectId === projectId)),
-                                createdAt: nowIso,
-                                updatedAt: nowIso,
-                                rev: 1,
-                                revBy: CLOUD_API_REV_BY,
-                            };
-                            data.sections.push(section);
-                            const finalized = finalizeCloudDataForWrite(data, nowIso);
-                            if ('error' in finalized) return finalized.error;
-                            writeCloudData(filePath, finalized);
-                            return jsonResponse({ section }, { status: 201 });
-                        });
-                    }
-
-                    const sectionMatch = pathname.match(/^\/v1\/sections\/([^/]+)$/);
-                    if (sectionMatch) {
-                        const sectionId = parseEntityRouteId(sectionMatch[1]);
-                        if (!sectionId) return errorResponse('Invalid section id', 400);
-
-                        if (req.method === 'GET') {
-                            const data = loadAppData(filePath);
-                            const section = data.sections.find((item) => item.id === sectionId && !item.deletedAt);
-                            if (!section) return errorResponse('Section not found', 404);
-                            return jsonResponse({ section });
-                        }
-
-                        if (req.method === 'PATCH') {
-                            const body = await readJsonBody(req, maxBodyBytes, requestAbortController.signal);
-                            if (isBodyReadError(body)) {
-                                const err = body.__mindwtrError;
-                                return errorResponse(String(err?.message || 'Payload too large'), Number(err?.status) || 413);
-                            }
-                            if (!readObjectBody(body)) return errorResponse('Invalid JSON body');
-                            const validatedPatch = validateSectionPatchProps(body);
-                            if (!validatedPatch.ok) return errorResponse(validatedPatch.error, 400);
-                            const updates = validatedPatch.props;
-                            if (typeof updates.title === 'string' && !updates.title.trim()) return errorResponse('Missing section title');
-                            if (typeof updates.title === 'string' && updates.title.length > MAX_TASK_TITLE_LENGTH) {
-                                return errorResponse(`Section title too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
-                            }
-                            if (updates.projectId !== undefined && typeof updates.projectId !== 'string') return errorResponse('Invalid project id', 400);
-
-                            return await withWriteLock(key, async () => {
-                                throwIfRequestAborted(requestAbortController.signal);
-                                const data = loadAppData(filePath);
-                                const idx = data.sections.findIndex((item) => item.id === sectionId && !item.deletedAt);
-                                if (idx < 0) return errorResponse('Section not found', 404);
-                                const projectId = typeof updates.projectId === 'string' ? updates.projectId.trim() : data.sections[idx].projectId;
-                                if (!projectId) return errorResponse('Missing project id');
-                                if (!data.projects.some((project) => project.id === projectId && !project.deletedAt)) {
-                                    return errorResponse('Project not found', 404);
-                                }
-                                const nowIso = new Date().toISOString();
-                                const existing = data.sections[idx];
-                                data.sections[idx] = {
-                                    ...existing,
-                                    ...updates,
-                                    projectId,
-                                    title: typeof updates.title === 'string' ? updates.title.trim() : existing.title,
-                                    updatedAt: nowIso,
-                                    rev: normalizeRevision(existing.rev) + 1,
-                                    revBy: CLOUD_API_REV_BY,
-                                };
-                                const finalized = finalizeCloudDataForWrite(data, nowIso);
-                                if ('error' in finalized) return finalized.error;
-                                writeCloudData(filePath, finalized);
-                                const section = finalized.sections.find((item) => item.id === sectionId);
-                                return jsonResponse({ section });
-                            });
-                        }
-
-                        if (req.method === 'DELETE') {
-                            return await withWriteLock(key, async () => {
-                                throwIfRequestAborted(requestAbortController.signal);
-                                const data = loadAppData(filePath);
-                                const idx = data.sections.findIndex((item) => item.id === sectionId && !item.deletedAt);
-                                if (idx < 0) return errorResponse('Section not found', 404);
-                                const nowIso = new Date().toISOString();
-                                const existing = data.sections[idx];
-                                data.sections[idx] = {
-                                    ...existing,
-                                    deletedAt: nowIso,
-                                    updatedAt: nowIso,
-                                    rev: normalizeRevision(existing.rev) + 1,
-                                    revBy: CLOUD_API_REV_BY,
-                                };
-                                const finalized = finalizeCloudDataForWrite(data, nowIso);
-                                if ('error' in finalized) return finalized.error;
-                                writeCloudData(filePath, finalized);
-                                return jsonResponse({ ok: true });
-                            });
-                        }
-                    }
-
-                    if (req.method === 'GET' && pathname === '/v1/areas') {
-                        throwIfRequestAborted(requestAbortController.signal);
-                        const pagination = parsePagination(url.searchParams);
-                        if ('error' in pagination) return errorResponse(pagination.error, 400);
-                        const data = loadAppData(filePath);
-                        const areas = url.searchParams.get('deleted') === '1' ? data.areas : filterNotDeleted(data.areas);
-                        const total = areas.length;
-                        return jsonResponse({
-                            areas: areas.slice(pagination.offset, pagination.offset + pagination.limit),
-                            total,
-                            limit: pagination.limit,
-                            offset: pagination.offset,
-                        });
-                    }
-
-                    if (req.method === 'POST' && pathname === '/v1/areas') {
-                        const body = await readJsonBody(req, maxBodyBytes, requestAbortController.signal);
-                        if (isBodyReadError(body)) {
-                            const err = body.__mindwtrError;
-                            return errorResponse(String(err?.message || 'Payload too large'), Number(err?.status) || 413);
-                        }
-                        const bodyRecord = readObjectBody(body);
-                        if (!bodyRecord) return errorResponse('Invalid JSON body');
-                        const rawProps = isRecord(bodyRecord.props) ? bodyRecord.props : {};
-                        const validatedProps = validateAreaCreationProps(rawProps);
-                        if (!validatedProps.ok) return errorResponse(validatedProps.error, 400);
-                        const name = typeof bodyRecord.name === 'string' ? bodyRecord.name.trim() : '';
-                        if (!name) return errorResponse('Missing area name');
-                        if (name.length > MAX_TASK_TITLE_LENGTH) return errorResponse(`Area name too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
-
-                        return await withWriteLock(key, async () => {
-                            throwIfRequestAborted(requestAbortController.signal);
-                            const data = loadAppData(filePath);
-                            const nowIso = new Date().toISOString();
-                            const props = validatedProps.props as Record<string, unknown>;
-                            const rawOrder = props.order;
-                            const { order: _order, ...restProps } = props;
-                            const area: Area = {
-                                id: generateUUID(),
-                                name,
-                                ...restProps,
-                                order: typeof rawOrder === 'number' && Number.isFinite(rawOrder) ? rawOrder : nextOrder(data.areas),
-                                createdAt: nowIso,
-                                updatedAt: nowIso,
-                                rev: 1,
-                                revBy: CLOUD_API_REV_BY,
-                            };
-                            data.areas.push(area);
-                            const finalized = finalizeCloudDataForWrite(data, nowIso);
-                            if ('error' in finalized) return finalized.error;
-                            writeCloudData(filePath, finalized);
-                            return jsonResponse({ area }, { status: 201 });
-                        });
-                    }
-
-                    const areaMatch = pathname.match(/^\/v1\/areas\/([^/]+)$/);
-                    if (areaMatch) {
-                        const areaId = parseEntityRouteId(areaMatch[1]);
-                        if (!areaId) return errorResponse('Invalid area id', 400);
-
-                        if (req.method === 'GET') {
-                            const data = loadAppData(filePath);
-                            const area = data.areas.find((item) => item.id === areaId && !item.deletedAt);
-                            if (!area) return errorResponse('Area not found', 404);
-                            return jsonResponse({ area });
-                        }
-
-                        if (req.method === 'PATCH') {
-                            const body = await readJsonBody(req, maxBodyBytes, requestAbortController.signal);
-                            if (isBodyReadError(body)) {
-                                const err = body.__mindwtrError;
-                                return errorResponse(String(err?.message || 'Payload too large'), Number(err?.status) || 413);
-                            }
-                            if (!readObjectBody(body)) return errorResponse('Invalid JSON body');
-                            const validatedPatch = validateAreaPatchProps(body);
-                            if (!validatedPatch.ok) return errorResponse(validatedPatch.error, 400);
-                            const updates = validatedPatch.props;
-                            if (typeof updates.name === 'string' && !updates.name.trim()) return errorResponse('Missing area name');
-                            if (typeof updates.name === 'string' && updates.name.length > MAX_TASK_TITLE_LENGTH) {
-                                return errorResponse(`Area name too long (max ${MAX_TASK_TITLE_LENGTH} characters)`, 400);
-                            }
-
-                            return await withWriteLock(key, async () => {
-                                throwIfRequestAborted(requestAbortController.signal);
-                                const data = loadAppData(filePath);
-                                const idx = data.areas.findIndex((item) => item.id === areaId && !item.deletedAt);
-                                if (idx < 0) return errorResponse('Area not found', 404);
-                                const nowIso = new Date().toISOString();
-                                const existing = data.areas[idx];
-                                data.areas[idx] = {
-                                    ...existing,
-                                    ...updates,
-                                    name: typeof updates.name === 'string' ? updates.name.trim() : existing.name,
-                                    updatedAt: nowIso,
-                                    rev: normalizeRevision(existing.rev) + 1,
-                                    revBy: CLOUD_API_REV_BY,
-                                };
-                                const finalized = finalizeCloudDataForWrite(data, nowIso);
-                                if ('error' in finalized) return finalized.error;
-                                writeCloudData(filePath, finalized);
-                                const area = finalized.areas.find((item) => item.id === areaId);
-                                return jsonResponse({ area });
-                            });
-                        }
-
-                        if (req.method === 'DELETE') {
-                            return await withWriteLock(key, async () => {
-                                throwIfRequestAborted(requestAbortController.signal);
-                                const data = loadAppData(filePath);
-                                const idx = data.areas.findIndex((item) => item.id === areaId && !item.deletedAt);
-                                if (idx < 0) return errorResponse('Area not found', 404);
-                                const nowIso = new Date().toISOString();
-                                const existing = data.areas[idx];
-                                data.areas[idx] = {
-                                    ...existing,
-                                    deletedAt: nowIso,
-                                    updatedAt: nowIso,
-                                    rev: normalizeRevision(existing.rev) + 1,
-                                    revBy: CLOUD_API_REV_BY,
-                                };
-                                const finalized = finalizeCloudDataForWrite(data, nowIso);
-                                if ('error' in finalized) return finalized.error;
-                                writeCloudData(filePath, finalized);
-                                return jsonResponse({ ok: true });
-                            });
-                        }
+                        if (entityRouteResponse) return entityRouteResponse;
                     }
 
                     if (req.method === 'GET' && pathname === '/v1/search') {
