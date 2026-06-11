@@ -141,7 +141,6 @@ export function ProjectsView() {
         addSection,
         updateSection,
         deleteSection,
-        addTask,
         toggleProjectFocus,
         allTasks,
         highlightTaskId,
@@ -651,9 +650,7 @@ export function ProjectsView() {
                     )}
 
                     <ProjectWorkspace
-                        addProject={addProject}
                         addSection={addSection}
-                        addTask={addTask}
                         allTasks={allTasks}
                         allTokens={allTokens}
                         areaById={areaById}

@@ -19,6 +19,7 @@ import {
   isSelectableProjectForTaskAssignment,
   parseQuickAdd,
   shallow,
+  tFallback,
   type AIProviderId,
   type Project,
   type Task,
@@ -30,6 +31,7 @@ import { useToast } from '@/contexts/toast-context';
 import { useLanguage } from '../contexts/language-context';
 import { buildCopilotConfig, isAIKeyRequired, loadAIKey } from '../lib/ai-config';
 import { logError } from '../lib/app-log';
+import { openTaskScreen } from '@/lib/task-meta-navigation';
 
 type CaptureSearchParams = {
   initialProps?: string;
@@ -54,6 +56,12 @@ const decodeSearchParam = (value: string | string[] | undefined): string => {
   } catch {
     return raw;
   }
+};
+
+const getCreatedTaskId = (result: unknown): string | null => {
+  if (!result || typeof result !== 'object') return null;
+  const maybeId = (result as { id?: unknown }).id;
+  return typeof maybeId === 'string' && maybeId.trim() ? maybeId : null;
 };
 
 const parseInitialPropsJson = (value: string | string[] | undefined): Record<string, unknown> => {
@@ -292,7 +300,7 @@ export default function CaptureScreen() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async ({ openAfterSave = false }: { openAfterSave?: boolean } = {}) => {
     if (!value.trim()) return;
     const { title, props, projectTitle, invalidDateCommands, detectedDate } = parseQuickAdd(
       value,
@@ -377,7 +385,12 @@ export default function CaptureScreen() {
       const nextTags = Array.from(new Set([...(taskProps.tags ?? []), ...copilotTags]));
       taskProps.tags = nextTags;
     }
-    await addTask(finalTitle, taskProps);
+    const addTaskResult = await addTask(finalTitle, taskProps);
+    const createdTaskId = getCreatedTaskId(addTaskResult);
+    if (openAfterSave && createdTaskId) {
+      openTaskScreen(createdTaskId, taskProps.projectId, 'task');
+      return;
+    }
     router.replace('/inbox');
   };
 
@@ -420,7 +433,9 @@ export default function CaptureScreen() {
             placeholderTextColor={placeholderColor}
             value={value}
             onChangeText={handleInputChange}
-            onSubmitEditing={handleSave}
+            onSubmitEditing={() => {
+              void handleSave();
+            }}
             returnKeyType="done"
             multiline
           />
@@ -475,7 +490,20 @@ export default function CaptureScreen() {
             <TouchableOpacity onPress={handleCancel} style={[styles.button, styles.cancel, { backgroundColor: tc.inputBg }]}>
               <Text style={{ color: tc.text }}>{t('common.cancel')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleSave} style={[styles.button, styles.save]}>
+            <TouchableOpacity
+              onPress={() => {
+                void handleSave({ openAfterSave: true });
+              }}
+              style={[styles.button, styles.editAfterSave, { borderColor: tc.border }]}
+            >
+              <Text style={{ color: tc.text }}>{tFallback(t, 'quickAdd.saveAndEdit', 'Save & edit')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                void handleSave();
+              }}
+              style={[styles.button, styles.save]}
+            >
               <Text style={styles.saveText}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
@@ -590,6 +618,9 @@ const styles = StyleSheet.create({
   cancel: {},
   save: {
     backgroundColor: '#3B82F6',
+  },
+  editAfterSave: {
+    borderWidth: 1,
   },
   saveText: {
     color: '#fff',

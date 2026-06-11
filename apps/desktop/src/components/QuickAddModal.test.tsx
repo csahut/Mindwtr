@@ -6,6 +6,7 @@ import type { ComponentProps } from 'react';
 import { LanguageProvider } from '../contexts/language-context';
 import { QuickAddModal } from './QuickAddModal';
 import { QUICK_ADD_MAIN_WINDOW_LABEL, QUICK_ADD_SAVED_EVENT } from '../lib/quick-add-saved-event';
+import { useUiStore } from '../store/ui-store';
 
 const tauriMocks = vi.hoisted(() => ({
     emitTo: vi.fn(async () => undefined),
@@ -98,6 +99,10 @@ beforeEach(() => {
                 },
             },
         }));
+        useUiStore.setState({
+            editingTaskId: null,
+            projectView: { selectedProjectId: null },
+        });
     });
 });
 
@@ -229,6 +234,45 @@ describe('QuickAddModal', () => {
             projectId: 'project-launch',
             areaId: undefined,
         }));
+    });
+
+    it('opens the created project task when save and edit is requested', async () => {
+        const addTask = vi.fn(async () => ({ success: true, id: 'task-created' }));
+        const navigateListener = vi.fn();
+        act(() => {
+            useTaskStore.setState((state) => ({
+                ...state,
+                addTask,
+            }));
+        });
+        window.addEventListener('mindwtr:navigate', navigateListener);
+
+        renderQuickAddModal();
+
+        await act(async () => {
+            window.dispatchEvent(new CustomEvent('mindwtr:quick-add', {
+                detail: {
+                    initialValue: 'Draft launch brief',
+                    initialProps: { projectId: 'project-launch', status: 'next' },
+                },
+            }));
+            await Promise.resolve();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save & edit' }));
+
+        await waitFor(() => {
+            expect(addTask).toHaveBeenCalledWith('Draft launch brief', expect.objectContaining({
+                projectId: 'project-launch',
+                status: 'next',
+            }));
+        });
+        expect(useUiStore.getState().projectView.selectedProjectId).toBe('project-launch');
+        expect(useUiStore.getState().editingTaskId).toBe('task-created');
+        expect(navigateListener).toHaveBeenCalledWith(expect.objectContaining({
+            detail: { view: 'projects' },
+        }));
+        window.removeEventListener('mindwtr:navigate', navigateListener);
     });
 
     it('attaches a pasted image to a text quick-add task', async () => {

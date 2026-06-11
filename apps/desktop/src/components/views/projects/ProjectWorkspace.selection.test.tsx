@@ -1,7 +1,7 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Project, Task } from '@mindwtr/core';
+import type { Project, Section, Task } from '@mindwtr/core';
 
 import { useUiStore } from '../../../store/ui-store';
 import { ProjectWorkspace } from './ProjectWorkspace';
@@ -112,6 +112,15 @@ const project: Project = {
     updatedAt: '2026-05-12T00:00:00.000Z',
 };
 
+const projectSection: Section = {
+    id: 'section-1',
+    projectId: project.id,
+    title: 'Planning',
+    order: 0,
+    createdAt: '2026-05-12T00:00:00.000Z',
+    updatedAt: '2026-05-12T00:00:00.000Z',
+};
+
 const task = (id: string, title: string, overrides: Partial<Task> = {}): Task => ({
     id,
     title,
@@ -127,9 +136,7 @@ const task = (id: string, title: string, overrides: Partial<Task> = {}): Task =>
 type ProjectWorkspaceProps = ComponentProps<typeof ProjectWorkspace>;
 
 const defaultProps: ProjectWorkspaceProps = {
-    addProject: vi.fn(),
     addSection: vi.fn(),
-    addTask: vi.fn(),
     allTasks: [],
     allTokens: [],
     areaById: new Map(),
@@ -181,46 +188,44 @@ describe('ProjectWorkspace Select mode', () => {
         useUiStore.setState({ editingTaskId: null });
     });
 
-    it('keeps plain task add as fire-and-forget without opening edit mode', async () => {
-        const addTask = vi.fn().mockResolvedValue({ success: true, id: 'created-task' });
-        const setHighlightTask = vi.fn();
-        const { getByPlaceholderText, getByRole } = renderWorkspace({
-            addTask,
-            setHighlightTask,
-        });
+    it('opens global quick add with the selected project defaults', () => {
+        const quickAddListener = vi.fn();
+        window.addEventListener('mindwtr:quick-add', quickAddListener);
+        const { getByRole } = renderWorkspace();
 
-        fireEvent.change(getByPlaceholderText('Add task'), { target: { value: 'Draft launch checklist' } });
         fireEvent.click(getByRole('button', { name: 'Add task' }));
 
-        await waitFor(() => {
-            expect(addTask).toHaveBeenCalledWith('Draft launch checklist', expect.objectContaining({
+        expect(quickAddListener).toHaveBeenCalledTimes(1);
+        const event = quickAddListener.mock.calls[0]?.[0] as CustomEvent;
+        expect(event.detail).toEqual({
+            initialProps: {
                 projectId: project.id,
                 status: 'next',
-            }));
+            },
         });
-        expect(setHighlightTask).not.toHaveBeenCalled();
         expect(useUiStore.getState().editingTaskId).toBeNull();
+        window.removeEventListener('mindwtr:quick-add', quickAddListener);
     });
 
-    it('opens the created task only when add-and-edit is explicitly requested', async () => {
-        const addTask = vi.fn().mockResolvedValue({ success: true, id: 'created-task' });
-        const setHighlightTask = vi.fn();
-        const { getByPlaceholderText, getByRole } = renderWorkspace({
-            addTask,
-            setHighlightTask,
+    it('opens global quick add with section defaults from section add buttons', () => {
+        const quickAddListener = vi.fn();
+        window.addEventListener('mindwtr:quick-add', quickAddListener);
+        const { getAllByRole } = renderWorkspace({
+            sections: [projectSection],
         });
 
-        fireEvent.change(getByPlaceholderText('Add task'), { target: { value: 'Add launch brief' } });
-        fireEvent.click(getByRole('button', { name: 'Add task / Edit' }));
+        fireEvent.click(getAllByRole('button', { name: 'Add task' })[1]);
 
-        await waitFor(() => {
-            expect(addTask).toHaveBeenCalledWith('Add launch brief', expect.objectContaining({
+        expect(quickAddListener).toHaveBeenCalledTimes(1);
+        const event = quickAddListener.mock.calls[0]?.[0] as CustomEvent;
+        expect(event.detail).toEqual({
+            initialProps: {
                 projectId: project.id,
+                sectionId: projectSection.id,
                 status: 'next',
-            }));
+            },
         });
-        expect(setHighlightTask).toHaveBeenCalledWith('created-task');
-        expect(useUiStore.getState().editingTaskId).toBe('created-task');
+        window.removeEventListener('mindwtr:quick-add', quickAddListener);
     });
 
     it('shows bulk organize and area assignment for selected project tasks', () => {

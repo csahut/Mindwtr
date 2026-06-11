@@ -10,6 +10,7 @@ const {
   addProject,
   updateSettings,
   showToast,
+  openTaskScreen,
   getUsedTaskTokens,
   parseQuickAdd,
   selectStore,
@@ -18,6 +19,7 @@ const {
   const addProject = vi.fn();
   const updateSettings = vi.fn();
   const showToast = vi.fn();
+  const openTaskScreen = vi.fn();
   const getUsedTaskTokens = vi.fn<() => string[]>(() => []);
   const parseQuickAdd = vi.fn<(input: string) => any>((input: string) => ({
     title: input,
@@ -42,6 +44,7 @@ const {
     addProject,
     updateSettings,
     showToast,
+    openTaskScreen,
     getUsedTaskTokens,
     parseQuickAdd,
     selectStore,
@@ -74,6 +77,10 @@ vi.mock('@mindwtr/core', () => ({
   },
   safeParseDate: () => null,
   shallow: (left: unknown, right: unknown) => left === right,
+  tFallback: (t: (key: string) => string, key: string, fallback: string) => {
+    const value = t(key);
+    return value && value !== key ? value : fallback;
+  },
   useTaskStore: selectStore,
 }));
 
@@ -124,6 +131,10 @@ vi.mock('@/hooks/use-theme-colors', () => ({
     text: '#f8fafc',
     tint: '#3b82f6',
   }),
+}));
+
+vi.mock('@/lib/task-meta-navigation', () => ({
+  openTaskScreen,
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -325,6 +336,44 @@ describe('QuickCaptureSheet save handling', () => {
       resolveAddTask?.({ success: true, id: 'task-1' });
       await Promise.resolve();
     });
+  });
+
+  it('opens the created task when save and edit is requested', async () => {
+    addTask.mockResolvedValueOnce({ success: true, id: 'task-new' });
+    const onClose = vi.fn();
+    selectStore.getState().projects = [{
+      id: 'project-1',
+      title: 'Launch',
+      status: 'active',
+    }];
+
+    let tree!: ReturnType<typeof create>;
+    await act(async () => {
+      tree = create(
+        <QuickCaptureSheet
+          visible
+          openRequestId={1}
+          initialValue="Draft launch brief"
+          initialProps={{ projectId: 'project-1', status: 'next' }}
+          onClose={onClose}
+        />
+      );
+      await Promise.resolve();
+    });
+
+    const body = tree.root.findAll((node) => String(node.type) === 'QuickCaptureSheetBody')[0];
+    if (!body) throw new Error('QuickCaptureSheetBody not found');
+    await act(async () => {
+      body.props.handleSaveAndEdit();
+      await Promise.resolve();
+    });
+
+    expect(addTask).toHaveBeenCalledWith('Draft launch brief', expect.objectContaining({
+      projectId: 'project-1',
+      status: 'next',
+    }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(openTaskScreen).toHaveBeenCalledWith('task-new', 'project-1', 'task');
   });
 
   it('saves picker due dates as date-only values', async () => {

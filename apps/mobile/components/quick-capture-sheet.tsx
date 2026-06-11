@@ -26,6 +26,7 @@ import { useMobileAreaFilter } from '@/hooks/use-mobile-area-filter';
 import { useToast } from '@/contexts/toast-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { logError, logWarn } from '../lib/app-log';
+import { openTaskScreen } from '@/lib/task-meta-navigation';
 import {
   buildCaptureExtra,
   normalizeContextToken,
@@ -56,6 +57,12 @@ const resolveInitialContextTokens = (contexts?: string[]): string[] => (
     )
   )
 );
+
+const getCreatedTaskId = (result: unknown): string | null => {
+  if (!result || typeof result !== 'object') return null;
+  const maybeId = (result as { id?: unknown }).id;
+  return typeof maybeId === 'string' && maybeId.trim() ? maybeId : null;
+};
 
 export function QuickCaptureSheet({
   visible,
@@ -453,7 +460,7 @@ export function QuickCaptureSheet({
     finalizeClose();
   }, [finalizeClose, recording, recordingBusy, stopRecording]);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async ({ openAfterSave = false }: { openAfterSave?: boolean } = {}) => {
     if (!value.trim()) return;
     if (isSavingRef.current) return;
     isSavingRef.current = true;
@@ -470,7 +477,16 @@ export function QuickCaptureSheet({
       }
       if (!title.trim()) return;
 
-      await addTask(title, props);
+      const addTaskResult = await addTask(title, props);
+      const createdTaskId = getCreatedTaskId(addTaskResult);
+
+      if (openAfterSave) {
+        finalizeClose();
+        if (createdTaskId) {
+          openTaskScreen(createdTaskId, props.projectId, 'task');
+        }
+        return;
+      }
 
       if (addAnother) {
         resetDraftState({ keepAddAnother: true, value: '' });
@@ -759,6 +775,9 @@ export function QuickCaptureSheet({
         handleClose={handleClose}
         handleSave={() => {
           void handleSave();
+        }}
+        handleSaveAndEdit={() => {
+          void handleSave({ openAfterSave: true });
         }}
         insetsBottom={insets.bottom}
         inputRef={inputRef}

@@ -1,13 +1,14 @@
 import React from 'react';
-import { Keyboard, KeyboardAvoidingView, ScrollView, TouchableOpacity } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, ScrollView, Text, TouchableOpacity } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import CaptureScreen from '@/app/capture-modal';
 
-const { parseQuickAdd, routerMocks, routeParams, storeState } = vi.hoisted(() => {
+const { openTaskScreen, parseQuickAdd, routerMocks, routeParams, storeState } = vi.hoisted(() => {
   const parseQuickAdd = vi.fn<(value: string) => any>((value: string) => ({ title: value, props: {}, invalidDateCommands: [] }));
   return {
+    openTaskScreen: vi.fn(),
     parseQuickAdd,
     routerMocks: {
       back: vi.fn(),
@@ -46,6 +47,10 @@ vi.mock('@mindwtr/core', () => ({
   )),
   parseQuickAdd,
   shallow: (left: unknown, right: unknown) => Object.is(left, right),
+  tFallback: (t: (key: string) => string, key: string, fallback: string) => {
+    const value = t(key);
+    return value && value !== key ? value : fallback;
+  },
   useTaskStore: (selector?: (state: typeof storeState) => unknown) => (
     typeof selector === 'function' ? selector(storeState) : storeState
   ),
@@ -100,6 +105,19 @@ vi.mock('@/lib/app-log', () => ({
   logError: vi.fn(),
 }));
 
+vi.mock('@/lib/task-meta-navigation', () => ({
+  openTaskScreen,
+}));
+
+const findTouchableByText = (tree: ReturnType<typeof create>, label: string) => {
+  const button = tree.root.findAll((node) => (
+    node.type === TouchableOpacity
+    && node.findAllByType(Text).some((child) => child.props.children === label)
+  ))[0];
+  if (!button) throw new Error(`TouchableOpacity not found for ${label}`);
+  return button;
+};
+
 describe('CaptureScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -107,6 +125,7 @@ describe('CaptureScreen', () => {
     routerMocks.canGoBack.mockReturnValue(false);
     routeParams.current = { text: encodeURIComponent('Shared text') };
     storeState.addProject.mockResolvedValue(null);
+    storeState.addTask.mockResolvedValue({ success: true, id: 'task-created' });
     storeState.projects = [];
     storeState.areas = [];
   });
@@ -199,7 +218,7 @@ describe('CaptureScreen', () => {
       tree = create(<CaptureScreen />);
     });
 
-    const saveButton = tree.root.findAllByType(TouchableOpacity)[2];
+    const saveButton = findTouchableByText(tree, 'Save');
 
     await act(async () => {
       await saveButton.props.onPress();
@@ -233,7 +252,7 @@ describe('CaptureScreen', () => {
       tree = create(<CaptureScreen />);
     });
 
-    const saveButton = tree.root.findAllByType(TouchableOpacity)[2];
+    const saveButton = findTouchableByText(tree, 'Save');
 
     await act(async () => {
       await saveButton.props.onPress();
@@ -263,7 +282,7 @@ describe('CaptureScreen', () => {
       tree = create(<CaptureScreen />);
     });
 
-    const saveButton = tree.root.findAllByType(TouchableOpacity)[2];
+    const saveButton = findTouchableByText(tree, 'Save');
 
     await act(async () => {
       await saveButton.props.onPress();
@@ -289,7 +308,7 @@ describe('CaptureScreen', () => {
       tree = create(<CaptureScreen />);
     });
 
-    const saveButton = tree.root.findAllByType(TouchableOpacity)[2];
+    const saveButton = findTouchableByText(tree, 'Save');
 
     await act(async () => {
       await saveButton.props.onPress();
@@ -320,7 +339,7 @@ describe('CaptureScreen', () => {
       tree = create(<CaptureScreen />);
     });
 
-    const saveButton = tree.root.findAllByType(TouchableOpacity)[2];
+    const saveButton = findTouchableByText(tree, 'Save');
 
     await act(async () => {
       await saveButton.props.onPress();
@@ -332,5 +351,40 @@ describe('CaptureScreen', () => {
       projectId: 'project-launch',
       areaId: undefined,
     });
+  });
+
+  it('opens the created task when save and edit is requested', async () => {
+    routeParams.current = {
+      initialValue: encodeURIComponent('Project task'),
+      initialProps: encodeURIComponent(JSON.stringify({
+        projectId: 'project-1',
+        status: 'next',
+      })),
+    };
+    storeState.projects = [{
+      id: 'project-1',
+      title: 'Launch',
+      status: 'active',
+    }];
+    storeState.addTask.mockResolvedValueOnce({ success: true, id: 'task-new' });
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<CaptureScreen />);
+    });
+
+    const saveAndEditButton = findTouchableByText(tree, 'Save & edit');
+
+    await act(async () => {
+      await saveAndEditButton.props.onPress();
+    });
+
+    expect(storeState.addTask).toHaveBeenCalledWith('Project task', {
+      status: 'next',
+      projectId: 'project-1',
+    });
+    expect(openTaskScreen).toHaveBeenCalledWith('task-new', 'project-1', 'task');
+    expect(routerMocks.replace).not.toHaveBeenCalledWith('/inbox');
   });
 });

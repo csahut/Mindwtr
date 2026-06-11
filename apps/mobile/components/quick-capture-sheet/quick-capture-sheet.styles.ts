@@ -219,6 +219,23 @@ export const styles = StyleSheet.create({
     flexShrink: 0,
     justifyContent: 'center',
   },
+  saveActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    flexShrink: 1,
+    flexWrap: 'wrap',
+  },
+  saveAndEditButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    minWidth: 112,
+  },
+  saveAndEditText: {
+    fontWeight: '700',
+    fontSize: 13,
+  },
   saveText: {
     color: '#FFFFFF',
     fontWeight: '700',

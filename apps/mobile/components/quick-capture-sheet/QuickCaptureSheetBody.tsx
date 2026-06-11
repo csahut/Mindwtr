@@ -19,6 +19,7 @@ interface QuickCaptureSheetBodyProps {
   dueTimeLabel: string;
   handleClose: () => void;
   handleSave: () => void;
+  handleSaveAndEdit?: () => void;
   insetsBottom: number;
   inputRef: RefObject<TextInput | null>;
   onOpenAreaPicker: () => void;
@@ -64,6 +65,7 @@ export function QuickCaptureSheetBody({
   dueTimeLabel,
   handleClose,
   handleSave,
+  handleSaveAndEdit,
   insetsBottom,
   inputRef,
   onOpenAreaPicker,
@@ -417,23 +419,48 @@ export function QuickCaptureSheetBody({
                   {t('quickAdd.addAnother')}
                 </Text>
               </View>
-              <TouchableOpacity
-                onPress={handleSave}
-                style={[styles.saveButton, { backgroundColor: tc.tint, opacity: value.trim() ? 1 : 0.5 }]}
-                disabled={!value.trim()}
-                accessibilityRole="button"
-                accessibilityLabel={t('common.save')}
-              >
-                <Text
-                  style={styles.saveText}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
-                  maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
+              <View style={styles.saveActions}>
+                {handleSaveAndEdit ? (
+                  <TouchableOpacity
+                    onPress={handleSaveAndEdit}
+                    style={[
+                      styles.saveButton,
+                      styles.saveAndEditButton,
+                      { borderColor: tc.border, opacity: value.trim() ? 1 : 0.5 },
+                    ]}
+                    disabled={!value.trim()}
+                    accessibilityRole="button"
+                    accessibilityLabel={tFallback(t, 'quickAdd.saveAndEdit', 'Save & edit')}
+                  >
+                    <Text
+                      style={[styles.saveAndEditText, { color: tc.text }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                      maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
+                    >
+                      {tFallback(t, 'quickAdd.saveAndEdit', 'Save & edit')}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  onPress={handleSave}
+                  style={[styles.saveButton, { backgroundColor: tc.tint, opacity: value.trim() ? 1 : 0.5 }]}
+                  disabled={!value.trim()}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.save')}
                 >
-                  {t('common.save')}
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={styles.saveText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                    maxFontSizeMultiplier={COMPACT_TEXT_MAX_SCALE}
+                  >
+                    {t('common.save')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </KeyboardAvoidingView>

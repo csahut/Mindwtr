@@ -26,7 +26,9 @@ import { encodeWav, resampleAudio } from '../lib/audio-utils';
 import { getPreferredDesktopAudioCaptureBackend } from '../lib/audio-capture-backend';
 import { processAudioCapture, type SpeechToTextResult } from '../lib/speech-to-text';
 import { DEFAULT_WHISPER_MODEL } from '../lib/speech-models';
+import { dispatchNavigateEvent } from '../lib/navigation-events';
 import { ModalPortal } from './ModalPortal';
+import { useUiStore } from '../store/ui-store';
 import {
     QUICK_ADD_NATIVE_TARGET_MAIN,
     QUICK_ADD_NATIVE_TARGET_WINDOW,
@@ -55,6 +57,12 @@ type QuickAddOpenDetail = {
     initialValue?: string;
     captureMode?: 'text' | 'audio';
 };
+
+function getCreatedTaskId(result: unknown): string | null {
+    if (!result || typeof result !== 'object') return null;
+    const maybeId = (result as { id?: unknown }).id;
+    return typeof maybeId === 'string' && maybeId.trim() ? maybeId : null;
+}
 
 function getClipboardImageFiles(data: DataTransfer | null): File[] {
     if (!data) return [];
@@ -101,16 +109,19 @@ async function readClipboardFileBytes(file: File): Promise<Uint8Array> {
 
 export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) {
     const getDerivedState = useTaskStore((state) => state.getDerivedState);
-    const { addTask, addProject, projects, areas, settings } = useTaskStore(
+    const { addTask, addProject, projects, areas, settings, setHighlightTask } = useTaskStore(
         (state) => ({
             addTask: state.addTask,
             addProject: state.addProject,
             projects: state.projects,
             areas: state.areas,
             settings: state.settings,
+            setHighlightTask: state.setHighlightTask,
         }),
         shallow
     );
+    const setProjectView = useUiStore((state) => state.setProjectView);
+    const setEditingTaskId = useUiStore((state) => state.setEditingTaskId);
     const { allContexts, allTags } = getDerivedState();
     const suggestionTokens = useMemo(
         () => Array.from(new Set([...allContexts, ...allTags])).sort(),
@@ -735,6 +746,35 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
         close();
     };
 
+    const openCreatedTaskForEditing = useCallback((taskId: string, props: Partial<Task>) => {
+        setHighlightTask(taskId);
+        setEditingTaskId(taskId);
+        if (props.projectId) {
+            setProjectView({ selectedProjectId: props.projectId });
+            dispatchNavigateEvent('projects');
+            return;
+        }
+        switch (props.status) {
+            case 'next':
+                dispatchNavigateEvent('next');
+                return;
+            case 'waiting':
+                dispatchNavigateEvent('waiting');
+                return;
+            case 'someday':
+                dispatchNavigateEvent('someday');
+                return;
+            case 'reference':
+                dispatchNavigateEvent('reference');
+                return;
+            case 'done':
+                dispatchNavigateEvent('done');
+                return;
+            default:
+                dispatchNavigateEvent('inbox');
+        }
+    }, [setEditingTaskId, setHighlightTask, setProjectView]);
+
     useEffect(() => {
         if (!isOpen) return;
         const handler = (event: KeyboardEvent) => {
@@ -746,8 +786,7 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
         return () => window.removeEventListener('keydown', handler);
     }, [handleClose, isOpen]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const saveTask = async ({ openAfterSave = false }: { openAfterSave?: boolean } = {}) => {
         if (isPastingImage) return;
         const hasPastedAttachments = pastedAttachments.length > 0;
         if (!value.trim() && !hasPastedAttachments) return;
@@ -804,11 +843,20 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
         if (!baseProps.status) mergedProps.status = 'inbox';
         const addTaskResult = await addTask(finalTitle, mergedProps);
         if (!addTaskResult.success) return;
+        const createdTaskId = getCreatedTaskId(addTaskResult);
         if (standaloneWindow) {
             await flushPendingSave().catch((error) => reportError('Failed to save quick add task', error));
             await notifyStandaloneTaskSaved();
         }
         close({ keepPastedImages: true });
+        if (openAfterSave && createdTaskId && !standaloneWindow) {
+            openCreatedTaskForEditing(createdTaskId, mergedProps);
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await saveTask();
     };
 
     const scheduledLabel = initialProps?.startTime
@@ -980,6 +1028,21 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
                             >
                                 {t('common.cancel')}
                             </button>
+                            {!standaloneWindow && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        void saveTask({ openAfterSave: true });
+                                    }}
+                                    disabled={saveDisabled}
+                                    className={cn(
+                                        'px-3 py-1.5 rounded-md text-sm border border-border bg-background hover:bg-muted/60',
+                                        saveDisabled && 'opacity-50 cursor-not-allowed hover:bg-background',
+                                    )}
+                                >
+                                    {tFallback(t, 'quickAdd.saveAndEdit', 'Save & edit')}
+                                </button>
+                            )}
                             <button
                                 type="submit"
                                 disabled={saveDisabled}

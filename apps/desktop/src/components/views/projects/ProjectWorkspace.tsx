@@ -16,8 +16,6 @@ import {
     type StoreActionResult,
     type TaskStatus,
     generateUUID,
-    getQuickAddProjectInitialProps,
-    parseQuickAdd,
     sortTasksBy,
     splitCompletedTasks,
     updateRangeSelection,
@@ -29,7 +27,6 @@ import { ArrowDown, ArrowUp, CheckCircle2, ChevronDown, ChevronRight, FileText, 
 import { PromptModal } from '../../PromptModal';
 import { TokenPickerModal } from '../../TokenPickerModal';
 import { TaskItem } from '../../TaskItem';
-import { TaskInput } from '../../Task/TaskInput';
 import { BulkSelectionToolbar } from '../list/BulkSelectionToolbar';
 import { ListBulkActions } from '../list/ListBulkActions';
 import { TaskBulkOrganizeModal } from '../list/TaskBulkOrganizeModal';
@@ -52,7 +49,6 @@ import {
     toDateTimeLocalValue,
 } from './projects-utils';
 import type { ConfirmationRequestOptions } from '../../../hooks/useConfirmDialog';
-import { useUiStore } from '../../../store/ui-store';
 
 const projectTaskDndMeasuring = {
     droppable: {
@@ -189,31 +185,10 @@ type BulkTokenPickerState = {
     action: 'add' | 'remove';
 } | null;
 
-type AddProjectTaskResult = {
-    added: boolean;
-    taskId: string | null;
-};
-
 type ProjectTaskSortBy = 'default' | 'due';
 
-function getCreatedTaskId(result: unknown): string | null {
-    if (!result || typeof result !== 'object') return null;
-    const maybeId = (result as { id?: unknown }).id;
-    return typeof maybeId === 'string' && maybeId.trim() ? maybeId : null;
-}
-
-function isFailedStoreAction(result: unknown): result is { success: false; error?: string } {
-    return Boolean(result && typeof result === 'object' && (result as { success?: unknown }).success === false);
-}
-
 type ProjectWorkspaceProps = {
-    addProject: (
-        title: string,
-        color: string,
-        options?: { areaId?: string }
-    ) => Promise<Project | null | undefined> | Project | null | undefined;
     addSection: (projectId: string, title: string) => Promise<unknown> | unknown;
-    addTask: (title: string, initialProps?: Partial<Task>) => Promise<unknown> | unknown;
     allTasks: Task[];
     allTokens: string[];
     areaById: Map<string, Area>;
@@ -287,9 +262,7 @@ export function shouldShowProjectWorkspaceTask(
 }
 
 export function ProjectWorkspace({
-    addProject,
     addSection,
-    addTask,
     allTasks,
     allTokens,
     areaById,
@@ -335,13 +308,9 @@ export function ProjectWorkspace({
     const [sectionDraft, setSectionDraft] = useState('');
     const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
     const [sectionNotesOpen, setSectionNotesOpen] = useState<Record<string, boolean>>({});
-    const [showSectionTaskPrompt, setShowSectionTaskPrompt] = useState(false);
-    const [sectionTaskDraft, setSectionTaskDraft] = useState('');
-    const [sectionTaskTargetId, setSectionTaskTargetId] = useState<string | null>(null);
     const [tagDraft, setTagDraft] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [editProjectTitle, setEditProjectTitle] = useState('');
-    const [projectTaskTitle, setProjectTaskTitle] = useState('');
     const [projectTaskSortBy, setProjectTaskSortBy] = useState<ProjectTaskSortBy>('default');
     const [projectDetailsExpanded, setProjectDetailsExpanded] = useState(false);
     const [isProjectDeleting, setIsProjectDeleting] = useState(false);
@@ -356,12 +325,22 @@ export function ProjectWorkspace({
     const projectScrollRef = useRef<HTMLDivElement | null>(null);
     const isArchivedProject = selectedProject?.status === 'archived';
     const shouldGroupCompletedTasks = Boolean(selectedProject && !isArchivedProject && showCompletedTasks);
-    const setEditingTaskId = useUiStore((state) => state.setEditingTaskId);
     const resolveText = useCallback((key: string, fallback: string) => {
         const value = t(key);
         return value && value !== key ? value : fallback;
     }, [t]);
-    const addAndEditTaskLabel = `${resolveText('projects.addTask', 'Add task')} / ${resolveText('common.edit', 'Edit')}`;
+    const openProjectQuickAdd = useCallback((sectionId?: string | null) => {
+        if (!selectedProject) return;
+        window.dispatchEvent(new CustomEvent('mindwtr:quick-add', {
+            detail: {
+                initialProps: {
+                    projectId: selectedProject.id,
+                    status: 'next',
+                    ...(sectionId ? { sectionId } : {}),
+                },
+            },
+        }));
+    }, [selectedProject]);
 
     const {
         handleAddSection,
@@ -369,7 +348,6 @@ export function ProjectWorkspace({
         handleDeleteSection,
         handleToggleSection,
         handleToggleSectionNotes,
-        handleOpenSectionTaskPrompt,
     } = useProjectSectionActions({
         t,
         selectedProject,
@@ -379,9 +357,6 @@ export function ProjectWorkspace({
         deleteSection,
         updateSection,
         setSectionNotesOpen,
-        setSectionTaskTargetId,
-        setSectionTaskDraft,
-        setShowSectionTaskPrompt,
         requestConfirmation,
     });
 
@@ -406,10 +381,6 @@ export function ProjectWorkspace({
     }, [selectedProject?.id, selectedProject?.tagIds]);
 
     useEffect(() => {
-        setProjectTaskTitle('');
-    }, [selectedProject?.id]);
-
-    useEffect(() => {
         setProjectTaskSortBy('default');
     }, [selectedProject?.id]);
 
@@ -423,8 +394,6 @@ export function ProjectWorkspace({
 
     useEffect(() => {
         setSectionNotesOpen({});
-        setShowSectionTaskPrompt(false);
-        setSectionTaskTargetId(null);
     }, [selectedProjectId]);
 
     const projectTaskSource = selectedProjectTasks ?? allTasks;
@@ -1042,7 +1011,7 @@ export function ProjectWorkspace({
                                     )}
                                     <button
                                         type="button"
-                                        onClick={() => handleOpenSectionTaskPrompt(group.section.id)}
+                                        onClick={() => openProjectQuickAdd(group.section.id)}
                                         className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground"
                                         aria-label={t('projects.addTask')}
                                     >
@@ -1301,83 +1270,6 @@ export function ProjectWorkspace({
         ? t('taskEdit.tagsPlaceholder')
         : t('taskEdit.contextsPlaceholder');
 
-    const handleAddTaskForProject = useCallback(
-        async (value: string, sectionId?: string | null): Promise<AddProjectTaskResult> => {
-            const notAdded = { added: false, taskId: null };
-            if (!selectedProject) return notAdded;
-            const {
-                title: parsedTitle,
-                props,
-                projectTitle,
-                invalidDateCommands,
-            } = parseQuickAdd(value, projects, new Date(), areas);
-            if (invalidDateCommands && invalidDateCommands.length > 0) {
-                showToast(`${t('quickAdd.invalidDateCommand')}: ${invalidDateCommands.join(', ')}`, 'error');
-                return notAdded;
-            }
-
-            const finalTitle = (parsedTitle || value).trim();
-            if (!finalTitle) return notAdded;
-
-            const initialProps: Partial<Task> = {
-                projectId: selectedProject.id,
-                status: 'next',
-                ...props,
-            };
-            if (!props.status) initialProps.status = 'next';
-            if (!props.projectId) initialProps.projectId = selectedProject.id;
-
-            if (!initialProps.projectId && projectTitle) {
-                const created = await addProject(
-                    projectTitle,
-                    DEFAULT_AREA_COLOR,
-                    getQuickAddProjectInitialProps(props, selectedProject.areaId),
-                );
-                if (!created) return notAdded;
-                initialProps.projectId = created.id;
-            }
-
-            if (sectionId && initialProps.projectId === selectedProject.id) {
-                initialProps.sectionId = sectionId;
-            } else {
-                initialProps.sectionId = undefined;
-            }
-
-            try {
-                const result = await addTask(finalTitle, initialProps);
-                if (isFailedStoreAction(result)) {
-                    showToast(result.error || t('projects.addTaskFailed') || 'Failed to add task', 'error');
-                    return notAdded;
-                }
-                return { added: true, taskId: getCreatedTaskId(result) };
-            } catch (error) {
-                reportError('Failed to add task to project', error);
-                showToast(t('projects.addTaskFailed') || 'Failed to add task', 'error');
-                return notAdded;
-            }
-        },
-        [addProject, addTask, areas, projects, selectedProject, showToast, t],
-    );
-
-    const handleAddProjectTaskSubmit = useCallback(async () => {
-        if (!projectTaskTitle.trim()) return;
-        const result = await handleAddTaskForProject(projectTaskTitle);
-        if (result.added) {
-            setProjectTaskTitle('');
-        }
-    }, [handleAddTaskForProject, projectTaskTitle]);
-
-    const handleAddProjectTaskAndEdit = useCallback(async () => {
-        if (!projectTaskTitle.trim()) return;
-        const result = await handleAddTaskForProject(projectTaskTitle);
-        if (!result.added) return;
-        setProjectTaskTitle('');
-        if (result.taskId) {
-            setHighlightTask(result.taskId);
-            setEditingTaskId(result.taskId);
-        }
-    }, [handleAddTaskForProject, projectTaskTitle, setEditingTaskId, setHighlightTask]);
-
     return (
         <>
             <div className="flex-1 min-w-0 h-full flex">
@@ -1512,48 +1404,14 @@ export function ProjectWorkspace({
                             <section className="border-t border-border/50 py-5">
                                 <div className="sticky top-0 z-20 -mx-2 mb-4 border-y border-border/60 bg-background/95 px-2 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85">
                                     {!isArchivedProject && (
-                                        <form
-                                            onSubmit={async (event) => {
-                                                event.preventDefault();
-                                                await handleAddProjectTaskSubmit();
-                                            }}
-                                            className="mb-3 flex gap-2"
+                                        <button
+                                            type="button"
+                                            onClick={() => openProjectQuickAdd()}
+                                            className="mb-3 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                                         >
-                                            <TaskInput
-                                                value={projectTaskTitle}
-                                                projects={projects}
-                                                contexts={allTokens}
-                                                areas={areas}
-                                                onCreateProject={async (title) => {
-                                                    const created = await addProject(
-                                                        title,
-                                                        DEFAULT_AREA_COLOR,
-                                                        getQuickAddProjectInitialProps({}, selectedProject.areaId),
-                                                    );
-                                                    return created?.id ?? null;
-                                                }}
-                                                onChange={(next) => setProjectTaskTitle(next)}
-                                                placeholder={t('projects.addTaskPlaceholder')}
-                                                containerClassName="flex-1"
-                                                className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                            />
-                                            <button
-                                                type="submit"
-                                                className="h-9 whitespace-nowrap rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                                            >
-                                                {t('projects.addTask')}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={handleAddProjectTaskAndEdit}
-                                                disabled={!projectTaskTitle.trim()}
-                                                aria-label={addAndEditTaskLabel}
-                                                title={addAndEditTaskLabel}
-                                                className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
-                                            >
-                                                <Pencil className="h-4 w-4" aria-hidden="true" />
-                                            </button>
-                                        </form>
+                                            <Plus className="h-4 w-4" aria-hidden="true" />
+                                            {t('projects.addTask')}
+                                        </button>
                                     )}
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -1713,28 +1571,6 @@ export function ProjectWorkspace({
                     setShowSectionPrompt(false);
                     setEditingSectionId(null);
                     setSectionDraft('');
-                }}
-            />
-
-            <PromptModal
-                isOpen={showSectionTaskPrompt}
-                title={t('projects.addTask')}
-                description={t('projects.addTaskPlaceholder')}
-                placeholder={t('projects.addTaskPlaceholder')}
-                defaultValue={sectionTaskDraft}
-                confirmLabel={t('projects.addTask')}
-                cancelLabel={t('common.cancel')}
-                onCancel={() => {
-                    setShowSectionTaskPrompt(false);
-                    setSectionTaskTargetId(null);
-                    setSectionTaskDraft('');
-                }}
-                onConfirm={async (value) => {
-                    if (!sectionTaskTargetId) return;
-                    await handleAddTaskForProject(value, sectionTaskTargetId);
-                    setShowSectionTaskPrompt(false);
-                    setSectionTaskTargetId(null);
-                    setSectionTaskDraft('');
                 }}
             />
 
