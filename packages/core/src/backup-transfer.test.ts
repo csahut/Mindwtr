@@ -38,6 +38,7 @@ const buildAppData = (): AppData => {
         ],
         sections: [],
         areas: [],
+        people: [],
         settings: {},
     };
 };

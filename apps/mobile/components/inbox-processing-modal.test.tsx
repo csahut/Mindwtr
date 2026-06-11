@@ -145,6 +145,38 @@ vi.mock('@mindwtr/core', () => {
     isSelectableProjectForTaskAssignment: vi.fn((project: any) => (
       !project.deletedAt && project.status !== 'archived' && project.status !== 'completed'
     )),
+    getPersonSuggestionNames: vi.fn((people: any[] | undefined, tasks: any[], value: string | undefined, limit: number) => {
+      const query = (value ?? '').trim().toLowerCase();
+      if (!query) return [];
+      const names = new Map<string, { name: string; lastUsedAt: number }>();
+      for (const person of people ?? []) {
+        if (person.deletedAt || typeof person.name !== 'string') continue;
+        const name = person.name.trim();
+        if (!name) continue;
+        names.set(name.toLowerCase(), {
+          name,
+          lastUsedAt: Date.parse(person.updatedAt || person.createdAt || '') || 0,
+        });
+      }
+      for (const task of tasks) {
+        if (task.deletedAt || typeof task.assignedTo !== 'string') continue;
+        const name = task.assignedTo.trim();
+        if (!name) continue;
+        const key = name.toLowerCase();
+        const current = names.get(key);
+        const lastUsedAt = Date.parse(task.updatedAt || task.createdAt || '') || 0;
+        names.set(key, {
+          name: current?.name ?? name,
+          lastUsedAt: Math.max(current?.lastUsedAt ?? 0, lastUsedAt),
+        });
+      }
+      return Array.from(names.values())
+        .filter((entry) => entry.name.toLowerCase().includes(query))
+        .filter((entry) => entry.name.toLowerCase() !== query)
+        .sort((left, right) => right.lastUsedAt - left.lastUsedAt || left.name.localeCompare(right.name))
+        .slice(0, limit)
+        .map((entry) => entry.name);
+    }),
     isTaskInActiveProject: vi.fn(() => true),
     normalizeClockTimeInput: vi.fn((value?: string | null) => {
       const trimmed = String(value ?? '').trim();

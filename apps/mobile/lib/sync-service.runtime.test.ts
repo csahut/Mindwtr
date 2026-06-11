@@ -7,6 +7,7 @@ const emptyData = {
   projects: [],
   sections: [],
   areas: [],
+  people: [],
   settings: {},
 };
 
@@ -839,6 +840,7 @@ describe('mobile sync-service runtime', () => {
       projects: [],
       sections: [],
       areas: [],
+      people: [],
       settings: {
         syncPreferences: { appearance: true },
         syncPreferencesUpdatedAt: {

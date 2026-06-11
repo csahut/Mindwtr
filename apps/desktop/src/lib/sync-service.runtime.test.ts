@@ -45,6 +45,7 @@ const localData: AppData = {
     projects: [],
     sections: [],
     areas: [],
+    people: [],
     settings: {},
 };
 
@@ -140,6 +141,7 @@ describe('desktop sync-service runtime', () => {
             projects: [],
             sections: [],
             areas: [],
+            people: [],
             settings: {},
         }));
         externalCalendarGetMock.mockResolvedValue([]);
@@ -151,6 +153,7 @@ describe('desktop sync-service runtime', () => {
             projects: [],
             sections: [],
             areas: [],
+            people: [],
             settings: {},
         });
         writeRemoteCloudKitMock.mockResolvedValue(undefined);
@@ -577,6 +580,7 @@ describe('desktop sync-service runtime', () => {
                 projects: [],
                 sections: [],
                 areas: [],
+                people: [],
                 settings: {},
             });
             return { status: 'success', stats: emptyStats, data: merged };
@@ -597,6 +601,7 @@ describe('desktop sync-service runtime', () => {
             projects: [],
             sections: [],
             areas: [],
+            people: [],
             settings: {
                 syncPreferences: { appearance: true },
                 syncPreferencesUpdatedAt: {
@@ -674,6 +679,7 @@ describe('desktop sync-service runtime', () => {
             projects: [],
             sections: [],
             areas: [],
+            people: [],
             settings: {
                 syncPreferences: { appearance: true },
                 theme: 'dark',
@@ -724,6 +730,7 @@ describe('desktop sync-service runtime', () => {
             projects: [],
             sections: [],
             areas: [],
+            people: [],
             settings: {},
         };
         const remoteFingerprint = 'webdav:v1:etag="fast"';
@@ -794,6 +801,7 @@ describe('desktop sync-service runtime', () => {
             projects: [],
             sections: [],
             areas: [],
+            people: [],
             settings: {},
         };
         const remoteChangedData: AppData = {
