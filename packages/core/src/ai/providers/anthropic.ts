@@ -14,6 +14,7 @@ import type {
 import { buildBreakdownPrompt, buildClarifyPrompt, buildCopilotPrompt, buildReviewAnalysisPrompt } from '../prompts';
 import { fetchWithTimeout, normalizeTags, normalizeTimeEstimate, parseJson, rateLimit } from '../utils';
 import { isBreakdownResponse, isClarifyResponse, isCopilotResponse, isReviewAnalysisResponse } from '../validators';
+import { sleep } from '../../async-utils';
 
 const ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -21,7 +22,6 @@ const MAX_RETRIES = 2;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 const DEFAULT_MAX_TOKENS = 1024;
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const resolveTimeoutMs = (value?: number) =>
     typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : DEFAULT_TIMEOUT_MS;
 

@@ -2,6 +2,7 @@ import type { AIProvider, AIProviderConfig, BreakdownInput, BreakdownResponse, C
 import { buildBreakdownPrompt, buildClarifyPrompt, buildCopilotPrompt, buildReviewAnalysisPrompt } from '../prompts';
 import { fetchWithTimeout, normalizeTags, normalizeTimeEstimate, parseJson, rateLimit } from '../utils';
 import { isBreakdownResponse, isClarifyResponse, isCopilotResponse, isReviewAnalysisResponse } from '../validators';
+import { sleep } from '../../async-utils';
 
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -20,7 +21,6 @@ interface GeminiResponse {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const resolveTimeoutMs = (value?: number) =>
     typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : DEFAULT_TIMEOUT_MS;
 

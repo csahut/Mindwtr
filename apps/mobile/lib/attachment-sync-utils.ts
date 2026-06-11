@@ -4,9 +4,11 @@ import type { AppData, Attachment } from '@mindwtr/core';
 import {
   computeSha256Hex,
   createWebdavDownloadBackoff,
+  decodeUriSafe,
   globalProgressTracker,
   isDropboxUnauthorizedError,
   markAttachmentUnrecoverable,
+  sleep,
 } from '@mindwtr/core';
 import {
   CLOUD_TOKEN_KEY,
@@ -39,7 +41,7 @@ const webdavDownloadBackoff = createWebdavDownloadBackoff({
 });
 export const CLOUD_PROVIDER_DROPBOX = 'dropbox';
 
-export { markAttachmentUnrecoverable };
+export { markAttachmentUnrecoverable, sleep };
 
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const BASE64_LOOKUP = (() => {
@@ -64,8 +66,6 @@ export const logAttachmentWarn = (message: string, error?: unknown) => {
 export const logAttachmentInfo = (message: string, extra?: Record<string, string>) => {
   void logInfo(message, { scope: 'attachment', extra });
 };
-
-export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export const getWebdavDownloadBackoff = (attachmentId: string): number | null => {
   return webdavDownloadBackoff.getBlockedUntil(attachmentId);
@@ -170,14 +170,6 @@ export const extractExtension = (value?: string): string => {
 const stripUriQueryAndFragment = (value: string): string => (
   value.split('?')[0]?.split('#')[0] ?? value
 );
-
-const decodeUriSafe = (value: string): string => {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-};
 
 const getSafLeafName = (value: string): string => {
   const decoded = decodeUriSafe(value);

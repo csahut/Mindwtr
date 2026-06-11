@@ -2,7 +2,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from './file-system';
 import { Directory as ExpoDirectory, File as ExpoFile } from 'expo-file-system';
-import { AppData } from '@mindwtr/core';
+import { AppData, decodeUriSafe, sleep } from '@mindwtr/core';
 import { Platform } from 'react-native';
 import { logError, logInfo, logWarn } from './app-log';
 import { createSyncPathBookmark } from './sync-path-bookmarks';
@@ -37,10 +37,6 @@ const isPickerCanceledError = (error: unknown): boolean => {
     return /cancel/i.test(message);
 };
 
-function sleep(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 const normalizeDirectoryUri = (uri: string): string => uri.replace(/\/+$/, '');
 
 const buildSyncFileUri = (directoryUri: string, fileName = SYNC_FILE_NAME): string =>
@@ -56,14 +52,6 @@ const emptyPickResult = (fileUri: string, fileBookmark?: string | null): PickRes
     __fileBookmark: fileBookmark?.trim() || undefined,
     __icloud: isICloudUri(fileUri),
 });
-
-const decodeUriSafe = (value: string): string => {
-    try {
-        return decodeURIComponent(value);
-    } catch {
-        return value;
-    }
-};
 
 const isLikelySyncFileUri = (uri: string): boolean => {
     const decoded = decodeUriSafe(uri);

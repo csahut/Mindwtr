@@ -3,6 +3,7 @@ import {
     isSyncFilePath,
     normalizePath,
     normalizeSyncBackend,
+    sleep,
     toStableJson,
     type Attachment,
     type SyncBackend,
@@ -45,13 +46,6 @@ export const fallbackHashString = (value: string): string => {
     return (hash >>> 0).toString(16);
 };
 
-export const sleep = (ms: number) => new Promise<void>((resolve) => {
-    const timerHost = typeof window !== 'undefined' && typeof window.setTimeout === 'function'
-        ? window
-        : globalThis;
-    timerHost.setTimeout(resolve, ms);
-});
-
 export const yieldToRenderer = async (): Promise<void> => {
     if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
         await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
@@ -74,6 +68,7 @@ export {
     isSyncFilePath,
     normalizePath,
     normalizeSyncBackend,
+    sleep,
     toStableJson,
     type SyncBackend,
 };

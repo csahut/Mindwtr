@@ -9,7 +9,7 @@ import {
     writeFileSync,
 } from 'fs';
 import { basename, dirname, join, relative, resolve, sep } from 'path';
-import type { AppData } from '@mindwtr/core';
+import { sleep, type AppData } from '@mindwtr/core';
 import {
     ATTACHMENT_PATH_ALLOWLIST,
     CLOUD_DATA_LOCK_REFRESH_MS,
@@ -326,8 +326,6 @@ export function writeData(filePath: string, data: unknown) {
         }
     }
 }
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function getCloudLockPath(dataDir: string, key: string): string {
     return join(dataDir, '.locks', `${key}.lock`);

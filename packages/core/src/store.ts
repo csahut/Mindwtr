@@ -16,6 +16,7 @@ import { markCoreStartupPhase } from './startup-profiler';
 import { createProjectActions } from './store-projects';
 import { createSettingsActions } from './store-settings';
 import { createTaskActions } from './store-tasks';
+import { sleep } from './async-utils';
 
 export { applyTaskUpdates } from './store-helpers';
 
@@ -54,7 +55,6 @@ const SAVE_FLUSH_DELAY_MS = 120;
 const ERROR_AUTO_CLEAR_MS = 10_000;
 const SAVE_QUEUE_OVERFLOW_ERROR_PREFIX = 'Save queue overflow:';
 const hasPendingSaveWork = (): boolean => pendingSaves.length > 0 || saveInFlight !== null || immediateSavesInFlight.size > 0;
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const hasOwnField = (value: object, field: PropertyKey): boolean => Object.prototype.hasOwnProperty.call(value, field);
 const getRequiredArrayField = <T>(value: Record<string, unknown>, field: string): T[] => {
     const resolved = value[field];

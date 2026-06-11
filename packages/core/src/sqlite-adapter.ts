@@ -14,6 +14,7 @@ import { normalizeRecurrenceForLoad } from './recurrence';
 import { logWarn } from './logger';
 import { normalizeSavedFilter, normalizeSavedFilters } from './saved-filters';
 import { normalizeProjectSequentialScope } from './project-utils';
+import { sleep } from './async-utils';
 
 export interface SqliteClient {
     run(sql: string, params?: unknown[]): Promise<void>;
@@ -185,7 +186,6 @@ const READ_PAGE_SIZE = 1000;
 const FTS_LOCK_TTL_MS = 5 * 60 * 1000;
 const FTS_LOCK_REFRESH_INTERVAL_MS = Math.max(15_000, Math.floor(FTS_LOCK_TTL_MS / 3));
 const SQLITE_ID_INSERT_BATCH_SIZE = 500;
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const SEARCH_TASK_SELECT = [
     't.id AS id',
     't.title AS title',

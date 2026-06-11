@@ -58,6 +58,11 @@ export type {
 } from './types';
 
 export {
+    decodeUriSafe,
+    sleep,
+} from './async-utils';
+
+export {
     noopStorage,
     SEARCH_RESULT_LIMIT,
 } from './storage';
