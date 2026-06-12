@@ -1987,9 +1987,6 @@ export class SyncService {
                 return { success: true };
             }
 
-            // Pre-sync local attachments so cloudKeys exist before writing remote data.
-            await SyncService.runPreSyncAttachmentPhase(run);
-
             // CloudKit setup: ensure zone and subscription exist before syncing.
             if (context.backend === 'cloudkit') {
                 run.setStep('cloudkit_setup');
@@ -2001,6 +1998,9 @@ export class SyncService {
             if (unchangedResult) {
                 return unchangedResult;
             }
+
+            // Pre-sync local attachments so cloudKeys exist before writing remote data.
+            await SyncService.runPreSyncAttachmentPhase(run);
 
             const syncResult = await syncServiceDependencies.performSyncCycle({
                 readLocal: async () => {

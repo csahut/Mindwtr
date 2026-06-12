@@ -445,7 +445,25 @@ describe('desktop sync-service runtime', () => {
     it('only emits sync payload trace logs when diagnostics logging is enabled', async () => {
         const syncServiceModule = await syncServiceModulePromise;
         const syncedData: AppData = {
-            tasks: [],
+            tasks: [{
+                id: 'task-1',
+                title: 'Task',
+                status: 'inbox',
+                tags: [],
+                contexts: [],
+                attachments: [{
+                    id: 'att-1',
+                    kind: 'file',
+                    title: 'doc.txt',
+                    uri: '/local/doc.txt',
+                    cloudKey: 'attachments/att-1.txt',
+                    localStatus: 'available',
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    updatedAt: '2026-01-01T00:00:00.000Z',
+                }],
+                createdAt: '2026-01-01T00:00:00.000Z',
+                updatedAt: '2026-01-01T00:00:00.000Z',
+            }],
             projects: [],
             sections: [],
             areas: [],
@@ -808,7 +826,7 @@ describe('desktop sync-service runtime', () => {
 
         storeStateRef.current = {
             ...storeStateRef.current,
-            _allTasks: [],
+            _allTasks: syncedData.tasks,
             _allProjects: [],
             _allSections: [],
             _allAreas: [],
@@ -849,11 +867,13 @@ describe('desktop sync-service runtime', () => {
         expect(headFetchMock.mock.calls.some(([input, init]) =>
             init?.method === 'HEAD' || (typeof Request !== 'undefined' && input instanceof Request && input.method === 'HEAD')
         )).toBe(true);
+        expect(headFetchMock.mock.calls).toHaveLength(1);
         expect(invokeMock.mock.calls.some(([command]) => command === 'save_data')).toBe(false);
         expect(JSON.parse(localStorage.getItem('mindwtr-local-sync-status-v1') ?? '{}')).toMatchObject({
             lastSyncStatus: 'success',
         });
         expect(storeStateRef.current.updateSettings).not.toHaveBeenCalled();
+        expect(fsMocks.readFile).not.toHaveBeenCalled();
     });
 
     it('reuses the fast-check local snapshot when falling back to a full WebDAV sync', async () => {

@@ -14,6 +14,7 @@ import { logInfo, logWarn } from './app-log';
 const IGNORE_WINDOW_MS = 2000;
 const DEBOUNCE_MS = 750;
 const IGNORE_DRAIN_PADDING_MS = 25;
+const SQLITE_NOOP_REFRESH_IGNORE_MS = 2000;
 const SELF_WRITE_RETENTION_MS = 10_000;
 const MAX_PENDING_SELF_WRITES = 8;
 const timerHost = getDesktopTimerHost();
@@ -184,6 +185,15 @@ const runPendingMerge = () => {
     });
 };
 
+const hashCurrentSnapshot = async (): Promise<string> => {
+    const normalized = localDataWatcherDependencies.normalize(localDataWatcherDependencies.getSnapshot());
+    return localDataWatcherDependencies.hashPayload(toStableJson(normalized));
+};
+
+const extendSqliteIgnoreWindow = (windowMs: number = IGNORE_WINDOW_MS): void => {
+    sqliteIgnoreUntil = Math.max(sqliteIgnoreUntil, localDataWatcherDependencies.now() + windowMs);
+};
+
 async function mergeExternalData(externalData: PendingExternalData): Promise<void> {
     try {
         await flushPendingSave();
@@ -222,7 +232,13 @@ const runSqliteRefresh = (): Promise<void> => {
     sqliteRefreshInFlight = (async () => {
         try {
             await flushPendingSave();
+            const beforeHash = await hashCurrentSnapshot();
             await localDataWatcherDependencies.refreshStorageData();
+            const afterHash = await hashCurrentSnapshot();
+            if (beforeHash === afterHash) {
+                extendSqliteIgnoreWindow(SQLITE_NOOP_REFRESH_IGNORE_MS);
+                return;
+            }
             localDataWatcherDependencies.logInfo('[local-data-watcher] Refreshed after SQLite change');
         } catch (error) {
             localDataWatcherDependencies.logWarn('[local-data-watcher] Failed to refresh SQLite change: ' + String(error));
@@ -249,8 +265,10 @@ async function handleSqliteChange(options: { immediate?: boolean } = {}): Promis
         return;
     }
 
+    const scheduledDuringRefresh = sqliteRefreshInFlight !== null;
     sqliteDebounceTimer = localDataWatcherDependencies.schedule(() => {
         sqliteDebounceTimer = null;
+        if (scheduledDuringRefresh && localDataWatcherDependencies.now() < sqliteIgnoreUntil) return;
         void runSqliteRefresh();
     }, DEBOUNCE_MS);
 }
@@ -349,7 +367,7 @@ export function markLocalWrite(data?: AppData): void {
 }
 
 export function markLocalSqliteWrite(): void {
-    sqliteIgnoreUntil = localDataWatcherDependencies.now() + IGNORE_WINDOW_MS;
+    extendSqliteIgnoreWindow();
 }
 
 export async function start(dataPath: string, dbPath?: string): Promise<void> {
