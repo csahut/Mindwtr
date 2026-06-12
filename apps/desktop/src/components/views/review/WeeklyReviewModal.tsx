@@ -85,6 +85,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
         [projectMap, tasks],
     );
     const allContexts = useMemo(() => getUsedTaskTokens(activeTasks, (task) => task.contexts, { prefix: '@' }), [activeTasks]);
+    const allTags = useMemo(() => getUsedTaskTokens(activeTasks, (task) => task.tags, { prefix: '#' }), [activeTasks]);
     const { t } = useLanguage();
     const [aiSuggestions, setAiSuggestions] = useState<ReviewSuggestion[]>([]);
     const [aiSelectedIds, setAiSelectedIds] = useState<Set<string>>(new Set());
@@ -588,6 +589,7 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
                             updateTask={updateTask}
                             deleteTask={deleteTask}
                             allContexts={allContexts}
+                            allTags={allTags}
                             isProcessing={isProcessing}
                             setIsProcessing={setIsProcessing}
                         />

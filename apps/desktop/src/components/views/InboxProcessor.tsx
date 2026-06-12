@@ -16,6 +16,7 @@ type InboxProcessorProps = {
     updateTask: (id: string, updates: Partial<Task>) => Promise<unknown>;
     deleteTask: (id: string) => Promise<unknown>;
     allContexts: string[];
+    allTags: string[];
     isProcessing: boolean;
     setIsProcessing: (value: boolean) => void;
 };
@@ -31,6 +32,7 @@ export function InboxProcessor({
     updateTask,
     deleteTask,
     allContexts,
+    allTags,
     isProcessing,
     setIsProcessing,
 }: InboxProcessorProps) {
@@ -50,6 +52,7 @@ export function InboxProcessor({
         updateTask,
         deleteTask,
         allContexts,
+        allTags,
         isProcessing,
         setIsProcessing,
     });

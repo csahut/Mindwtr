@@ -105,6 +105,7 @@ export function DailyReviewGuideModal({ onClose }: DailyReviewGuideModalProps) {
     });
 
     const allContexts = getUsedTaskTokens(activeTasks, (task) => task.contexts, { prefix: '@' });
+    const allTags = getUsedTaskTokens(activeTasks, (task) => task.tags, { prefix: '#' });
 
     const sequentialProjectIds = useMemo(
         () => new Set(projects.filter((project) => project.isSequential && !project.deletedAt).map((project) => project.id)),
@@ -572,6 +573,7 @@ export function DailyReviewGuideModal({ onClose }: DailyReviewGuideModalProps) {
                             updateTask={updateTask}
                             deleteTask={deleteTask}
                             allContexts={allContexts}
+                            allTags={allTags}
                             isProcessing={isProcessing}
                             setIsProcessing={setIsProcessing}
                         />

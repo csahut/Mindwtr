@@ -8,6 +8,7 @@ import {
     type InboxProcessingScheduleFieldKey,
     type InboxProcessingScheduleFieldsControls,
 } from './InboxProcessingScheduleFields';
+import { TokenAutocompleteInput } from './Task/TokenAutocompleteInput';
 import { ProjectSelector } from './ui/ProjectSelector';
 import { QuickDateChips } from './QuickDateChips';
 
@@ -67,6 +68,8 @@ export type InboxProcessingQuickPanelProps = {
     toggleTag: (tag: string) => void;
     suggestedContexts: string[];
     suggestedTags: string[];
+    allContexts: string[];
+    allTags: string[];
     projects: Project[];
     areas: Area[];
     selectedProjectId: string | null;
@@ -178,6 +181,8 @@ export function InboxProcessingQuickPanel({
     toggleTag,
     suggestedContexts,
     suggestedTags,
+    allContexts,
+    allTags,
     projects,
     areas,
     selectedProjectId,
@@ -660,11 +665,14 @@ export function InboxProcessingQuickPanel({
                             <div className="grid gap-3 md:grid-cols-2">
                                 {showContextsField ? (
                                     <div className="space-y-2">
-                                        <label className="text-[11px] text-muted-foreground font-medium">{t('taskEdit.contextsLabel')}</label>
-                                        <input
+                                        <label htmlFor="quick-processing-contexts" className="text-[11px] text-muted-foreground font-medium">{t('taskEdit.contextsLabel')}</label>
+                                        <TokenAutocompleteInput
+                                            id="quick-processing-contexts"
                                             aria-label={t('taskEdit.contextsLabel')}
                                             value={contextsDraft}
-                                            onChange={(event) => onContextsInputChange(event.target.value)}
+                                            onChange={onContextsInputChange}
+                                            suggestions={[...suggestedContexts, ...allContexts]}
+                                            prefix="@"
                                             placeholder={t('taskEdit.contextsPlaceholder')}
                                             className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
                                         />
@@ -691,11 +699,14 @@ export function InboxProcessingQuickPanel({
                                 ) : null}
                                 {showTagsField ? (
                                     <div className="space-y-2">
-                                        <label className="text-[11px] text-muted-foreground font-medium">{t('taskEdit.tagsLabel')}</label>
-                                        <input
+                                        <label htmlFor="quick-processing-tags" className="text-[11px] text-muted-foreground font-medium">{t('taskEdit.tagsLabel')}</label>
+                                        <TokenAutocompleteInput
+                                            id="quick-processing-tags"
                                             aria-label={t('taskEdit.tagsLabel')}
                                             value={tagsDraft}
-                                            onChange={(event) => onTagsInputChange(event.target.value)}
+                                            onChange={onTagsInputChange}
+                                            suggestions={[...suggestedTags, ...allTags]}
+                                            prefix="#"
                                             placeholder={t('taskEdit.tagsPlaceholder')}
                                             className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
                                         />

@@ -98,6 +98,8 @@ type RenderInboxProcessorOptions = {
     tasks?: Task[];
     projects?: Project[];
     areas?: Area[];
+    allContexts?: string[];
+    allTags?: string[];
 };
 
 const isRenderInboxProcessorOptions = (
@@ -109,6 +111,8 @@ const isRenderInboxProcessorOptions = (
         || 'tasks' in options
         || 'projects' in options
         || 'areas' in options
+        || 'allContexts' in options
+        || 'allTags' in options
     )
 );
 
@@ -136,7 +140,8 @@ const renderInboxProcessor = (options?: AppData['settings'] | RenderInboxProcess
                 addProject={addProject}
                 updateTask={updateTask}
                 deleteTask={deleteTask}
-                allContexts={[]}
+                allContexts={renderOptions.allContexts ?? []}
+                allTags={renderOptions.allTags ?? []}
                 isProcessing={isProcessing}
                 setIsProcessing={setIsProcessing}
             />
@@ -680,6 +685,51 @@ describe('InboxProcessor', () => {
                     status: 'next',
                     contexts: ['@home', '@desk'],
                     tags: ['#deep', '#writing'],
+                }),
+            );
+        });
+    });
+
+    it('autocompletes quick processing context and tag inputs with ranked local labels', async () => {
+        const user = userEvent.setup();
+        const { getByRole, getByLabelText, updateTask } = renderInboxProcessor({
+            settings: {
+                gtd: {
+                    taskEditor: {
+                        hidden: [],
+                    },
+                },
+            },
+            allContexts: ['@school', '@office', '@chores'],
+            allTags: ['#deep-work', '#writing'],
+        });
+
+        fireEvent.click(getByRole('button', { name: /process\.btn/i }));
+        fireEvent.click(getByRole('button', { name: 'process.modeQuick' }));
+
+        const contextsInput = getByLabelText('taskEdit.contextsLabel') as HTMLInputElement;
+        const tagsInput = getByLabelText('taskEdit.tagsLabel') as HTMLInputElement;
+        await user.type(contextsInput, 'of');
+        fireEvent.keyDown(contextsInput, { key: 'Tab' });
+        await waitFor(() => {
+            expect(contextsInput.value).toBe('@office, ');
+        });
+
+        await user.type(tagsInput, 'wr');
+        fireEvent.keyDown(tagsInput, { key: 'Tab' });
+        await waitFor(() => {
+            expect(tagsInput.value).toBe('#writing, ');
+        });
+
+        fireEvent.click(getByRole('button', { name: 'process.next' }));
+
+        await waitFor(() => {
+            expect(updateTask).toHaveBeenCalledWith(
+                'task-1',
+                expect.objectContaining({
+                    status: 'next',
+                    contexts: ['@office'],
+                    tags: ['#writing'],
                 }),
             );
         });

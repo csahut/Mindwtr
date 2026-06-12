@@ -877,6 +877,7 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                                 updateTask={updateTask}
                                 deleteTask={deleteTask}
                                 allContexts={allContexts}
+                                allTags={allTags}
                                 isProcessing={isProcessing}
                                 setIsProcessing={setIsProcessing}
                             />

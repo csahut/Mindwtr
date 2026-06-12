@@ -2,6 +2,11 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ClipboardEventHandler, KeyboardEventHandler, RefObject } from 'react';
 import type { Area, Project } from '@mindwtr/core';
 import { cn } from '../../lib/utils';
+import {
+    compareAutocompleteLabels,
+    matchesAutocompleteQuery,
+    normalizeAutocompleteTokens,
+} from './token-autocomplete';
 
 type TriggerType = 'project' | 'context' | 'tag' | 'area';
 
@@ -78,22 +83,6 @@ function getTrigger(text: string, caret: number): TriggerState | null {
         query: token.slice(1),
     };
 }
-
-const compareAutocompleteLabels = (left: string, right: string, query: string): number => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const leftLabel = left.toLowerCase();
-    const rightLabel = right.toLowerCase();
-    const leftStartsWithQuery = normalizedQuery.length === 0 || leftLabel.startsWith(normalizedQuery);
-    const rightStartsWithQuery = normalizedQuery.length === 0 || rightLabel.startsWith(normalizedQuery);
-
-    if (leftStartsWithQuery !== rightStartsWithQuery) {
-        return leftStartsWithQuery ? -1 : 1;
-    }
-    return left.localeCompare(right, undefined, { sensitivity: 'base' });
-};
-
-const matchesAutocompleteQuery = (label: string, query: string): boolean =>
-    query.length === 0 || label.toLowerCase().includes(query);
 
 function removeAcceptedTriggerText(text: string, trigger: TriggerState): { value: string; caret: number } {
     const before = text.slice(0, trigger.start);
@@ -190,12 +179,7 @@ export function TaskInput({
             }));
         }
         const expectedPrefix = trigger.type === 'tag' ? '#' : '@';
-        const normalizedTokens = contexts
-            .map((token) => {
-                if (token.startsWith('@') || token.startsWith('#')) return token;
-                return `${expectedPrefix}${token}`;
-            })
-            .filter((token) => token.startsWith(expectedPrefix));
+        const normalizedTokens = normalizeAutocompleteTokens(contexts, expectedPrefix);
         const matches = normalizedTokens
             .filter((token) => matchesAutocompleteQuery(token.slice(1), query))
             .sort((a, b) => compareAutocompleteLabels(a.slice(1), b.slice(1), query));

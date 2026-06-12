@@ -33,6 +33,7 @@ type UseInboxProcessingControllerParams = {
     updateTask: (id: string, updates: Partial<Task>) => Promise<unknown>;
     deleteTask: (id: string) => Promise<unknown>;
     allContexts: string[];
+    allTags: string[];
     isProcessing: boolean;
     setIsProcessing: (value: boolean) => void;
 };
@@ -55,6 +56,7 @@ export function useInboxProcessingController({
     updateTask,
     deleteTask,
     allContexts,
+    allTags,
     isProcessing,
     setIsProcessing,
 }: UseInboxProcessingControllerParams): UseInboxProcessingControllerResult {
@@ -502,16 +504,16 @@ export function useInboxProcessingController({
         updateSelectedContexts(nextContexts);
     }, [selectedContexts, toggleTag, updateSelectedContexts]);
 
-    const addCustomContext = useCallback(() => {
-        const contexts = parseTokenListInput(customContext, '@');
+    const addCustomContext = useCallback((value?: string) => {
+        const contexts = parseTokenListInput(value ?? customContext, '@');
         if (contexts.length > 0) {
             updateSelectedContexts(Array.from(new Set([...selectedContexts, ...contexts])));
         }
         setCustomContext('');
     }, [customContext, selectedContexts, setCustomContext, updateSelectedContexts]);
 
-    const addCustomTag = useCallback(() => {
-        const tags = parseTokenListInput(customTag, '#');
+    const addCustomTag = useCallback((value?: string) => {
+        const tags = parseTokenListInput(value ?? customTag, '#');
         if (tags.length > 0) {
             updateSelectedTags(Array.from(new Set([...selectedTags, ...tags])));
         }
@@ -767,6 +769,8 @@ export function useInboxProcessingController({
             toggleTag,
             suggestedContexts,
             suggestedTags,
+            allContexts,
+            allTags,
             projects,
             areas: activeAreas,
             selectedProjectId,
@@ -838,6 +842,7 @@ export function useInboxProcessingController({
         selectedPriority,
         setSelectedPriority,
         allContexts,
+        allTags,
         customContext,
         setCustomContext,
         addCustomContext,

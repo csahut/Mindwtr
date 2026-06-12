@@ -8,6 +8,7 @@ import {
     type InboxProcessingScheduleFieldKey,
     type InboxProcessingScheduleFieldsControls,
 } from './InboxProcessingScheduleFields';
+import { TokenAutocompleteInput } from './Task/TokenAutocompleteInput';
 import { ProjectSelector } from './ui/ProjectSelector';
 import { QuickDateChips } from './QuickDateChips';
 
@@ -65,12 +66,13 @@ export type InboxProcessingWizardProps = {
     selectedPriority?: TaskPriority;
     setSelectedPriority: (value: TaskPriority | undefined) => void;
     allContexts: string[];
+    allTags: string[];
     customContext: string;
     setCustomContext: (value: string) => void;
-    addCustomContext: () => void;
+    addCustomContext: (value?: string) => void;
     customTag: string;
     setCustomTag: (value: string) => void;
-    addCustomTag: () => void;
+    addCustomTag: (value?: string) => void;
     toggleContext: (ctx: string) => void;
     toggleTag: (tag: string) => void;
     suggestedContexts: string[];
@@ -171,6 +173,7 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
     selectedPriority,
     setSelectedPriority,
     allContexts,
+    allTags,
     customContext,
     setCustomContext,
     addCustomContext,
@@ -636,11 +639,13 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
                     {showContextsField ? (
                         <>
                             <div className="flex gap-2">
-                                <input
-                                    type="text"
+                                <TokenAutocompleteInput
                                     placeholder="@home"
                                     value={customContext}
-                                    onChange={(e) => setCustomContext(e.target.value)}
+                                    onChange={setCustomContext}
+                                    suggestions={[...suggestedContexts, ...allContexts]}
+                                    prefix="@"
+                                    onAcceptToken={(token) => addCustomContext(token)}
                                     className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary"
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
@@ -649,7 +654,7 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
                                     }}
                                 />
                                 <button
-                                    onClick={addCustomContext}
+                                    onClick={() => addCustomContext()}
                                     disabled={!customContext.trim()}
                                     className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
@@ -680,25 +685,6 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
                                     </div>
                                 </div>
                             )}
-
-                            {allContexts.length > 0 && (
-                                <div className="flex flex-wrap gap-2 justify-center">
-                                    {allContexts.filter((ctx) => !suggestedContexts.includes(ctx)).map(ctx => (
-                                        <button
-                                            key={ctx}
-                                            onClick={() => toggleContext(ctx)}
-                                            className={cn(
-                                                'px-4 py-2 rounded-full text-sm font-medium transition-colors',
-                                                selectedContexts.includes(ctx)
-                                                    ? 'bg-primary text-primary-foreground'
-                                                    : 'bg-muted hover:bg-muted/80'
-                                            )}
-                                        >
-                                            {ctx}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
                         </>
                     ) : null}
 
@@ -708,11 +694,13 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
                                 {t('taskEdit.tagsLabel')}
                             </div>
                             <div className="flex gap-2">
-                                <input
-                                    type="text"
+                                <TokenAutocompleteInput
                                     placeholder="#deep-work"
                                     value={customTag}
-                                    onChange={(e) => setCustomTag(e.target.value)}
+                                    onChange={setCustomTag}
+                                    suggestions={[...suggestedTags, ...allTags]}
+                                    prefix="#"
+                                    onAcceptToken={(token) => addCustomTag(token)}
                                     className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary"
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
@@ -721,7 +709,7 @@ export const InboxProcessingWizard = memo(function InboxProcessingWizard({
                                     }}
                                 />
                                 <button
-                                    onClick={addCustomTag}
+                                    onClick={() => addCustomTag()}
                                     disabled={!customTag.trim()}
                                     className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
