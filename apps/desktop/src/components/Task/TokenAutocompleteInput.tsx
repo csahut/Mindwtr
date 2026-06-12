@@ -28,6 +28,8 @@ type TokenAutocompleteInputProps = {
     onAcceptToken?: (token: string) => void;
 };
 
+const NO_ACTIVE_OPTION = -1;
+
 const getTokenSegment = (text: string, caret: number): TokenSegment | null => {
     const safeCaret = Math.max(0, Math.min(caret, text.length));
     const before = text.slice(0, safeCaret);
@@ -79,14 +81,16 @@ export function TokenAutocompleteInput({
     const listboxId = useId();
     const valueRef = useRef(value);
     const [segment, setSegment] = useState<TokenSegment | null>(null);
-    const [selectedIndex, setSelectedIndex] = useState(0);
+    const [selectedIndex, setSelectedIndex] = useState(NO_ACTIVE_OPTION);
 
     const options = useMemo(
         () => segment ? rankAutocompleteTokens(suggestions, prefix, segment.query) : [],
         [prefix, segment, suggestions],
     );
     const hasOptions = segment && options.length > 0;
-    const activeDescendantId = hasOptions ? `${listboxId}-option-${selectedIndex}` : undefined;
+    const activeDescendantId = hasOptions && selectedIndex >= 0
+        ? `${listboxId}-option-${selectedIndex}`
+        : undefined;
 
     useEffect(() => {
         valueRef.current = value;
@@ -94,18 +98,18 @@ export function TokenAutocompleteInput({
 
     useEffect(() => {
         if (selectedIndex >= options.length) {
-            setSelectedIndex(0);
+            setSelectedIndex(NO_ACTIVE_OPTION);
         }
     }, [options.length, selectedIndex]);
 
     const closeOptions = () => {
         setSegment(null);
-        setSelectedIndex(0);
+        setSelectedIndex(NO_ACTIVE_OPTION);
     };
 
     const updateSegment = (input: HTMLInputElement) => {
         setSegment(getTokenSegment(input.value, input.selectionStart ?? input.value.length));
-        setSelectedIndex(0);
+        setSelectedIndex(NO_ACTIVE_OPTION);
     };
 
     const resolveSegment = (): { text: string; segment: TokenSegment } | null => {
@@ -145,20 +149,22 @@ export function TokenAutocompleteInput({
             if (event.key === 'ArrowDown') {
                 event.preventDefault();
                 event.stopPropagation();
-                setSelectedIndex((prev) => (prev + 1) % options.length);
+                setSelectedIndex((prev) => (prev < 0 ? 0 : (prev + 1) % options.length));
                 return;
             }
             if (event.key === 'ArrowUp') {
                 event.preventDefault();
                 event.stopPropagation();
-                setSelectedIndex((prev) => (prev - 1 + options.length) % options.length);
+                setSelectedIndex((prev) => (prev < 0 ? options.length - 1 : (prev - 1 + options.length) % options.length));
                 return;
             }
             if (event.key === 'Enter' || (event.key === 'Tab' && !event.shiftKey)) {
-                event.preventDefault();
-                event.stopPropagation();
-                applyToken(options[selectedIndex]);
-                return;
+                if (selectedIndex >= 0) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    applyToken(options[selectedIndex]);
+                    return;
+                }
             }
             if (event.key === 'Escape') {
                 event.stopPropagation();
