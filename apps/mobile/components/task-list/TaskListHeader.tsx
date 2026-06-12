@@ -30,6 +30,7 @@ type TaskListHeaderProps = {
   onOpenFilters: () => void;
   onOpenSort: () => void;
   showHeader: boolean;
+  showFilterButton?: boolean;
   showSort: boolean;
   sortByLabel: string;
   t: (key: string) => string;
@@ -47,6 +48,7 @@ export function TaskListHeader({
   onOpenFilters,
   onOpenSort,
   showHeader,
+  showFilterButton = true,
   showSort,
   sortByLabel,
   t,
@@ -70,7 +72,7 @@ export function TaskListHeader({
       <ArrowUpDown size={16} color={themeColors.secondaryText} strokeWidth={2} />
     </TouchableOpacity>
   ) : null;
-  const filterControl = (
+  const filterControl = showFilterButton ? (
     <TouchableOpacity
       onPress={onOpenFilters}
       style={[
@@ -93,7 +95,7 @@ export function TaskListHeader({
         </View>
       ) : null}
     </TouchableOpacity>
-  );
+  ) : null;
   return (
     <>
       {showHeader ? (

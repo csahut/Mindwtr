@@ -119,9 +119,8 @@ export interface TaskListProps {
   emptyActionLabel?: string;
   onEmptyAction?: () => void;
   headerAccessory?: React.ReactNode;
-  filterSheetAccessory?: React.ReactNode;
-  extraFilterActiveCount?: number;
-  onClearExtraFilters?: () => void;
+  showFilterButton?: boolean;
+  onFilterStateChange?: (state: { activeCount: number; hasActive: boolean }) => void;
   enableCopilot?: boolean;
   defaultEditTab?: 'task' | 'view';
   contentPaddingBottom?: number;
@@ -161,9 +160,8 @@ function TaskListComponent({
   emptyActionLabel,
   onEmptyAction,
   headerAccessory,
-  filterSheetAccessory,
-  extraFilterActiveCount = 0,
-  onClearExtraFilters,
+  showFilterButton = true,
+  onFilterStateChange,
   enableCopilot = true,
   defaultEditTab,
   contentPaddingBottom,
@@ -372,12 +370,20 @@ function TaskListComponent({
   const projectById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const { areaById, resolvedAreaFilter, selectedAreaIdForNewTasks } = useMobileAreaFilter();
 
+  // Track the last-seen signal so a remount (e.g. toggling reorder mode swaps the
+  // scroll container component type) doesn't re-open the sheet from a stale value.
+  const lastFilterOpenSignalRef = useRef(externalFilterOpenSignal);
   useEffect(() => {
+    if (externalFilterOpenSignal === lastFilterOpenSignalRef.current) return;
+    lastFilterOpenSignalRef.current = externalFilterOpenSignal;
     if (externalFilterOpenSignal <= 0) return;
     setFiltersVisible(true);
   }, [externalFilterOpenSignal]);
 
+  const lastQuickAddFocusSignalRef = useRef(externalQuickAddFocusSignal);
   useEffect(() => {
+    if (externalQuickAddFocusSignal === lastQuickAddFocusSignalRef.current) return;
+    lastQuickAddFocusSignalRef.current = externalQuickAddFocusSignal;
     if (externalQuickAddFocusSignal <= 0) return;
     if (!quickAddAvailable) return;
     quickAddInputRef.current?.focus();
@@ -476,8 +482,7 @@ function TaskListComponent({
   }, []);
   const clearAllFilters = useCallback(() => {
     clearTaskFilters();
-    onClearExtraFilters?.();
-  }, [clearTaskFilters, onClearExtraFilters]);
+  }, [clearTaskFilters]);
 
   const filterableTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -521,8 +526,11 @@ function TaskListComponent({
   ]);
   const activeTaskFilterCount = countActiveMobileTaskFilters(taskListFilters);
   const hasActiveTaskFilters = activeTaskFilterCount > 0;
-  const totalFilterActiveCount = activeTaskFilterCount + extraFilterActiveCount;
-  const hasAnyActiveFilters = hasActiveTaskFilters || extraFilterActiveCount > 0;
+  const totalFilterActiveCount = activeTaskFilterCount;
+  const hasAnyActiveFilters = hasActiveTaskFilters;
+  useEffect(() => {
+    onFilterStateChange?.({ activeCount: totalFilterActiveCount, hasActive: hasAnyActiveFilters });
+  }, [hasAnyActiveFilters, onFilterStateChange, totalFilterActiveCount]);
   const activeFilterChips = useMemo<TaskListActiveFilterChip[]>(() => {
     const chips: TaskListActiveFilterChip[] = [];
     const normalizedSearch = taskSearchQuery.trim();
@@ -1542,6 +1550,7 @@ function TaskListComponent({
         onOpenFilters={() => setFiltersVisible(true)}
         onOpenSort={() => setSortModalVisible(true)}
         showHeader={showHeader}
+        showFilterButton={showFilterButton}
         showSort={showSort}
         sortByLabel={t(`sort.${sortBy}`)}
         t={t}
@@ -1551,7 +1560,6 @@ function TaskListComponent({
 
       <TaskListFiltersSheet
         energyLevelOptions={ENERGY_LEVEL_OPTIONS}
-        extraContent={filterSheetAccessory}
         hasFilters={hasAnyActiveFilters}
         locationQuery={locationFilter}
         onChangeLocationQuery={setLocationFilter}

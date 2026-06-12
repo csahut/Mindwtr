@@ -80,7 +80,6 @@ vi.mock('../../components/task-list', async () => {
             return ReactModule.createElement(
                 ReactModule.Fragment,
                 null,
-                props.filterSheetAccessory,
                 props.headerAccessory,
             );
         },
@@ -458,10 +457,10 @@ describe('ProjectDetailModal task sorting', () => {
         expect(taskListPropsSpy).toHaveBeenCalled();
         expect(taskListPropsSpy.mock.calls.at(-1)?.[0].projectSortBy).toBe('default');
         expect(taskListPropsSpy.mock.calls.at(-1)?.[0].taskSource).toBe(selectedProjectTasks);
-        expect(taskListPropsSpy.mock.calls.at(-1)?.[0].extraFilterActiveCount).toBe(0);
+        expect(taskListPropsSpy.mock.calls.at(-1)?.[0].showFilterButton).toBe(false);
 
         act(() => {
-            tree.root.findByProps({ testID: 'project-task-sort-due' }).props.onPress();
+            tree.root.findByProps({ testID: 'project-task-sort-toggle' }).props.onPress();
         });
 
         expect(onProjectTaskSortByChange).toHaveBeenCalledWith('due');
@@ -513,28 +512,22 @@ describe('ProjectDetailModal task sorting', () => {
         expect(tree.root.findByProps({ testID: 'project-task-reorder-toggle' }).props.accessibilityState).toEqual({ selected: true });
     });
 
-    it('clears project-local filter sheet controls with the task filters', () => {
-        const onProjectTaskSortByChange = vi.fn();
-        const onToggleShowCompletedTasks = vi.fn();
+    it('reflects the active in-sheet filter count on the pinned filter button badge', () => {
+        let tree!: ReturnType<typeof create>;
 
         act(() => {
-            create(<ProjectDetailModal {...createProjectDetailModalProps({
-                onProjectTaskSortByChange,
-                onToggleShowCompletedTasks,
-                projectTaskSortBy: 'due',
-                showCompletedTasks: true,
-            })} />);
+            tree = create(<ProjectDetailModal {...createProjectDetailModalProps()} />);
         });
 
         const taskListProps = taskListPropsSpy.mock.calls.at(-1)?.[0];
-        expect(taskListProps.extraFilterActiveCount).toBe(2);
+        expect(typeof taskListProps.onFilterStateChange).toBe('function');
 
         act(() => {
-            taskListProps.onClearExtraFilters();
+            taskListProps.onFilterStateChange({ activeCount: 2, hasActive: true });
         });
 
-        expect(onProjectTaskSortByChange).toHaveBeenCalledWith('default');
-        expect(onToggleShowCompletedTasks).toHaveBeenCalledTimes(1);
+        const filterButton = tree.root.findByProps({ testID: 'project-task-filter-button' });
+        expect(filterButton.findAllByProps({ children: 2 }).length).toBeGreaterThan(0);
     });
 });
 
