@@ -108,6 +108,66 @@ type ScheduledTaskBlockProps = {
   triggerDragHaptic: () => void;
 };
 
+type PlanningTaskListProps = {
+  getScheduleSlotLabel: (date: Date | null, task: Task) => string;
+  planningTasks: Task[];
+  scheduleTaskOnSelectedDate: (taskId: string) => void;
+  selectedDate: Date | null;
+  selectedDatePlanningLabel: string;
+  t: ReturnType<typeof useCalendarViewController>['t'];
+  tc: ReturnType<typeof useCalendarViewController>['tc'];
+  tr: ReturnType<typeof useCalendarViewController>['tr'];
+  variant?: 'results' | 'section';
+};
+
+function PlanningTaskList({
+  getScheduleSlotLabel,
+  planningTasks,
+  scheduleTaskOnSelectedDate,
+  selectedDate,
+  selectedDatePlanningLabel,
+  t,
+  tc,
+  tr,
+  variant = 'results',
+}: PlanningTaskListProps) {
+  const isSection = variant === 'section';
+  const items = planningTasks.map((task) => {
+    const slotLabel = getScheduleSlotLabel(selectedDate, task);
+    const taskContent = (
+      <>
+        <Text style={[styles.taskItemTitle, { color: tc.text }]} numberOfLines={1}>
+          {task.title}
+        </Text>
+        <Text style={[styles.taskItemTime, { color: tc.secondaryText }]}>
+          {slotLabel ? `${t('calendar.scheduleAction')} · ${slotLabel}` : t('calendar.scheduleAction')}
+        </Text>
+      </>
+    );
+    return (
+      <Pressable
+        key={task.id}
+        style={[styles.taskItem, { backgroundColor: tc.inputBg, borderLeftColor: tc.tint }]}
+        onPress={() => scheduleTaskOnSelectedDate(task.id)}
+      >
+        {isSection ? <View style={styles.taskItemMain}>{taskContent}</View> : taskContent}
+      </Pressable>
+    );
+  });
+
+  return (
+    <View style={isSection ? styles.scheduleSection : styles.scheduleResults}>
+      <Text style={[isSection ? styles.scheduleDate : styles.scheduleResultsTitle, { color: tc.secondaryText }]}>
+        {tr('calendar.planningTitle')}
+      </Text>
+      <Text style={[styles.scheduleResultsSubtitle, { color: tc.secondaryText }]}>
+        {selectedDatePlanningLabel}
+      </Text>
+      {isSection ? <View style={styles.scheduleItems}>{items}</View> : items}
+    </View>
+  );
+}
+
 function ScheduledTaskBlock({
   DAY_END_HOUR,
   DAY_START_HOUR,
@@ -1002,31 +1062,16 @@ export function CalendarView() {
 
             <View style={[styles.dayScheduleCard, { backgroundColor: tc.cardBg, borderColor: tc.border }]}>
               {planningTasks.length > 0 && (
-                <View style={styles.scheduleResults}>
-                  <Text style={[styles.scheduleResultsTitle, { color: tc.secondaryText }]}>
-                    {tr('calendar.planningTitle')}
-                  </Text>
-                  <Text style={[styles.scheduleResultsSubtitle, { color: tc.secondaryText }]}>
-                    {selectedDatePlanningLabel}
-                  </Text>
-                  {planningTasks.map((task) => {
-                    const slotLabel = getScheduleSlotLabel(selectedDate, task);
-                    return (
-                      <Pressable
-                        key={task.id}
-                        style={[styles.taskItem, { backgroundColor: tc.inputBg, borderLeftColor: tc.tint }]}
-                        onPress={() => scheduleTaskOnSelectedDate(task.id)}
-                      >
-                        <Text style={[styles.taskItemTitle, { color: tc.text }]} numberOfLines={1}>
-                          {task.title}
-                        </Text>
-                        <Text style={[styles.taskItemTime, { color: tc.secondaryText }]}>
-                          {slotLabel ? `${t('calendar.scheduleAction')} · ${slotLabel}` : t('calendar.scheduleAction')}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <PlanningTaskList
+                  getScheduleSlotLabel={getScheduleSlotLabel}
+                  planningTasks={planningTasks}
+                  scheduleTaskOnSelectedDate={scheduleTaskOnSelectedDate}
+                  selectedDate={selectedDate}
+                  selectedDatePlanningLabel={selectedDatePlanningLabel}
+                  t={t}
+                  tc={tc}
+                  tr={tr}
+                />
               )}
 
               <View style={styles.addTaskForm}>
@@ -1473,35 +1518,17 @@ export function CalendarView() {
           contentContainerStyle={styles.scheduleContent}
           keyExtractor={(section) => section.id}
           ListHeaderComponent={selectedDate && planningTasks.length > 0 ? (
-            <View style={styles.scheduleSection}>
-              <Text style={[styles.scheduleDate, { color: tc.secondaryText }]}>
-                {tr('calendar.planningTitle')}
-              </Text>
-              <Text style={[styles.scheduleResultsSubtitle, { color: tc.secondaryText }]}>
-                {selectedDatePlanningLabel}
-              </Text>
-              <View style={styles.scheduleItems}>
-                {planningTasks.map((task) => {
-                  const slotLabel = getScheduleSlotLabel(selectedDate, task);
-                  return (
-                    <Pressable
-                      key={task.id}
-                      style={[styles.taskItem, { backgroundColor: tc.inputBg, borderLeftColor: tc.tint }]}
-                      onPress={() => scheduleTaskOnSelectedDate(task.id)}
-                    >
-                      <View style={styles.taskItemMain}>
-                        <Text style={[styles.taskItemTitle, { color: tc.text }]} numberOfLines={1}>
-                          {task.title}
-                        </Text>
-                        <Text style={[styles.taskItemTime, { color: tc.secondaryText }]}>
-                          {slotLabel ? `${t('calendar.scheduleAction')} · ${slotLabel}` : t('calendar.scheduleAction')}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
+            <PlanningTaskList
+              getScheduleSlotLabel={getScheduleSlotLabel}
+              planningTasks={planningTasks}
+              scheduleTaskOnSelectedDate={scheduleTaskOnSelectedDate}
+              selectedDate={selectedDate}
+              selectedDatePlanningLabel={selectedDatePlanningLabel}
+              t={t}
+              tc={tc}
+              tr={tr}
+              variant="section"
+            />
           ) : null}
           renderItem={({ item: section }) => (
             <View style={styles.scheduleSection}>
@@ -1774,31 +1801,16 @@ export function CalendarView() {
             </View>
 
             {planningTasks.length > 0 && (
-              <View style={styles.scheduleResults}>
-                <Text style={[styles.scheduleResultsTitle, { color: tc.secondaryText }]}>
-                  {tr('calendar.planningTitle')}
-                </Text>
-                <Text style={[styles.scheduleResultsSubtitle, { color: tc.secondaryText }]}>
-                  {selectedDatePlanningLabel}
-                </Text>
-                {planningTasks.map((task) => {
-                  const slotLabel = getScheduleSlotLabel(selectedDate, task);
-                  return (
-                    <Pressable
-                      key={task.id}
-                      style={[styles.taskItem, { backgroundColor: tc.inputBg, borderLeftColor: tc.tint }]}
-                      onPress={() => scheduleTaskOnSelectedDate(task.id)}
-                    >
-                      <Text style={[styles.taskItemTitle, { color: tc.text }]} numberOfLines={1}>
-                        {task.title}
-                      </Text>
-                      <Text style={[styles.taskItemTime, { color: tc.secondaryText }]}>
-                        {slotLabel ? `${t('calendar.scheduleAction')} · ${slotLabel}` : t('calendar.scheduleAction')}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <PlanningTaskList
+                getScheduleSlotLabel={getScheduleSlotLabel}
+                planningTasks={planningTasks}
+                scheduleTaskOnSelectedDate={scheduleTaskOnSelectedDate}
+                selectedDate={selectedDate}
+                selectedDatePlanningLabel={selectedDatePlanningLabel}
+                t={t}
+                tc={tc}
+                tr={tr}
+              />
             )}
 
             <View style={styles.addTaskForm}>
