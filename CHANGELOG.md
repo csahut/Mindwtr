@@ -7,6 +7,10 @@ This file intentionally stays as a short index so it does not drift from the per
 ## Latest Releases
 
 - [Unreleased](docs/release-notes/unreleased.md)
+- [v0.9.10](docs/release-notes/0.9.10.md)
+- [v0.9.9](docs/release-notes/0.9.9.md)
+- [v0.9.8](docs/release-notes/0.9.8.md)
+- [v0.9.7](docs/release-notes/0.9.7.md)
 - [v0.9.6](docs/release-notes/0.9.6.md)
 - [v0.9.5](docs/release-notes/0.9.5.md)
 - [v0.9.4](docs/release-notes/0.9.4.md)
