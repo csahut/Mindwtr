@@ -252,4 +252,32 @@ describe('useRootLayoutSyncEffects', () => {
     });
     vi.useRealTimers();
   });
+
+  it('does not queue duplicate foreground syncs for repeated active AppState events', async () => {
+    vi.useFakeTimers();
+    let tree: ReturnType<typeof create>;
+    await act(async () => {
+      tree = create(<TestHarness />);
+      await flushMicrotasks();
+    });
+    performMobileSync.mockClear();
+    const listener = Array.from(appStateListeners)[0];
+    expect(listener).toBeTypeOf('function');
+
+    await act(async () => {
+      listener('background');
+      await flushMicrotasks();
+      listener('active');
+      listener('active');
+      await vi.advanceTimersByTimeAsync(45_000);
+      await flushMicrotasks();
+    });
+
+    expect(performMobileSync).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      tree.unmount();
+    });
+    vi.useRealTimers();
+  });
 });

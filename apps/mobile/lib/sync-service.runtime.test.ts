@@ -410,6 +410,66 @@ describe('mobile sync-service runtime', () => {
     expect(asyncStorageMocks.setItem.mock.calls.some(([key]) => key === '@mindwtr_local_sync_status_v1')).toBe(true);
   });
 
+  it('does not run attachment sync for unchanged WebDAV data with stable uploaded attachments', async () => {
+    const syncedData: AppData = {
+      ...emptyData,
+      tasks: [
+        {
+          id: 'task-1',
+          title: 'Task',
+          status: 'inbox',
+          rev: 0,
+          pushCount: 0,
+          isFocusedToday: false,
+          suppressMindwtrReminders: false,
+          tags: [],
+          contexts: [],
+          attachments: [
+            {
+              id: 'att-1',
+              kind: 'file',
+              title: 'doc.txt',
+              uri: 'file://document/attachments/doc.txt',
+              cloudKey: 'attachments/doc.txt',
+              localStatus: 'available',
+              createdAt: '2026-01-01T00:00:00.000Z',
+              updatedAt: '2026-01-01T00:00:00.000Z',
+            },
+          ],
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+    const activityStates: string[] = [];
+    const unsubscribeActivity = syncServiceModule.subscribeMobileSyncActivityState((state) => {
+      activityStates.push(state);
+    });
+    storageMocks.getData.mockResolvedValue(syncedData);
+    coreMocks.getInMemoryAppDataSnapshot.mockReturnValue(syncedData);
+    coreMocks.webdavGetJson.mockResolvedValue(syncedData);
+    asyncStorageMocks.getItem.mockImplementation(async (key: string) => {
+      const values: Record<string, string | null> = {
+        '@mindwtr_sync_backend': 'webdav',
+        '@mindwtr_webdav_url': 'https://sync.example.com/data.json',
+        '@mindwtr_webdav_username': 'user',
+        '@mindwtr_webdav_password': 'pass',
+      };
+      return values[key] ?? null;
+    });
+
+    const result = await syncServiceModule.performMobileSync();
+    unsubscribeActivity();
+
+    expect(result).toEqual({ success: true, skipped: 'unchanged' });
+    expect(activityStates).toEqual(['idle']);
+    expect(coreMocks.performSyncCycle).not.toHaveBeenCalled();
+    expect(coreMocks.webdavGetJson).toHaveBeenCalledTimes(1);
+    expect(coreMocks.webdavHeadFile).not.toHaveBeenCalled();
+    expect(attachmentSyncMocks.syncWebdavAttachments).not.toHaveBeenCalled();
+    expect(storageMocks.saveData).not.toHaveBeenCalled();
+  });
+
   it('keeps WebDAV read-only no-change checks out of the visible sync activity state', async () => {
     const activityStates: string[] = [];
     const unsubscribeActivity = syncServiceModule.subscribeMobileSyncActivityState((state) => {
