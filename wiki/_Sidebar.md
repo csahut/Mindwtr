@@ -59,6 +59,7 @@
 
 **Developer Docs**
 * [[Developer Guide]]
+* [[Engineering Principles]]
 * [[Developer Troubleshooting]]
 * [[Architecture]]
 * [[Core API]]
