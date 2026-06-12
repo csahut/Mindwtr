@@ -377,7 +377,7 @@ export function BoardView() {
                 list = sortByProjectOrder(list);
             }
         }
-        return sortTasksByBoardOrder(list);
+        return sortBy === 'default' ? sortTasksByBoardOrder(list) : list;
     }, [computeSequential, filteredTasks, projectMap, sequentialProjectFirstTasks, sortBy, sortByProjectOrder]);
 
     const handleDragEnd = (event: DragEndEvent) => {
@@ -396,7 +396,7 @@ export function BoardView() {
             activeStatus: currentTask?.status,
             overStatus: overTask?.status,
             columnTaskIds: currentTask ? getColumnTasks(currentTask.status).map((task) => task.id) : [],
-            canReorder: true,
+            canReorder: sortBy === 'default',
         });
         if (action.type === 'move') {
             moveTask(action.taskId, action.status);

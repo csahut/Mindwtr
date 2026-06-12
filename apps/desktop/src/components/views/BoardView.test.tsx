@@ -2,7 +2,7 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import { BoardView } from './BoardView';
 import { LanguageProvider } from '../../contexts/language-context';
-import { useTaskStore } from '@mindwtr/core';
+import { useTaskStore, type AppData, type Area, type Project, type Task } from '@mindwtr/core';
 import { useUiStore } from '../../store/ui-store';
 
 vi.mock('@dnd-kit/core', () => ({
@@ -42,10 +42,32 @@ const getRenderedTaskTitles = (column: HTMLElement, titles: string[]): string[] 
         .filter((title): title is string => Boolean(title))
 );
 
+const setBoardStoreState = ({
+    tasks = [],
+    projects = [],
+    areas = [],
+    settings = {},
+}: {
+    tasks?: Task[];
+    projects?: Project[];
+    areas?: Area[];
+    settings?: AppData['settings'];
+}) => {
+    useTaskStore.setState({
+        tasks,
+        projects,
+        areas,
+        settings,
+        _allTasks: tasks,
+        _allProjects: projects,
+        _allAreas: areas,
+    });
+};
+
 describe('BoardView', () => {
     beforeEach(() => {
         window.localStorage.clear();
-        useTaskStore.setState({
+        setBoardStoreState({
             tasks: [],
             projects: [],
             areas: [],
@@ -73,7 +95,7 @@ describe('BoardView', () => {
     });
 
     it('allows hiding the project filter panel after selecting a filter', () => {
-        useTaskStore.setState({
+        setBoardStoreState({
             tasks: [],
             projects: [{
                 id: 'project-1',
@@ -100,7 +122,7 @@ describe('BoardView', () => {
     });
 
     it('hides tasks that belong to deferred projects', () => {
-        useTaskStore.setState({
+        setBoardStoreState({
             tasks: [
                 {
                     id: 'active-task',
@@ -163,7 +185,7 @@ describe('BoardView', () => {
             createdAt: '2026-05-18T12:00:00.000Z',
             updatedAt: '2026-05-18T12:00:00.000Z',
         };
-        useTaskStore.setState({
+        setBoardStoreState({
             tasks: [
                 { ...baseTask, id: 'task-q', title: 'Task Q', boardOrder: 1 },
                 { ...baseTask, id: 'task-w', title: 'Task W', boardOrder: 2 },
@@ -182,7 +204,7 @@ describe('BoardView', () => {
         expect(titles).toEqual(['Task E', 'Task Q', 'Task W', 'Task R']);
     });
 
-    it('keeps manual board order when a non-default task sort is selected', () => {
+    it('uses the selected task sort instead of manual board order when non-default sort is selected', () => {
         const baseTask = {
             status: 'next' as const,
             tags: [],
@@ -190,7 +212,7 @@ describe('BoardView', () => {
             createdAt: '2026-05-18T12:00:00.000Z',
             updatedAt: '2026-05-18T12:00:00.000Z',
         };
-        useTaskStore.setState({
+        setBoardStoreState({
             tasks: [
                 { ...baseTask, id: 'task-q', title: 'Task Q', boardOrder: 1, createdAt: '2026-05-18T12:00:00.000Z' },
                 { ...baseTask, id: 'task-w', title: 'Task W', boardOrder: 2, createdAt: '2026-05-19T12:00:00.000Z' },
@@ -206,6 +228,6 @@ describe('BoardView', () => {
 
         const column = getByRole('list', { name: /next actions tasks list/i });
         const titles = getRenderedTaskTitles(column, ['Task Q', 'Task W', 'Task E', 'Task R']);
-        expect(titles).toEqual(['Task E', 'Task Q', 'Task W', 'Task R']);
+        expect(titles).toEqual(['Task R', 'Task E', 'Task W', 'Task Q']);
     });
 });
