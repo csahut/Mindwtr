@@ -317,14 +317,24 @@ async function persistLocalDataForSync(data: AppData): Promise<void> {
 
 async function persistSyncSettings(updates: Partial<AppSettings>): Promise<void> {
     if (isTauriRuntimeEnv()) {
-        syncServiceDependencies.markLocalSqliteWrite();
+        const persisted = normalizeAppData(await tauriInvoke<AppData>('get_data'));
+        const nextData = normalizeAppData({
+            ...persisted,
+            settings: {
+                ...(persisted.settings ?? {}),
+                ...updates,
+            },
+        });
+        await persistLocalDataForSync(nextData);
+        useTaskStore.setState((state) => ({
+            settings: {
+                ...(state.settings ?? {}),
+                ...updates,
+            },
+        }));
+        return;
     }
     await getStoreState().updateSettings(updates);
-    if (isTauriRuntimeEnv()) {
-        syncServiceDependencies.markLocalSqliteWrite();
-        await syncServiceDependencies.flushPendingSave();
-        syncServiceDependencies.markLocalSqliteWrite();
-    }
 }
 
 const DROPBOX_REDIRECT_URI_FALLBACK = 'http://127.0.0.1:53682/oauth/dropbox/callback';

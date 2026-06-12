@@ -184,18 +184,42 @@ describe('SyncService testability hooks', () => {
         expect(invoke).toHaveBeenCalledWith('save_data', { data });
     });
 
-    it('marks and flushes sync status writes as local SQLite writes', async () => {
+    it('persists sync status on top of persisted Tauri data', async () => {
+        const persistedData: AppData = {
+            tasks: [],
+            projects: [],
+            sections: [],
+            areas: [
+                { id: 'area-1', name: 'Work', order: 0, createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-06-01T00:00:00.000Z' },
+                { id: 'area-2', name: 'Home', order: 1, createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-06-02T00:00:00.000Z' },
+            ],
+            settings: {
+                lastSyncAt: '2026-06-11T00:00:00.000Z',
+            },
+        };
+        const savedData: AppData[] = [];
+        const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
+            if (command === 'get_data') return structuredClone(persistedData);
+            if (command === 'save_data') {
+                savedData.push(structuredClone((args as { data: AppData }).data));
+                return undefined;
+            }
+            throw new Error(`unexpected command: ${command}`);
+        });
         const updateSettings = vi.fn(async () => undefined);
         const flushPendingSave = vi.fn(async () => undefined);
+        markLocalWriteMock.mockReset();
         markLocalSqliteWriteMock.mockReset();
         __syncServiceTestUtils.setDependenciesForTests({
             isTauriRuntime: () => true,
+            invoke: invoke as unknown as <T>(command: string, args?: Record<string, unknown>) => Promise<T>,
             flushPendingSave,
             getStoreState: () => ({
                 updateSettings,
                 lastDataChangeAt: 123,
                 settings: {},
             }) as any,
+            markLocalWrite: markLocalWriteMock as unknown as (data?: AppData) => void,
             markLocalSqliteWrite: markLocalSqliteWriteMock as unknown as () => void,
         });
 
@@ -205,13 +229,18 @@ describe('SyncService testability hooks', () => {
         );
 
         expect(result).toBe(true);
-        expect(updateSettings).toHaveBeenCalledWith({
+        expect(updateSettings).not.toHaveBeenCalled();
+        expect(flushPendingSave).not.toHaveBeenCalled();
+        expect(invoke).toHaveBeenCalledWith('get_data', undefined);
+        expect(savedData).toHaveLength(1);
+        expect(savedData[0].areas).toEqual(persistedData.areas);
+        expect(savedData[0].settings).toMatchObject({
             lastSyncAt: '2026-06-12T00:00:00.000Z',
             lastSyncStatus: 'success',
-            lastSyncError: undefined,
         });
-        expect(markLocalSqliteWriteMock).toHaveBeenCalledTimes(3);
-        expect(flushPendingSave).toHaveBeenCalledTimes(1);
+        expect(savedData[0].settings.lastSyncError).toBeUndefined();
+        expect(markLocalWriteMock).toHaveBeenCalledWith(savedData[0]);
+        expect(markLocalSqliteWriteMock).toHaveBeenCalledTimes(2);
     });
 
     it('defaults cloud provider to selfhosted and persists selection', async () => {
