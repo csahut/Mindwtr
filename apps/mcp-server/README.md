@@ -422,11 +422,12 @@ claude mcp add mindwtr -- \
 
 ## Safety & Concurrency
 
-- The server uses **SQLite WAL mode** and a 5s busy timeout.
-- Writes will fail if the DB is locked; clients should retry.
+- The server uses **SQLite WAL mode**. Read-only tools can run while the desktop app is open.
+- Write tools fail fast on SQLite writer locks, then retry the whole Mindwtr write operation. Each retry reloads current data before applying the requested change, so a delayed MCP write does not keep working from a stale pre-lock snapshot.
 - Writes are **disabled by default**. Use `--write` to enable edits.
 - Write operations go through the shared **@mindwtr/core** store to enforce business rules (both Bun and Node).
 - SQL is reserved for read-heavy paths (list/search) where performance matters.
+- Do not point a separate container/server deployment at the same local storage or sync data while the desktop app is also writing. That creates independent writers outside the local SQLite coordination path and is unsupported.
 
 ---
 

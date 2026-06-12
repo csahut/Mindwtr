@@ -73,6 +73,8 @@ let coreReadonly = false;
 let coreReady: Promise<void> | null = null;
 let coreQueue: SerializedAsyncQueue | null = null;
 
+const CORE_SQLITE_BUSY_TIMEOUT_MS = 0;
+
 const isBun = () => typeof (globalThis as any).Bun !== 'undefined';
 
 const createSqliteClient = async (dbPath: string, readonly: boolean) => {
@@ -89,15 +91,18 @@ const createSqliteClient = async (dbPath: string, readonly: boolean) => {
     const exec = async (sql: string) => {
       db.exec(sql);
     };
+    await exec(`PRAGMA busy_timeout = ${CORE_SQLITE_BUSY_TIMEOUT_MS};`);
     await exec('PRAGMA journal_mode = WAL;');
     await exec('PRAGMA foreign_keys = ON;');
-    await exec('PRAGMA busy_timeout = 5000;');
     return { client: { run, all, get, exec }, close: () => db.close() };
   }
 
   const mod = await import('better-sqlite3');
   const Database = mod.default;
-  const db = new Database(dbPath, { readonly, fileMustExist: true });
+  const db = new Database(dbPath, {
+    readonly,
+    fileMustExist: true,
+  });
   const run = async (sql: string, params: unknown[] = []) => {
     db.prepare(sql).run(params);
   };
@@ -108,9 +113,9 @@ const createSqliteClient = async (dbPath: string, readonly: boolean) => {
   const exec = async (sql: string) => {
     db.exec(sql);
   };
+  await exec(`PRAGMA busy_timeout = ${CORE_SQLITE_BUSY_TIMEOUT_MS};`);
   await exec('PRAGMA journal_mode = WAL;');
   await exec('PRAGMA foreign_keys = ON;');
-  await exec('PRAGMA busy_timeout = 5000;');
   return { client: { run, all, get, exec }, close: () => db.close() };
 };
 
@@ -142,32 +147,35 @@ const ensureCoreReady = async (options: DbOptions) => {
   coreReady = (async () => {
     const core = await loadCoreModules();
     coreQueue ??= core.createSerializedAsyncQueue();
-    const { client } = await createSqliteClient(coreDbPath!, coreReadonly);
-    const ensureOrderNumColumn = async (tableName: 'tasks' | 'projects') => {
-      let columns: Array<{ name?: string }> = [];
-      try {
-        columns = await client.all<{ name?: string }>(`PRAGMA table_info(${tableName})`);
-      } catch (error) {
-        throw new Error(`Failed to inspect ${tableName} schema during MCP preflight: ${getErrorMessage(error)}`);
-      }
-      const hasOrderNum = columns.some((col) => col.name === 'orderNum');
-      if (hasOrderNum || coreReadonly) return;
-      try {
-        await client.run(`ALTER TABLE ${tableName} ADD COLUMN orderNum INTEGER`);
-      } catch (error) {
-        if (isDuplicateColumnError(error)) return;
-        throw new Error(`Failed to add ${tableName}.orderNum during MCP preflight: ${getErrorMessage(error)}`);
-      }
-    };
-    // Preflight for older DBs missing orderNum column.
-    await ensureOrderNumColumn('tasks');
-    await ensureOrderNumColumn('projects');
-    const sqliteAdapter = new core.SqliteAdapter(client);
-    await sqliteAdapter.ensureSchema();
-    core.setStorageAdapter(sqliteAdapter);
-    await core.useTaskStore.getState().fetchData();
+    let closeClient: (() => void) | null = null;
+    try {
+      const { client, close } = await createSqliteClient(coreDbPath!, coreReadonly);
+      closeClient = close;
+      const ensureOrderNumColumn = async (tableName: 'tasks' | 'projects') => {
+        let columns: Array<{ name?: string }> = [];
+        try {
+          columns = await client.all<{ name?: string }>(`PRAGMA table_info(${tableName})`);
+        } catch (error) {
+          throw new Error(`Failed to inspect ${tableName} schema during MCP preflight: ${getErrorMessage(error)}`);
+        }
+        const hasOrderNum = columns.some((col) => col.name === 'orderNum');
+        if (hasOrderNum || coreReadonly) return;
+        try {
+          await client.run(`ALTER TABLE ${tableName} ADD COLUMN orderNum INTEGER`);
+        } catch (error) {
+          if (isDuplicateColumnError(error)) return;
+          throw new Error(`Failed to add ${tableName}.orderNum during MCP preflight: ${getErrorMessage(error)}`);
+        }
+      };
+      // Preflight for older DBs missing orderNum column.
+      await ensureOrderNumColumn('tasks');
+      await ensureOrderNumColumn('projects');
+      const sqliteAdapter = new core.SqliteAdapter(client);
+      await sqliteAdapter.ensureSchema();
+      core.setStorageAdapter(sqliteAdapter);
+      await core.useTaskStore.getState().fetchData();
 
-    coreService = {
+      coreService = {
       addTask: async ({ title, props }) => {
         const state = core.useTaskStore.getState();
         await state.fetchData();
@@ -337,7 +345,17 @@ const ensureCoreReady = async (options: DbOptions) => {
         return updated as Person;
       },
     };
-  })();
+      closeClient = null;
+    } finally {
+      closeClient?.();
+    }
+  })().catch((error) => {
+    if (coreDbPath === resolvedPath && coreReadonly === Boolean(options.readonly)) {
+      coreReady = null;
+      coreService = null;
+    }
+    throw error;
+  });
 
   return coreReady;
 };

@@ -144,6 +144,61 @@ describe('mcp service', () => {
     expect(receivedAddTaskInput.props.assignedTo).toBe('Dana');
   });
 
+  test('retries transient sqlite write conflicts by rerunning the write operation', async () => {
+    let runCoreCalls = 0;
+    let addTaskCalls = 0;
+    const fakeDb = {} as any;
+    const deps = {
+      openMindwtrDb: async () => ({ db: fakeDb }),
+      closeDb: () => undefined,
+      listTasks: () => [],
+      listProjects: () => [],
+      listAreas: () => [],
+      getTask: () => {
+        throw new Error('not used');
+      },
+      getProject: () => {
+        throw new Error('not used');
+      },
+      parseQuickAdd: () => ({ title: '', props: {} }),
+      runCoreService: async (_options: any, fn: any) => {
+        runCoreCalls += 1;
+        if (runCoreCalls === 1) {
+          throw new Error('SQLITE_BUSY: database is locked');
+        }
+        return fn({
+          addTask: async (input: any) => {
+            addTaskCalls += 1;
+            return {
+              id: 'created',
+              title: input.title,
+              status: input.props?.status ?? 'inbox',
+              createdAt: '2026-01-01',
+              updatedAt: '2026-01-01',
+            };
+          },
+          updateTask: async () => ({ id: 't1' }),
+          completeTask: async () => ({ id: 't1' }),
+          deleteTask: async () => ({ id: 't1' }),
+          restoreTask: async () => ({ id: 't1' }),
+          addProject: async () => ({ id: 'p1', title: 'Project' }),
+          updateProject: async () => ({ id: 'p1', title: 'Project' }),
+          deleteProject: async () => ({ id: 'p1', title: 'Project' }),
+          addArea: async () => ({ id: 'a1', name: 'Area' }),
+          updateArea: async () => ({ id: 'a1', name: 'Area' }),
+          deleteArea: async () => ({ id: 'a1', name: 'Area' }),
+        });
+      },
+    };
+    const service = createService({ readonly: false }, deps as any);
+
+    const task = await service.addTask({ title: 'Retry me' });
+
+    expect(task.title).toBe('Retry me');
+    expect(runCoreCalls).toBe(2);
+    expect(addTaskCalls).toBe(1);
+  });
+
   test('forwards plain-title addTask metadata fields to core addTask', async () => {
     let receivedAddTaskInput: any = null;
     const fakeDb = {} as any;

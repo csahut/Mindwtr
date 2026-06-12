@@ -88,6 +88,45 @@ const defaultServiceDeps: ServiceDeps = {
   runCoreService,
 };
 
+const SQLITE_WRITE_RETRY_ATTEMPTS = 7;
+const SQLITE_WRITE_RETRY_BASE_DELAY_MS = 100;
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryableSqliteWriteError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('sqlite_busy')
+    || normalized.includes('sqlite_locked')
+    || normalized.includes('database is locked')
+    || normalized.includes('database is busy')
+    || normalized.includes('database schema is locked')
+    || normalized.includes('resource busy')
+    || normalized.includes('temporarily unavailable')
+  );
+};
+
+const runCoreWriteWithRetries = async <T>(
+  options: DbOptions,
+  deps: ServiceDeps,
+  fn: Parameters<typeof runCoreService<T>>[1],
+): Promise<T> => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < SQLITE_WRITE_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await deps.runCoreService(options, fn);
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableSqliteWriteError(error) || attempt + 1 >= SQLITE_WRITE_RETRY_ATTEMPTS) {
+        throw error;
+      }
+      await sleep(SQLITE_WRITE_RETRY_BASE_DELAY_MS * 2 ** attempt);
+    }
+  }
+  throw lastError;
+};
+
 const createDbAccessor = (options: DbOptions, deps: ServiceDeps) => {
   let dbHandlePromise: Promise<Awaited<ReturnType<typeof openMindwtrDb>>> | null = null;
   const getDbHandle = async () => {
@@ -336,7 +375,7 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
     getPerson: async (input) => withDb((db) => deps.getPerson(db, input)),
     addTask: async (input) => {
       const normalizedInput = validateAddTaskInput(input);
-      return await deps.runCoreService(options, async (core) => {
+      return await runCoreWriteWithRetries(options, deps, async (core) => {
         if (normalizedInput.quickAdd) {
           const projects = await withDb((db) => deps.listProjects(db));
           const quick = deps.parseQuickAdd(normalizedInput.quickAdd, projects as CoreProject[]);
@@ -380,17 +419,17 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
       });
     },
     updateTask: async (input) =>
-      deps.runCoreService(options, async (core) => {
+      runCoreWriteWithRetries(options, deps, async (core) => {
         return core.updateTask({
           id: input.id,
           updates: buildTaskUpdates(input),
         });
       }),
-    completeTask: async (id) => deps.runCoreService(options, (core) => core.completeTask(id)),
-    deleteTask: async (id) => deps.runCoreService(options, (core) => core.deleteTask(id)),
-    restoreTask: async (id) => deps.runCoreService(options, (core) => core.restoreTask(id)),
+    completeTask: async (id) => runCoreWriteWithRetries(options, deps, (core) => core.completeTask(id)),
+    deleteTask: async (id) => runCoreWriteWithRetries(options, deps, (core) => core.deleteTask(id)),
+    restoreTask: async (id) => runCoreWriteWithRetries(options, deps, (core) => core.restoreTask(id)),
     addProject: async (input) =>
-      deps.runCoreService(options, async (core) => {
+      runCoreWriteWithRetries(options, deps, async (core) => {
         const title = validateProjectTitle(input.title);
         return core.addProject({
           title,
@@ -407,7 +446,7 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
         });
       }),
     updateProject: async (input) =>
-      deps.runCoreService(options, async (core) => {
+      runCoreWriteWithRetries(options, deps, async (core) => {
         const updates = filterUndefined({
           title: input.title !== undefined ? validateProjectTitle(input.title) : undefined,
           color: input.color ?? undefined,
@@ -421,9 +460,9 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
         }) as Partial<CoreProject>;
         return core.updateProject({ id: input.id, updates });
       }),
-    deleteProject: async (id) => deps.runCoreService(options, (core) => core.deleteProject(id)),
+    deleteProject: async (id) => runCoreWriteWithRetries(options, deps, (core) => core.deleteProject(id)),
     addSection: async (input) =>
-      deps.runCoreService(options, async (core) => {
+      runCoreWriteWithRetries(options, deps, async (core) => {
         const projectId = input.projectId.trim();
         if (!projectId) throw new ValidationError('Section projectId is required');
         const title = validateSectionTitle(input.title);
@@ -434,7 +473,7 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
         return core.addSection({ projectId, title, props });
       }),
     updateSection: async (input) =>
-      deps.runCoreService(options, async (core) => {
+      runCoreWriteWithRetries(options, deps, async (core) => {
         const updates: Partial<CoreSection> = {};
         if (input.title !== undefined) updates.title = validateSectionTitle(input.title);
         if (input.description !== undefined) updates.description = input.description ?? undefined;
@@ -442,9 +481,9 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
         if (input.isCollapsed !== undefined) updates.isCollapsed = input.isCollapsed;
         return core.updateSection({ id: input.id, updates });
       }),
-    deleteSection: async (id) => deps.runCoreService(options, (core) => core.deleteSection(id)),
+    deleteSection: async (id) => runCoreWriteWithRetries(options, deps, (core) => core.deleteSection(id)),
     addArea: async (input) =>
-      deps.runCoreService(options, async (core) => {
+      runCoreWriteWithRetries(options, deps, async (core) => {
         const name = validateAreaName(input.name);
         return core.addArea({
           name,
@@ -455,7 +494,7 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
         });
       }),
     updateArea: async (input) =>
-      deps.runCoreService(options, async (core) => {
+      runCoreWriteWithRetries(options, deps, async (core) => {
         const updates = filterUndefined({
           name: input.name !== undefined ? validateAreaName(input.name) : undefined,
           color: input.color ?? undefined,
@@ -463,9 +502,9 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
         }) as Partial<CoreArea>;
         return core.updateArea({ id: input.id, updates });
       }),
-    deleteArea: async (id) => deps.runCoreService(options, (core) => core.deleteArea(id)),
+    deleteArea: async (id) => runCoreWriteWithRetries(options, deps, (core) => core.deleteArea(id)),
     addPerson: async (input) =>
-      deps.runCoreService(options, async (core) => {
+      runCoreWriteWithRetries(options, deps, async (core) => {
         const name = validatePersonName(input.name);
         const props: Partial<CorePerson> = {};
         if (input.note !== undefined) props.note = input.note ?? undefined;
@@ -476,7 +515,7 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
         });
       }),
     updatePerson: async (input) =>
-      deps.runCoreService(options, async (core) => {
+      runCoreWriteWithRetries(options, deps, async (core) => {
         const updates: Partial<CorePerson> = {};
         if (input.name !== undefined) updates.name = validatePersonName(input.name);
         if (input.note !== undefined) updates.note = input.note ?? undefined;
@@ -484,14 +523,14 @@ export const createService = (options: DbOptions, deps: ServiceDeps = defaultSer
         return core.updatePerson({ id: input.id, updates });
       }),
     renamePerson: async (input) =>
-      deps.runCoreService(options, async (core) => {
+      runCoreWriteWithRetries(options, deps, async (core) => {
         return core.renamePerson({
           id: input.id,
           name: validatePersonName(input.name),
           updateTasks: input.updateTasks,
         });
       }),
-    deletePerson: async (id) => deps.runCoreService(options, (core) => core.deletePerson(id)),
+    deletePerson: async (id) => runCoreWriteWithRetries(options, deps, (core) => core.deletePerson(id)),
     close,
   };
 };
