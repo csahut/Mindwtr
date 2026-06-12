@@ -184,6 +184,36 @@ describe('SyncService testability hooks', () => {
         expect(invoke).toHaveBeenCalledWith('save_data', { data });
     });
 
+    it('marks and flushes sync status writes as local SQLite writes', async () => {
+        const updateSettings = vi.fn(async () => undefined);
+        const flushPendingSave = vi.fn(async () => undefined);
+        markLocalSqliteWriteMock.mockReset();
+        __syncServiceTestUtils.setDependenciesForTests({
+            isTauriRuntime: () => true,
+            flushPendingSave,
+            getStoreState: () => ({
+                updateSettings,
+                lastDataChangeAt: 123,
+                settings: {},
+            }) as any,
+            markLocalSqliteWrite: markLocalSqliteWriteMock as unknown as () => void,
+        });
+
+        const result = await (SyncService as any).persistSuccessfulSyncStatus(
+            'success',
+            '2026-06-12T00:00:00.000Z',
+        );
+
+        expect(result).toBe(true);
+        expect(updateSettings).toHaveBeenCalledWith({
+            lastSyncAt: '2026-06-12T00:00:00.000Z',
+            lastSyncStatus: 'success',
+            lastSyncError: undefined,
+        });
+        expect(markLocalSqliteWriteMock).toHaveBeenCalledTimes(3);
+        expect(flushPendingSave).toHaveBeenCalledTimes(1);
+    });
+
     it('defaults cloud provider to selfhosted and persists selection', async () => {
         expect(await SyncService.getCloudProvider()).toBe('selfhosted');
         await SyncService.setCloudProvider('dropbox');

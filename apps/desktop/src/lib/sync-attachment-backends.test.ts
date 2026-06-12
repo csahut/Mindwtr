@@ -1,7 +1,19 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppData } from '@mindwtr/core';
 
-import { syncCloudAttachments, syncCloudKitAttachments, type AttachmentBackendDeps } from './sync-attachment-backends';
+import {
+    clearAttachmentSyncState,
+    syncCloudAttachments,
+    syncCloudKitAttachments,
+    syncWebdavAttachments,
+    type AttachmentBackendDeps,
+} from './sync-attachment-backends';
+
+const coreMocks = vi.hoisted(() => ({
+    webdavFileExists: vi.fn(),
+    webdavMakeDirectory: vi.fn(),
+    withRetry: vi.fn((operation: () => Promise<unknown>) => operation()),
+}));
 
 const fsMocks = vi.hoisted(() => ({
     BaseDirectory: { Data: 'Data' },
@@ -24,6 +36,15 @@ const cloudKitMocks = vi.hoisted(() => ({
     saveCloudKitAttachmentAsset: vi.fn(),
 }));
 
+vi.mock('@mindwtr/core', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@mindwtr/core')>();
+    return {
+        ...actual,
+        webdavFileExists: coreMocks.webdavFileExists,
+        webdavMakeDirectory: coreMocks.webdavMakeDirectory,
+        withRetry: coreMocks.withRetry,
+    };
+});
 vi.mock('@tauri-apps/plugin-fs', () => fsMocks);
 vi.mock('@tauri-apps/api/path', () => pathMocks);
 vi.mock('./cloudkit-sync', () => cloudKitMocks);
@@ -39,6 +60,18 @@ const errorResponse = (status: number, statusText: string): Response =>
     }) as Response;
 
 describe('desktop sync attachment backends', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        clearAttachmentSyncState();
+        pathMocks.dataDir.mockResolvedValue('/app-data');
+        pathMocks.join.mockImplementation(async (...parts: string[]) => parts.join('/'));
+        fsMocks.mkdir.mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it('marks cloud attachments unrecoverable when the remote file is missing', async () => {
         const fetcher = vi.fn(async () => errorResponse(404, 'Not Found'));
         const logSyncWarning = vi.fn();
@@ -80,10 +113,6 @@ describe('desktop sync attachment backends', () => {
             resolveWebdavPassword: vi.fn(),
         };
 
-        pathMocks.dataDir.mockResolvedValue('/app-data');
-        pathMocks.join.mockImplementation(async (...parts: string[]) => parts.join('/'));
-        fsMocks.mkdir.mockResolvedValue(undefined);
-
         await expect(
             syncCloudAttachments(
                 appData,
@@ -105,8 +134,68 @@ describe('desktop sync attachment backends', () => {
         );
     });
 
+    it('keeps WebDAV attachment sync in cooldown across repeated sync runs after rate limiting', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-12T00:00:00.000Z'));
+        const rateLimitError = Object.assign(new Error('WebDAV MKCOL failed (503)'), { status: 503 });
+        const logSyncInfo = vi.fn();
+        const logSyncWarning = vi.fn();
+        const deps: AttachmentBackendDeps = {
+            getTauriFetch: vi.fn(async () => undefined),
+            isTauriRuntimeEnv: () => true,
+            logSyncInfo,
+            logSyncWarning,
+            resolveWebdavPassword: vi.fn(async () => 'secret'),
+        };
+        const appData: AppData = {
+            tasks: [],
+            projects: [],
+            sections: [],
+            areas: [],
+            settings: {},
+        };
+        coreMocks.webdavMakeDirectory.mockRejectedValueOnce(rateLimitError);
+
+        await expect(
+            syncWebdavAttachments(
+                appData,
+                { url: 'https://dav.example/mindwtr', username: 'alice' },
+                'https://dav.example/mindwtr',
+                deps,
+            ),
+        ).resolves.toBeNull();
+        await expect(
+            syncWebdavAttachments(
+                appData,
+                { url: 'https://dav.example/mindwtr', username: 'alice' },
+                'https://dav.example/mindwtr',
+                deps,
+            ),
+        ).resolves.toBeNull();
+
+        expect(coreMocks.webdavMakeDirectory).toHaveBeenCalledTimes(1);
+        expect(logSyncWarning).toHaveBeenCalledWith('WebDAV rate limited; pausing attachment sync', rateLimitError);
+        expect(logSyncInfo).toHaveBeenCalledWith(
+            'WebDAV attachment sync skipped during rate-limit cooldown',
+            { remainingMs: '60000' },
+        );
+
+        vi.advanceTimersByTime(60_000);
+        coreMocks.webdavMakeDirectory.mockResolvedValueOnce(undefined);
+
+        await expect(
+            syncWebdavAttachments(
+                appData,
+                { url: 'https://dav.example/mindwtr', username: 'alice' },
+                'https://dav.example/mindwtr',
+                deps,
+            ),
+        ).resolves.toBeNull();
+
+        expect(coreMocks.webdavMakeDirectory).toHaveBeenCalledTimes(2);
+    });
+
     it('uploads local attachments to CloudKit and flushes CloudKit pending deletes', async () => {
-        vi.clearAllMocks();
         const bytes = new Uint8Array([1, 2, 3]);
         const logSyncWarning = vi.fn();
         const appData: AppData = {

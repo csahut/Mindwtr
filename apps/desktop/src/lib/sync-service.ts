@@ -315,6 +315,18 @@ async function persistLocalDataForSync(data: AppData): Promise<void> {
     syncServiceDependencies.markLocalSqliteWrite();
 }
 
+async function persistSyncSettings(updates: Partial<AppSettings>): Promise<void> {
+    if (isTauriRuntimeEnv()) {
+        syncServiceDependencies.markLocalSqliteWrite();
+    }
+    await getStoreState().updateSettings(updates);
+    if (isTauriRuntimeEnv()) {
+        syncServiceDependencies.markLocalSqliteWrite();
+        await syncServiceDependencies.flushPendingSave();
+        syncServiceDependencies.markLocalSqliteWrite();
+    }
+}
+
 const DROPBOX_REDIRECT_URI_FALLBACK = 'http://127.0.0.1:53682/oauth/dropbox/callback';
 const DROPBOX_TEST_TIMEOUT_MS = 15_000;
 
@@ -910,15 +922,14 @@ export class SyncService {
         now: string,
         lastSyncHistory?: ReturnType<typeof appendSyncHistory>
     ): Promise<boolean> {
-        const state = getStoreState();
         try {
-            await state.updateSettings({
+            await persistSyncSettings({
                 lastSyncAt: now,
                 lastSyncStatus: syncStatus,
                 lastSyncError: undefined,
                 ...(lastSyncHistory ? { lastSyncHistory } : {}),
             });
-            SyncService.lastSuccessfulSyncLocalChangeAt = state.lastDataChangeAt;
+            SyncService.lastSuccessfulSyncLocalChangeAt = getStoreState().lastDataChangeAt;
             return true;
         } catch (error) {
             logSyncWarning('Failed to persist sync status', error);
@@ -1007,7 +1018,7 @@ export class SyncService {
         SyncService.setPendingExternalSyncChange(null);
         getStoreState().setError(null);
         try {
-            await getStoreState().updateSettings({
+            await persistSyncSettings({
                 lastSyncAt: now,
                 lastSyncStatus: 'success',
                 lastSyncError: undefined,
@@ -2047,7 +2058,7 @@ export class SyncService {
             getStoreState().setError(finalErrorMessage);
             try {
                 await getStoreState().fetchData({ silent: true });
-                await getStoreState().updateSettings({
+                await persistSyncSettings({
                     lastSyncAt: now,
                     lastSyncStatus: 'error',
                     lastSyncError: finalErrorMessage,

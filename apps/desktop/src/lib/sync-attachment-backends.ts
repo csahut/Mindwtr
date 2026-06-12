@@ -101,9 +101,26 @@ const webdavDownloadBackoff = createWebdavDownloadBackoff({
     missingBackoffMs: WEBDAV_ATTACHMENT_MISSING_BACKOFF_MS,
     errorBackoffMs: WEBDAV_ATTACHMENT_ERROR_BACKOFF_MS,
 });
+let webdavAttachmentRateLimitedUntil = 0;
 
 export const clearAttachmentSyncState = (): void => {
     webdavDownloadBackoff.clear();
+    webdavAttachmentRateLimitedUntil = 0;
+};
+
+const getWebdavAttachmentRateLimitRemainingMs = (): number => Math.max(0, webdavAttachmentRateLimitedUntil - Date.now());
+
+const markWebdavAttachmentRateLimited = (
+    error: unknown,
+    logSyncWarning: AttachmentBackendDeps['logSyncWarning'],
+): boolean => {
+    if (!isWebdavRateLimitedError(error)) return false;
+    webdavAttachmentRateLimitedUntil = Math.max(
+        webdavAttachmentRateLimitedUntil,
+        Date.now() + WEBDAV_ATTACHMENT_COOLDOWN_MS,
+    );
+    logSyncWarning('WebDAV rate limited; pausing attachment sync', error);
+    return true;
 };
 
 const getWebdavDownloadBackoff = (attachmentId: string): number | null => {
@@ -204,6 +221,13 @@ export async function syncWebdavAttachments(
 ): Promise<AppData | null> {
     if (!deps.isTauriRuntimeEnv()) return null;
     if (!webDavConfig.url) return null;
+    const cooldownRemainingMs = getWebdavAttachmentRateLimitRemainingMs();
+    if (cooldownRemainingMs > 0) {
+        deps.logSyncInfo('WebDAV attachment sync skipped during rate-limit cooldown', {
+            remainingMs: String(Math.ceil(cooldownRemainingMs)),
+        });
+        return null;
+    }
 
     const fetcher = await deps.getTauriFetch();
     const { BaseDirectory, exists, mkdir, readFile, writeFile, rename, remove } = await import('@tauri-apps/plugin-fs');
@@ -219,6 +243,9 @@ export async function syncWebdavAttachments(
             fetcher,
         });
     } catch (error) {
+        if (markWebdavAttachmentRateLimited(error, deps.logSyncWarning)) {
+            return null;
+        }
         deps.logSyncWarning('Failed to ensure WebDAV attachments directory', error);
     }
 
@@ -241,12 +268,12 @@ export async function syncWebdavAttachments(
     });
 
     let lastRequestAt = 0;
-    let blockedUntil = 0;
     const waitForSlot = async (): Promise<void> => {
-        const now = Date.now();
-        if (blockedUntil && now < blockedUntil) {
-            throw new Error(`WebDAV rate limited for ${blockedUntil - now}ms`);
+        const cooldownRemainingMs = getWebdavAttachmentRateLimitRemainingMs();
+        if (cooldownRemainingMs > 0) {
+            throw new Error(`WebDAV rate limited for ${cooldownRemainingMs}ms`);
         }
+        const now = Date.now();
         const elapsed = now - lastRequestAt;
         if (elapsed < WEBDAV_ATTACHMENT_MIN_INTERVAL_MS) {
             await sleep(WEBDAV_ATTACHMENT_MIN_INTERVAL_MS - elapsed);
@@ -254,10 +281,7 @@ export async function syncWebdavAttachments(
         lastRequestAt = Date.now();
     };
     const handleRateLimit = (error: unknown): boolean => {
-        if (!isWebdavRateLimitedError(error)) return false;
-        blockedUntil = Date.now() + WEBDAV_ATTACHMENT_COOLDOWN_MS;
-        deps.logSyncWarning('WebDAV rate limited; pausing attachment sync', error);
-        return true;
+        return markWebdavAttachmentRateLimited(error, deps.logSyncWarning);
     };
 
     const readLocalFile = async (path: string): Promise<Uint8Array> => {
