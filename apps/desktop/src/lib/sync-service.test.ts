@@ -5,6 +5,7 @@ import { fallbackHashString, getFileSyncDir, hashString, normalizeSyncBackend } 
 import { useUiStore } from '../store/ui-store';
 
 const markLocalWriteMock = vi.hoisted(() => vi.fn());
+const markLocalSqliteWriteMock = vi.hoisted(() => vi.fn());
 
 import { SyncService, __syncServiceTestUtils } from './sync-service';
 
@@ -168,15 +169,18 @@ describe('SyncService testability hooks', () => {
             settings: {},
         };
         markLocalWriteMock.mockReset();
+        markLocalSqliteWriteMock.mockReset();
         __syncServiceTestUtils.setDependenciesForTests({
             isTauriRuntime: () => true,
             invoke: invoke as unknown as <T>(command: string, args?: Record<string, unknown>) => Promise<T>,
             markLocalWrite: markLocalWriteMock as unknown as (data?: AppData) => void,
+            markLocalSqliteWrite: markLocalSqliteWriteMock as unknown as () => void,
         });
 
         await __syncServiceTestUtils.persistLocalDataForTests(data);
 
         expect(markLocalWriteMock).toHaveBeenCalledWith(data);
+        expect(markLocalSqliteWriteMock).toHaveBeenCalledTimes(2);
         expect(invoke).toHaveBeenCalledWith('save_data', { data });
     });
 

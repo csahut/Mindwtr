@@ -58,7 +58,7 @@ import { getTauriHttpFetch } from './tauri-http';
 import { reportError } from './report-error';
 import { logInfo, logSyncError, logWarn, sanitizeLogMessage } from './app-log';
 import { useUiStore } from '../store/ui-store';
-import { markLocalWrite } from './local-data-watcher';
+import { markLocalSqliteWrite, markLocalWrite } from './local-data-watcher';
 import { ExternalCalendarService } from './external-calendar-service';
 import { webStorage } from './storage-adapter-web';
 import {
@@ -170,6 +170,7 @@ type SyncServiceDependencies = {
     performSyncCycle: typeof performSyncCycle;
     getInMemoryAppDataSnapshot: typeof getInMemoryAppDataSnapshot;
     markLocalWrite: typeof markLocalWrite;
+    markLocalSqliteWrite: typeof markLocalSqliteWrite;
     reportError: typeof reportError;
     logInfo: typeof logInfo;
     logWarn: typeof logWarn;
@@ -206,6 +207,7 @@ const defaultSyncServiceDependencies: SyncServiceDependencies = {
     performSyncCycle,
     getInMemoryAppDataSnapshot,
     markLocalWrite,
+    markLocalSqliteWrite,
     reportError,
     logInfo,
     logWarn,
@@ -308,7 +310,9 @@ async function tauriInvoke<T>(command: string, args?: Record<string, unknown>): 
 
 async function persistLocalDataForSync(data: AppData): Promise<void> {
     syncServiceDependencies.markLocalWrite(data);
+    syncServiceDependencies.markLocalSqliteWrite();
     await tauriInvoke('save_data', { data });
+    syncServiceDependencies.markLocalSqliteWrite();
 }
 
 const DROPBOX_REDIRECT_URI_FALLBACK = 'http://127.0.0.1:53682/oauth/dropbox/callback';

@@ -71,6 +71,7 @@ const buildResponse = (
 
 const invokeMock = vi.hoisted(() => vi.fn());
 const markLocalWriteMock = vi.hoisted(() => vi.fn());
+const markLocalSqliteWriteMock = vi.hoisted(() => vi.fn());
 const flushPendingSaveMock = vi.hoisted(() => vi.fn());
 const performSyncCycleMock = vi.hoisted(() => vi.fn());
 const getInMemoryAppDataSnapshotMock = vi.hoisted(() => vi.fn());
@@ -201,6 +202,7 @@ describe('desktop sync-service runtime', () => {
             performSyncCycle: performSyncCycleMock as typeof performSyncCycleMock,
             getInMemoryAppDataSnapshot: getInMemoryAppDataSnapshotMock as typeof getInMemoryAppDataSnapshotMock,
             markLocalWrite: markLocalWriteMock as typeof markLocalWriteMock,
+            markLocalSqliteWrite: markLocalSqliteWriteMock as typeof markLocalSqliteWriteMock,
             reportError: vi.fn(),
             logInfo: logInfoMock as typeof logInfoMock,
             logWarn: logWarnMock as typeof logWarnMock,
@@ -222,6 +224,7 @@ describe('desktop sync-service runtime', () => {
 
         expect(result).toEqual({ success: true, skipped: 'requeued' });
         expect(markLocalWriteMock).toHaveBeenCalledTimes(1);
+        expect(markLocalSqliteWriteMock).toHaveBeenCalledTimes(2);
         expect(invokeMock).toHaveBeenCalledWith('save_data', {
             data: expect.objectContaining({
                 tasks: [
