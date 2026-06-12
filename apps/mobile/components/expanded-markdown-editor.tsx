@@ -312,11 +312,11 @@ export function ExpandedMarkdownEditor({
     const handleChangeText = React.useCallback((nextValue: string) => {
         const ignoredNativeChange = ignoredNativePairChangeRef.current;
         if (ignoredNativeChange) {
-            ignoredNativePairChangeRef.current = null;
             if (shouldIgnoreNativePairChange(nextValue, valueRef.current, ignoredNativeChange)) {
                 restoreEditorFocus(ignoredNativeChange.selection);
                 return;
             }
+            ignoredNativePairChangeRef.current = null;
         }
 
         const currentSelection = selectionRef.current;

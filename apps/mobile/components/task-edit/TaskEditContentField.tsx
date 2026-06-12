@@ -233,11 +233,11 @@ export function TaskEditContentField({
         const previousValue = checklistTitleRefs.current[key] ?? '';
         const ignoredNativeChange = ignoredNativePairChangeRefs.current[key];
         if (ignoredNativeChange) {
-            delete ignoredNativePairChangeRefs.current[key];
             if (shouldIgnoreNativePairChange(text, previousValue, ignoredNativeChange)) {
                 restoreChecklistSelection(key, ignoredNativeChange.selection);
                 return;
             }
+            delete ignoredNativePairChangeRefs.current[key];
         }
 
         const currentSelection = getChecklistSelection(key, previousValue);

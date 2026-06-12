@@ -193,11 +193,11 @@ export function useTaskDescriptionEditor({
     const handleDescriptionChange = React.useCallback((text: string) => {
         const ignoredNativeChange = ignoredNativePairChangeRef.current;
         if (ignoredNativeChange) {
-            ignoredNativePairChangeRef.current = null;
             if (shouldIgnoreNativePairChange(text, descriptionDraftRef.current, ignoredNativeChange)) {
                 restoreDescriptionSelection(ignoredNativeChange.selection);
                 return;
             }
+            ignoredNativePairChangeRef.current = null;
         }
 
         const currentSelection = descriptionSelectionRef.current;

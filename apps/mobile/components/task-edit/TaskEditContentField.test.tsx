@@ -432,6 +432,14 @@ describe('TaskEditContentField', () => {
 
       const callsAfterKeyPress = applyChecklistUpdate.mock.calls.length;
       act(() => {
+        input.props.onChangeText('(');
+      });
+
+      expect(getState().checklist[0].title).toBe('()');
+      expect(applyChecklistUpdate).toHaveBeenCalledTimes(callsAfterKeyPress);
+
+      input = tree.root.findByProps({ accessibilityLabel: 'taskEdit.checklist 1' });
+      act(() => {
         input.props.onChangeText('(())');
       });
 
