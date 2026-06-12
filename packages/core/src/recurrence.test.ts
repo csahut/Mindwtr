@@ -7,7 +7,9 @@ import {
     expandCalendarRecurringTasks,
     createProjectedRecurringTask,
     formatRecurrenceLabel,
+    getProjectedRecurringTaskCalendarDate,
     getProjectedRecurringTaskId,
+    getTaskCalendarOccurrenceDate,
     isProjectedRecurringTask,
     normalizeRecurrenceForLoad,
 } from './recurrence';
@@ -702,6 +704,38 @@ describe('recurrence', () => {
         expect(projected?.dueDate).toBe('2025-06-01');
         expect(projected?.createdAt).toBe(task.createdAt);
         expect(projected?.updatedAt).toBe('2025-05-27T12:00:00.000Z');
+    });
+
+    it('returns the calendar occurrence date for calendar-visible tasks', () => {
+        expect(getTaskCalendarOccurrenceDate({
+            startTime: '2026-07-09T09:00',
+            dueDate: '2026-07-10',
+        })).toBe('2026-07-09T09:00');
+        expect(getTaskCalendarOccurrenceDate({
+            dueDate: '2026-07-10',
+        })).toBe('2026-07-10');
+        expect(getTaskCalendarOccurrenceDate({})).toBeUndefined();
+    });
+
+    it('returns the projected calendar occurrence date for recurrence previews', () => {
+        const task: Task = {
+            id: 't-projected-date-label',
+            title: 'Ninth day planning',
+            status: 'next',
+            tags: [],
+            contexts: [],
+            recurrence: {
+                rule: 'monthly',
+                strategy: 'strict',
+                byMonthDay: [9],
+                rrule: 'FREQ=MONTHLY;BYMONTHDAY=9',
+            },
+            showFutureRecurrence: true,
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+        };
+
+        expect(getProjectedRecurringTaskCalendarDate(task, '2026-06-05T12:00:00.000Z')).toBe('2026-07-09');
     });
 
     it('projects a start-only monthly nth-weekday recurrence into the calendar preview', () => {

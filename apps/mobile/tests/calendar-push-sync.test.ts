@@ -131,6 +131,8 @@ vi.mock('@mindwtr/core', () => ({
         return projectedTask ? [task, projectedTask] : [task];
     },
     getProjectedRecurringTaskId: (taskId: string): string => `${taskId}:projected-recurrence`,
+    getTaskCalendarOccurrenceDate: (task: { startTime?: string; dueDate?: string }): string | undefined =>
+        task.startTime ?? task.dueDate,
     hasTimeComponent: (dateStr: string | null | undefined): boolean =>
         Boolean(dateStr && /[T\s]\d{2}:\d{2}/.test(dateStr)),
     timeEstimateToMinutes: (estimate?: string): number => {
@@ -155,6 +157,19 @@ vi.mock('@mindwtr/core', () => ({
         Boolean(task && typeof task === 'object' && (task as { isProjectedRecurringTask?: unknown }).isProjectedRecurringTask === true),
     isProjectedRecurringTaskId: (taskId: string | null | undefined): boolean =>
         typeof taskId === 'string' && taskId.endsWith(':projected-recurrence'),
+    safeFormatDate: (dateStr: string | Date | null | undefined, formatStr: string, fallback = ''): string => {
+        if (!dateStr) return fallback;
+        const date = typeof dateStr === 'string'
+            ? /^(\d{4})-(\d{2})-(\d{2})$/.test(dateStr)
+                ? new Date(Number(dateStr.slice(0, 4)), Number(dateStr.slice(5, 7)) - 1, Number(dateStr.slice(8, 10)))
+                : new Date(dateStr)
+            : dateStr;
+        if (Number.isNaN(date.getTime())) return fallback;
+        if (formatStr === 'PP') {
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        return date.toISOString();
+    },
     // Real implementation: parses YYYY-MM-DD as LOCAL midnight (not UTC).
     safeParseDate: (dateStr: string | null | undefined): Date | null => {
         if (!dateStr) return null;
@@ -688,8 +703,8 @@ describe('buildEventDetails — date-only calendar events stay on the intended d
 
         expect(mockCreateEventAsync).toHaveBeenCalledTimes(2);
         expect(mockCreateEventAsync).toHaveBeenCalledWith('cal-1', expect.objectContaining({
-            title: 'Monthly bill',
-            notes: expect.stringContaining('Projected recurring occurrence'),
+            title: 'Monthly bill (May 1, 2026)',
+            notes: expect.stringContaining('Projected recurring occurrence for May 1, 2026'),
         }));
         expect(mockUpsertCalendarSyncEntry).toHaveBeenCalledWith(expect.objectContaining({
             taskId: projectedTask.id,
@@ -1115,7 +1130,8 @@ describe('startCalendarPushSync', () => {
 
         expect(mockCreateEventAsync).toHaveBeenCalledWith('cal-1', expect.objectContaining({
             calendarId: 'cal-1',
-            notes: expect.stringContaining('Projected recurring occurrence'),
+            title: 'My Task (May 20, 2026)',
+            notes: expect.stringContaining('Projected recurring occurrence for May 20, 2026'),
         }));
         expect(mockUpsertCalendarSyncEntry).toHaveBeenCalledWith(expect.objectContaining({
             taskId: projectedTask.id,

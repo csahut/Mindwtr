@@ -4,6 +4,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Plus, Search } from 'lucide-re
 import {
     getCalendarDayOfMonth,
     getCalendarMonthIndex,
+    getTaskCalendarOccurrenceDate,
     hasTimeComponent,
     isProjectedRecurringTask,
     isSameCalendarMonth,
@@ -31,6 +32,16 @@ import {
     dayKey,
     useDesktopCalendarController,
 } from './calendar/useDesktopCalendarController';
+
+const PROJECTED_RECURRENCE_LABEL_DATE_FORMAT = 'MMM d';
+
+function getProjectedRecurrenceDisplayLabel(task: Task, projectedLabel: string): string {
+    const occurrenceDateLabel = safeFormatDate(
+        getTaskCalendarOccurrenceDate(task),
+        PROJECTED_RECURRENCE_LABEL_DATE_FORMAT
+    );
+    return occurrenceDateLabel ? `${projectedLabel} · ${occurrenceDateLabel}` : projectedLabel;
+}
 
 export function CalendarView() {
     const timelineScrollRef = useRef<HTMLDivElement | null>(null);
@@ -366,14 +377,14 @@ export function CalendarView() {
                                             : item.kind === 'event' && item.event.allDay
                                                 ? t('calendar.allDay')
                                                 : '';
-                                        const content = (
-                                            <>
-                                                {timeLabel && <span className="mr-1 text-[10px] opacity-75">{timeLabel}</span>}
-                                                <span>{item.title}</span>
-                                            </>
-                                        );
 
                                         if (item.kind === 'event') {
+                                            const content = (
+                                                <>
+                                                    {timeLabel && <span className="mr-1 text-[10px] opacity-75">{timeLabel}</span>}
+                                                    <span>{item.title}</span>
+                                                </>
+                                            );
                                             return (
                                                 <div
                                                     key={item.id}
@@ -388,6 +399,16 @@ export function CalendarView() {
 
                                         const task = item.task;
                                         const projected = isProjectedRecurringTask(task);
+                                        const projectedLabel = projected
+                                            ? getProjectedRecurrenceDisplayLabel(task, resolveText('calendar.projectedRecurrence', 'Projected'))
+                                            : '';
+                                        const content = (
+                                            <>
+                                                {timeLabel && <span className="mr-1 text-[10px] opacity-75">{timeLabel}</span>}
+                                                <span>{item.title}</span>
+                                                {projected && <span className="ml-1 text-[10px] opacity-75">{projectedLabel}</span>}
+                                            </>
+                                        );
                                         return (
                                             <button
                                                 key={item.id}
@@ -404,7 +425,7 @@ export function CalendarView() {
                                                         ? "bg-primary/10 text-primary"
                                                         : "border-l-[3px] border-destructive/70 bg-background/60 text-foreground"
                                                 )}
-                                                title={projected ? `${task.title} (${resolveText('calendar.projectedRecurrence', 'Projected')})` : task.title}
+                                                title={projected ? `${task.title} (${projectedLabel})` : task.title}
                                                 onDragStart={(event) => handleCalendarTaskDragStart(event, task, item.kind)}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -496,6 +517,9 @@ export function CalendarView() {
                                                 );
                                             }
                                             const projected = isProjectedRecurringTask(item.task);
+                                            const projectedLabel = projected
+                                                ? getProjectedRecurrenceDisplayLabel(item.task, resolveText('calendar.projectedRecurrence', 'Projected'))
+                                                : '';
                                             return (
                                                 <button
                                                     key={item.id}
@@ -516,9 +540,9 @@ export function CalendarView() {
                                                             ? "border-primary/70 bg-primary/5"
                                                             : "border-destructive/70 bg-background/70"
                                                     )}
-                                                    title={projected ? `${item.title} (${resolveText('calendar.projectedRecurrence', 'Projected')})` : item.title}
+                                                    title={projected ? `${item.title} (${projectedLabel})` : item.title}
                                                 >
-                                                    {item.title}
+                                                    {projected ? `${item.title} · ${projectedLabel}` : item.title}
                                                 </button>
                                             );
                                         })}
@@ -604,6 +628,9 @@ export function CalendarView() {
                                                     );
                                                 }
                                                 const projected = isProjectedRecurringTask(item.task);
+                                                const projectedLabel = projected
+                                                    ? getProjectedRecurrenceDisplayLabel(item.task, resolveText('calendar.projectedRecurrence', 'Projected'))
+                                                    : '';
                                                 return (
                                                     <button
                                                         key={item.id}
@@ -620,7 +647,7 @@ export function CalendarView() {
                                                                 : "bg-primary text-primary-foreground hover:bg-primary/90"
                                                         )}
                                                         style={commonStyle}
-                                                        title={projected ? `${item.title} ${timeLabel} (${resolveText('calendar.projectedRecurrence', 'Projected')})` : `${item.title} ${timeLabel}`}
+                                                        title={projected ? `${item.title} ${timeLabel} (${projectedLabel})` : `${item.title} ${timeLabel}`}
                                                         onDragStart={(event) => handleCalendarTaskDragStart(event, item.task, 'scheduled')}
                                                         onClick={(event) => {
                                                             event.stopPropagation();
@@ -630,7 +657,7 @@ export function CalendarView() {
                                                     >
                                                         <div className="truncate font-semibold">{item.title}</div>
                                                         <div className="truncate opacity-90">
-                                                            {projected ? `${timeLabel} · ${resolveText('calendar.projectedRecurrence', 'Projected')}` : timeLabel}
+                                                            {projected ? `${timeLabel} · ${projectedLabel}` : timeLabel}
                                                         </div>
                                                     </button>
                                                 );
@@ -700,6 +727,9 @@ export function CalendarView() {
                                                     );
                                                 }
                                                 const projected = isProjectedRecurringTask(item.task);
+                                                const projectedLabel = projected
+                                                    ? getProjectedRecurrenceDisplayLabel(item.task, resolveText('calendar.projectedRecurrence', 'Projected'))
+                                                    : '';
                                                 return (
                                                     <button
                                                         key={item.id}
@@ -723,7 +753,7 @@ export function CalendarView() {
                                                         <span className="min-w-0 flex-1 truncate text-foreground">{item.title}</span>
                                                         {projected && (
                                                             <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                                                                {resolveText('calendar.projectedRecurrence', 'Projected')}
+                                                                {projectedLabel}
                                                             </span>
                                                         )}
                                                     </button>

@@ -15,7 +15,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { CALENDAR_TIME_ESTIMATE_OPTIONS, getCalendarDayOfMonth, isProjectedRecurringTask, safeFormatDate, safeParseDate, type Task } from '@mindwtr/core';
+import { CALENDAR_TIME_ESTIMATE_OPTIONS, getCalendarDayOfMonth, getTaskCalendarOccurrenceDate, isProjectedRecurringTask, safeFormatDate, safeParseDate, type Task } from '@mindwtr/core';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -74,6 +74,16 @@ const getTimedBlockInsetStyle = (layout?: CalendarTimedLayout): TimedBlockInsetS
     marginLeft: layout && layout.columnIndex > 0 ? TIMED_BLOCK_COLUMN_GAP : 0,
     marginRight: layout && layout.columnIndex < layout.columnCount - 1 ? TIMED_BLOCK_COLUMN_GAP : 0,
   };
+};
+
+const PROJECTED_RECURRENCE_LABEL_DATE_FORMAT = 'MMM d';
+
+const getProjectedRecurrenceDisplayLabel = (task: Task, projectedLabel: string): string => {
+  const occurrenceDateLabel = safeFormatDate(
+    getTaskCalendarOccurrenceDate(task),
+    PROJECTED_RECURRENCE_LABEL_DATE_FORMAT
+  );
+  return occurrenceDateLabel ? `${projectedLabel} · ${occurrenceDateLabel}` : projectedLabel;
 };
 
 type ScheduledTaskBlockProps = {
@@ -162,6 +172,7 @@ function ScheduledTaskBlock({
   const label = start ? formatTimeRange(start, durationMinutes) : '';
   const compact = height < 48;
   const showTime = height >= 44;
+  const projectedDisplayLabel = projected ? getProjectedRecurrenceDisplayLabel(task, projectedLabel) : projectedLabel;
 
   const blockContent = (
     <>
@@ -173,7 +184,7 @@ function ScheduledTaskBlock({
       </Text>
       {showTime && (
         <Text style={[styles.taskBlockTime, projected && { color: tc.secondaryText }]} numberOfLines={1}>
-          {projected ? `${label} · ${projectedLabel}` : label}
+          {projected ? `${label} · ${projectedDisplayLabel}` : label}
         </Text>
       )}
     </>
@@ -855,10 +866,13 @@ export function CalendarView() {
                 <Text style={[styles.sectionLabel, { color: tc.secondaryText }]}>{t('calendar.allDay')}</Text>
                 {selectedDateAllDayScheduledTasks.slice(0, 6).map((task) => {
                   const projected = isProjectedRecurringTask(task);
+                  const projectedDisplayLabel = projected
+                    ? getProjectedRecurrenceDisplayLabel(task, tr('calendar.projectedRecurrence'))
+                    : '';
                   return (
                     <Pressable key={task.id} onPress={() => openTaskActions(task.id)} style={styles.allDayPressable}>
                       <Text style={[styles.allDayItem, { color: projected ? tc.tint : tc.text }]} numberOfLines={1}>
-                        {projected ? `${task.title} · ${tr('calendar.projectedRecurrence')}` : task.title}
+                        {projected ? `${task.title} · ${projectedDisplayLabel}` : task.title}
                       </Text>
                     </Pressable>
                   );
@@ -1133,6 +1147,9 @@ export function CalendarView() {
                     {allDayItems.map((item) => {
                       const isEvent = item.kind === 'event';
                       const projected = item.kind !== 'event' && isProjectedRecurringTask(item.task);
+                      const projectedDisplayLabel = projected
+                        ? getProjectedRecurrenceDisplayLabel(item.task, tr('calendar.projectedRecurrence'))
+                        : '';
                       return (
                         <Pressable
                           key={item.id}
@@ -1157,7 +1174,7 @@ export function CalendarView() {
                           ]}
                         >
                           <Text style={[styles.weekAllDayText, compactWeekColumns && styles.weekAllDayTextCompact, { color: tc.text }]} numberOfLines={1}>
-                            {projected ? `${item.title} · ${tr('calendar.projectedRecurrence')}` : item.title}
+                            {projected ? `${item.title} · ${projectedDisplayLabel}` : item.title}
                           </Text>
                         </Pressable>
                       );
@@ -1301,6 +1318,9 @@ export function CalendarView() {
                           const projected = isProjectedRecurringTask(item.task);
                           const start = item.task.startTime ? safeParseDate(item.task.startTime) : null;
                           if (!start) return null;
+                          const projectedDisplayLabel = projected
+                            ? getProjectedRecurrenceDisplayLabel(item.task, tr('calendar.projectedRecurrence'))
+                            : '';
                           const durationMinutes = timeEstimateToMinutes(item.task.timeEstimate);
                           const displayStartMs = Math.max(start.getTime(), dayStartMs);
                           const displayEndMs = Math.min(start.getTime() + durationMinutes * 60_000, dayEndMs);
@@ -1334,7 +1354,7 @@ export function CalendarView() {
                               <Text style={[styles.weekTaskBlockTitle, compactWeekColumns && styles.weekTaskBlockTitleCompact, projected && { color: tc.tint }]} numberOfLines={compactWeekColumns ? 2 : 1}>{item.title}</Text>
                               {!compactWeekColumns && (
                                 <Text style={[styles.weekTaskBlockTime, projected && { color: tc.secondaryText }]} numberOfLines={1}>
-                                  {projected ? `${formatTimeRange(start, durationMinutes)} · ${tr('calendar.projectedRecurrence')}` : formatTimeRange(start, durationMinutes)}
+                                  {projected ? `${formatTimeRange(start, durationMinutes)} · ${projectedDisplayLabel}` : formatTimeRange(start, durationMinutes)}
                                 </Text>
                               )}
                             </Pressable>
@@ -1497,6 +1517,9 @@ export function CalendarView() {
                   const timeLabel = start
                     ? formatTimeRange(start, timeEstimateToMinutes(item.task.timeEstimate))
                     : t('calendar.deadline');
+                  const projectedDisplayLabel = projected
+                    ? getProjectedRecurrenceDisplayLabel(item.task, tr('calendar.projectedRecurrence'))
+                    : '';
                   return (
                     <Pressable
                       key={item.id}
@@ -1518,7 +1541,7 @@ export function CalendarView() {
                           {item.title}
                         </Text>
                         <Text style={[styles.taskItemTime, { color: tc.secondaryText }]}>
-                          {projected ? `${timeLabel} · ${tr('calendar.projectedRecurrence')}` : timeLabel}
+                          {projected ? `${timeLabel} · ${projectedDisplayLabel}` : timeLabel}
                         </Text>
                       </View>
                     </Pressable>
@@ -1634,6 +1657,9 @@ export function CalendarView() {
                       {visibleItems.map((item) => {
                         const isEvent = item.kind === 'event';
                         const projected = item.kind !== 'event' && isProjectedRecurringTask(item.task);
+                        const projectedDisplayLabel = projected
+                          ? getProjectedRecurrenceDisplayLabel(item.task, tr('calendar.projectedRecurrence'))
+                          : '';
                         return (
                           <View
                             key={item.id}
@@ -1660,7 +1686,7 @@ export function CalendarView() {
                               style={[styles.monthPreviewText, { color: item.kind === 'scheduled' || projected ? tc.tint : tc.text }]}
                               numberOfLines={1}
                             >
-                              {projected ? `${item.title} · ${tr('calendar.projectedRecurrence')}` : item.title}
+                              {projected ? `${item.title} · ${projectedDisplayLabel}` : item.title}
                             </Text>
                           </View>
                         );
@@ -1819,6 +1845,9 @@ export function CalendarView() {
 
               {selectedDateDeadlines.map((task) => {
                 const projected = isProjectedRecurringTask(task);
+                const projectedDisplayLabel = projected
+                  ? getProjectedRecurrenceDisplayLabel(task, tr('calendar.projectedRecurrence'))
+                  : '';
                 return (
                   <View
                     key={task.id}
@@ -1842,7 +1871,7 @@ export function CalendarView() {
                         {task.title}
                       </Text>
                       <Text style={[styles.taskItemTime, { color: tc.secondaryText }]}>
-                        {projected ? `${t('calendar.deadline')} · ${tr('calendar.projectedRecurrence')}` : t('calendar.deadline')}
+                        {projected ? `${t('calendar.deadline')} · ${projectedDisplayLabel}` : t('calendar.deadline')}
                       </Text>
                     </Pressable>
                     {!projected && task.status !== 'done' && task.status !== 'archived' && (
@@ -1859,6 +1888,9 @@ export function CalendarView() {
 
               {selectedDateScheduled.map((task) => {
                 const projected = isProjectedRecurringTask(task);
+                const projectedDisplayLabel = projected
+                  ? getProjectedRecurrenceDisplayLabel(task, tr('calendar.projectedRecurrence'))
+                  : '';
                 return (
                   <Pressable
                     key={task.id}
@@ -1888,7 +1920,7 @@ export function CalendarView() {
                           const label = !isTimedScheduledTask(task)
                             ? t('calendar.allDay')
                             : `${safeFormatDate(start, 'p')}-${safeFormatDate(end, 'p')}`;
-                          return projected ? `${label} · ${tr('calendar.projectedRecurrence')}` : label;
+                          return projected ? `${label} · ${projectedDisplayLabel}` : label;
                         })()}
                       </Text>
                     </View>

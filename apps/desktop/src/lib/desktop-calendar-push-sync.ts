@@ -9,9 +9,11 @@
 import {
     expandCalendarRecurringTasks,
     getProjectedRecurringTaskId,
+    getTaskCalendarOccurrenceDate,
     hasTimeComponent,
     isProjectedRecurringTask,
     isProjectedRecurringTaskId,
+    safeFormatDate,
     safeParseDate,
     timeEstimateToMinutes,
     useTaskStore,
@@ -40,6 +42,7 @@ const PLATFORM = 'macos';
 const SYNC_DEBOUNCE_MS = 2500;
 const CALENDAR_SYNC_CONCURRENCY = 4;
 const ACCOUNT_TARGET_TITLE_PREFIX = 'Mindwtr: ';
+const PROJECTED_RECURRENCE_EVENT_DATE_FORMAT = 'PP';
 
 type CalendarPushTarget = {
     id: string;
@@ -228,13 +231,25 @@ function buildAllDayBoundary(date: Date, dayOffset = 0): Date {
     return boundary;
 }
 
-function formatCalendarEventTitle(title: string, shouldPrefixTitle: boolean): string {
+function formatProjectedRecurrenceEventDate(task: Task): string {
+    return safeFormatDate(getTaskCalendarOccurrenceDate(task), PROJECTED_RECURRENCE_EVENT_DATE_FORMAT);
+}
+
+function formatCalendarEventTitle(title: string, shouldPrefixTitle: boolean, occurrenceDateLabel = ''): string {
     const trimmed = title.trim() || 'Task';
-    if (!shouldPrefixTitle) return trimmed;
+    const datedTitle = occurrenceDateLabel ? `${trimmed} (${occurrenceDateLabel})` : trimmed;
+    if (!shouldPrefixTitle) return datedTitle;
     if (trimmed.toLowerCase().startsWith(ACCOUNT_TARGET_TITLE_PREFIX.toLowerCase())) {
-        return trimmed;
+        return datedTitle;
     }
-    return `${ACCOUNT_TARGET_TITLE_PREFIX}${trimmed}`;
+    return `${ACCOUNT_TARGET_TITLE_PREFIX}${datedTitle}`;
+}
+
+function formatProjectedRecurrenceNote(task: Task): string {
+    const occurrenceDateLabel = formatProjectedRecurrenceEventDate(task);
+    return occurrenceDateLabel
+        ? `Projected recurring occurrence for ${occurrenceDateLabel}. Complete the current Mindwtr task to create the real next task.`
+        : 'Projected recurring occurrence. Complete the current Mindwtr task to create the real next task.';
 }
 
 function buildEventDetails(task: Task, target: CalendarPushTarget): SystemCalendarEventDetails {
@@ -242,13 +257,16 @@ function buildEventDetails(task: Task, target: CalendarPushTarget): SystemCalend
     const parsed = safeParseDate(dateValue);
     const startDate = parsed ?? new Date();
     const location = typeof task.location === 'string' ? task.location.trim() : '';
+    const projectedOccurrenceDateLabel = isProjectedRecurringTask(task)
+        ? formatProjectedRecurrenceEventDate(task)
+        : '';
     const notes = [
         isProjectedRecurringTask(task)
-            ? 'Projected recurring occurrence. Complete the current Mindwtr task to create the real next task.'
+            ? formatProjectedRecurrenceNote(task)
             : '',
         task.description ?? '',
     ].filter(Boolean).join('\n\n');
-    const title = formatCalendarEventTitle(task.title, target.shouldPrefixTitles);
+    const title = formatCalendarEventTitle(task.title, target.shouldPrefixTitles, projectedOccurrenceDateLabel);
 
     if (hasTimeComponent(dateValue)) {
         const endDate = new Date(startDate.getTime() + timeEstimateToMinutes(task.timeEstimate) * 60 * 1000);

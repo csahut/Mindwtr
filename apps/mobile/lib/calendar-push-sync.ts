@@ -12,9 +12,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     expandCalendarRecurringTasks,
     getProjectedRecurringTaskId,
+    getTaskCalendarOccurrenceDate,
     hasTimeComponent,
     isProjectedRecurringTask,
     isProjectedRecurringTaskId,
+    safeFormatDate,
     safeParseDate,
     timeEstimateToMinutes,
     useTaskStore,
@@ -41,6 +43,7 @@ const CALENDAR_SYNC_CONCURRENCY = 4;
 const MANAGED_CALENDAR_TITLE = 'Mindwtr';
 const MANAGED_CALENDAR_NAME = 'mindwtr';
 const DEFAULT_MANAGED_CALENDAR_COLOR = '#3B82F6';
+const PROJECTED_RECURRENCE_EVENT_DATE_FORMAT = 'PP';
 
 export const CALENDAR_PUSH_COLOR_OPTIONS = [
     '#3B82F6',
@@ -488,8 +491,20 @@ export const deleteMindwtrCalendar = async (): Promise<void> => {
 
 // MARK: - Per-task sync
 
-function formatCalendarEventTitle(title: string): string {
-    return title.trim() || 'Task';
+function formatProjectedRecurrenceEventDate(task: Task): string {
+    return safeFormatDate(getTaskCalendarOccurrenceDate(task), PROJECTED_RECURRENCE_EVENT_DATE_FORMAT);
+}
+
+function formatCalendarEventTitle(title: string, occurrenceDateLabel = ''): string {
+    const trimmed = title.trim() || 'Task';
+    return occurrenceDateLabel ? `${trimmed} (${occurrenceDateLabel})` : trimmed;
+}
+
+function formatProjectedRecurrenceNote(task: Task): string {
+    const occurrenceDateLabel = formatProjectedRecurrenceEventDate(task);
+    return occurrenceDateLabel
+        ? `Projected recurring occurrence for ${occurrenceDateLabel}. Complete the current Mindwtr task to create the real next task.`
+        : 'Projected recurring occurrence. Complete the current Mindwtr task to create the real next task.';
 }
 
 function buildEventDetails(task: Task) {
@@ -498,11 +513,14 @@ function buildEventDetails(task: Task) {
     const dateValue = task.startTime ?? task.dueDate;
     const parsed = safeParseDate(dateValue);
     const startDate = parsed ?? new Date();
-    const title = formatCalendarEventTitle(task.title);
+    const projectedOccurrenceDateLabel = isProjectedRecurringTask(task)
+        ? formatProjectedRecurrenceEventDate(task)
+        : '';
+    const title = formatCalendarEventTitle(task.title, projectedOccurrenceDateLabel);
     const location = typeof task.location === 'string' ? task.location.trim() : '';
     const notes = [
         isProjectedRecurringTask(task)
-            ? 'Projected recurring occurrence. Complete the current Mindwtr task to create the real next task.'
+            ? formatProjectedRecurrenceNote(task)
             : '',
         task.description ?? '',
     ].filter(Boolean).join('\n\n');

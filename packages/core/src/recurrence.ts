@@ -65,6 +65,10 @@ export const isProjectedRecurringTask = (task: Partial<Task> | null | undefined)
     )
 );
 
+export const getTaskCalendarOccurrenceDate = (task: Pick<Task, 'startTime' | 'dueDate'>): string | undefined => (
+    task.startTime ?? task.dueDate
+);
+
 const parseByDayToken = (token: string): RecurrenceByDay | null => {
     const trimmed = token.toUpperCase().trim();
     if (!trimmed) return null;
@@ -861,6 +865,14 @@ export function createProjectedRecurringTask(
         createdAt: task.createdAt,
         updatedAt: projectedAtIso,
     };
+}
+
+export function getProjectedRecurringTaskCalendarDate(
+    task: Task,
+    projectedAtIso: string = new Date().toISOString()
+): string | undefined {
+    const projectedTask = createProjectedRecurringTask(task, projectedAtIso);
+    return projectedTask ? getTaskCalendarOccurrenceDate(projectedTask) : undefined;
 }
 
 export function createCurrentRecurringCalendarTask(

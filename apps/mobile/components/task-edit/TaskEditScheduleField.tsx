@@ -3,6 +3,7 @@ import { Keyboard, Platform, Pressable, Text, TextInput, TouchableOpacity, View 
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
     buildRRuleString,
+    getProjectedRecurringTaskCalendarDate,
     getTaskDateCoherenceIssues,
     getRecurrenceUntilValue,
     hasTimeComponent,
@@ -13,6 +14,7 @@ import {
     type RecurrenceByDay,
     type RecurrenceRule,
     type RecurrenceStrategy,
+    type Task,
 } from '@mindwtr/core';
 
 import { QuickDateChips } from '../QuickDateChips';
@@ -194,6 +196,28 @@ export function TaskEditScheduleField({
         const parsed = safeParseDate(value);
         return parsed ? safeFormatDate(parsed, 'yyyy-MM-dd') : undefined;
     };
+    const projectedRecurrenceDateLabel = (() => {
+        const recurrence = editedTask.recurrence ?? task?.recurrence;
+        if (!recurrenceRuleValue || !recurrence) return '';
+        const nowIso = new Date().toISOString();
+        const previewTask = {
+            ...(task ?? {}),
+            ...editedTask,
+            id: editedTask.id ?? task?.id ?? 'draft-recurrence-preview',
+            title: String(editedTask.title ?? task?.title ?? ''),
+            status: editedTask.status ?? task?.status ?? 'next',
+            tags: editedTask.tags ?? task?.tags ?? [],
+            contexts: editedTask.contexts ?? task?.contexts ?? [],
+            createdAt: editedTask.createdAt ?? task?.createdAt ?? nowIso,
+            updatedAt: editedTask.updatedAt ?? task?.updatedAt ?? nowIso,
+            recurrence,
+            showFutureRecurrence: true,
+        } as Task;
+        return safeFormatDate(getProjectedRecurringTaskCalendarDate(previewTask, nowIso), 'PP');
+    })();
+    const projectedRecurrenceDateHint = projectedRecurrenceDateLabel
+        ? `${tFallback(t, 'recurrence.nextCalendarPreview', 'Next calendar preview')}: ${projectedRecurrenceDateLabel}.`
+        : '';
     const hasReminderHandoffSchedule = hasTimeComponent(editedTask.startTime) || hasTimeComponent(editedTask.dueDate);
     const renderReminderHandoffControl = () => {
         if (fieldId !== 'dueDate' || !hasReminderHandoffSchedule) return null;
@@ -575,6 +599,7 @@ export function TaskEditScheduleField({
                             </Text>
                             <Text style={{ marginTop: 4, color: tc.secondaryText, fontSize: 12, lineHeight: 16 }}>
                                 {tFallback(t, 'recurrence.showFutureInCalendarHint', 'Planning-only preview; the next task is still created when this one is completed.')}
+                                {projectedRecurrenceDateHint ? ` ${projectedRecurrenceDateHint}` : ''}
                             </Text>
                         </TouchableOpacity>
                     )}

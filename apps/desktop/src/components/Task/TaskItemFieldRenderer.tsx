@@ -11,6 +11,8 @@ import {
     formatCalendarInputDate,
     getCalendarDayOfMonth,
     getCalendarMonthIndex,
+    getProjectedRecurringTaskCalendarDate,
+    getRecurrenceCompletedOccurrencesValue,
     getTaskDateCoherenceIssues,
     hasTimeComponent,
     isJalaliCalendarLocale,
@@ -28,6 +30,7 @@ import {
     type MarkdownToolbarActionId,
     type MarkdownToolbarResult,
     type RecurrenceByDay,
+    type Recurrence,
     type RecurrenceRule,
     type RecurrenceStrategy,
     type Task,
@@ -714,6 +717,37 @@ export function TaskItemFieldRenderer({
             }
         );
     };
+    const recurrencePreviewValue: Recurrence | undefined = editRecurrence
+        ? { rule: editRecurrence, strategy: editRecurrenceStrategy }
+        : undefined;
+    if (recurrencePreviewValue && editRecurrenceRRule) {
+        if (parsedRecurrenceRRule.byDay && parsedRecurrenceRRule.byDay.length > 0) {
+            recurrencePreviewValue.byDay = parsedRecurrenceRRule.byDay;
+        }
+        if (parsedRecurrenceRRule.byMonthDay && parsedRecurrenceRRule.byMonthDay.length > 0) {
+            recurrencePreviewValue.byMonthDay = parsedRecurrenceRRule.byMonthDay;
+        }
+        if (parsedRecurrenceRRule.count) {
+            recurrencePreviewValue.count = parsedRecurrenceRRule.count;
+        }
+        if (parsedRecurrenceRRule.until) {
+            recurrencePreviewValue.until = parsedRecurrenceRRule.until;
+        }
+        const completedOccurrences = getRecurrenceCompletedOccurrencesValue(task.recurrence);
+        if (typeof completedOccurrences === 'number') {
+            recurrencePreviewValue.completedOccurrences = completedOccurrences;
+        }
+        recurrencePreviewValue.rrule = editRecurrenceRRule;
+    }
+    const projectedRecurrenceDateLabel = recurrencePreviewValue
+        ? safeFormatDate(getProjectedRecurringTaskCalendarDate({
+            ...task,
+            startTime: editStartTime || undefined,
+            dueDate: editDueDate || undefined,
+            recurrence: recurrencePreviewValue,
+            showFutureRecurrence: true,
+        }), 'PP')
+        : '';
 
     const resolvedDirection = resolveAutoTextDirection([task.title, editDescription].filter(Boolean).join(' '), language);
     const isRtl = resolvedDirection === 'rtl';
@@ -1224,6 +1258,7 @@ export function TaskItemFieldRenderer({
                     parsedRecurrenceRRule={parsedRecurrenceRRule}
                     recurrenceEndMode={recurrenceEndMode}
                     recurrenceDefaultEndDate={recurrenceDefaultEndDate}
+                    projectedRecurrenceDateLabel={projectedRecurrenceDateLabel}
                     onRecurrenceChange={setEditRecurrence}
                     onRecurrenceStrategyChange={setEditRecurrenceStrategy}
                     onRecurrenceRRuleChange={setEditRecurrenceRRule}

@@ -130,6 +130,24 @@ describe('desktop calendar push sync', () => {
         }));
     });
 
+    it('includes the projected occurrence date in pushed recurring event details', async () => {
+        setStoreTasks([makeTask({
+            id: 'task-recurring',
+            title: 'Monthly bill',
+            dueDate: '2026-01-10',
+            recurrence: { rule: 'monthly', strategy: 'strict' },
+            showFutureRecurrence: true,
+        })]);
+
+        await runFullDesktopCalendarPushSync();
+
+        expect(createEvent).toHaveBeenCalledWith(expect.objectContaining({
+            calendarId: 'cal-mindwtr',
+            title: 'Monthly bill (Feb 10, 2026)',
+            notes: expect.stringContaining('Projected recurring occurrence for Feb 10, 2026'),
+        }));
+    });
+
     it('removes pushed events when tasks are completed', async () => {
         const entry: CalendarSyncEntry = {
             taskId: 'task-1',

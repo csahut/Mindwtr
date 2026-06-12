@@ -15,6 +15,7 @@ type RecurrenceFieldProps = {
     parsedRecurrenceRRule: ReturnType<typeof parseRRuleString>;
     recurrenceEndMode: 'never' | 'until' | 'count';
     recurrenceDefaultEndDate: string;
+    projectedRecurrenceDateLabel?: string;
     onRecurrenceChange: (value: RecurrenceRule | '') => void;
     onRecurrenceStrategyChange: (value: RecurrenceStrategy) => void;
     onRecurrenceRRuleChange: (value: string) => void;
@@ -42,6 +43,7 @@ export function RecurrenceField({
     parsedRecurrenceRRule,
     recurrenceEndMode,
     recurrenceDefaultEndDate,
+    projectedRecurrenceDateLabel,
     onRecurrenceChange,
     onRecurrenceStrategyChange,
     onRecurrenceRRuleChange,
@@ -152,6 +154,9 @@ export function RecurrenceField({
                         </span>
                         <span className="block leading-snug">
                             {tFallback(t, 'recurrence.showFutureInCalendarHint', 'Planning-only preview; the next task is still created when this one is completed.')}
+                            {projectedRecurrenceDateLabel
+                                ? ` ${tFallback(t, 'recurrence.nextCalendarPreview', 'Next calendar preview')}: ${projectedRecurrenceDateLabel}.`
+                                : ''}
                         </span>
                     </span>
                 </label>
