@@ -46,33 +46,55 @@ export default function InboxScreen() {
     ? t('quickAdd.audioCaptureLabel')
     : t('nav.addTask');
 
-  const headerButtons = (
-    <View style={styles.headerButtonsRow}>
-      <TouchableOpacity
-        style={[styles.headerIconButton, styles.mindSweepButton, { borderColor: tc.tint, backgroundColor: tc.filterBg }]}
-        onPress={() => router.push('/mind-sweep-modal')}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={t('mindSweep.launchButton')}
-      >
-        <Brain size={17} color={tc.tint} strokeWidth={2.2} />
-      </TouchableOpacity>
-      {inboxTasks.length > 0 ? (
+  const hasInboxTasks = inboxTasks.length > 0;
+  const processCount = inboxTasks.length > 99 ? '99+' : `${inboxTasks.length}`;
+
+  // Mind Sweep (secondary, labeled) rides on the sort/filter row's empty right
+  // side when there are tasks to process; when the inbox is empty it is promoted
+  // to the full-width primary slot below.
+  const mindSweepPill = (
+    <TouchableOpacity
+      style={[styles.mindSweepPill, { borderColor: tc.tint, backgroundColor: tc.filterBg }]}
+      onPress={() => router.push('/mind-sweep-modal')}
+      accessibilityRole="button"
+      accessibilityLabel={t('mindSweep.launchButton')}
+    >
+      <Brain size={18} color={tc.tint} strokeWidth={2.2} />
+      <Text style={[styles.mindSweepLabel, { color: tc.tint }]} numberOfLines={1}>
+        {t('mindSweep.launchButton')}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  // Full-width primary action below the controls: Process Inbox when there is
+  // something to clarify, otherwise the promoted Mind Sweep entry point.
+  const primaryActionRow = (
+    <View style={styles.actionRow}>
+      {hasInboxTasks ? (
         <TouchableOpacity
-          style={[styles.headerIconButton, styles.processHeaderButton, { backgroundColor: tc.tint }]}
+          style={[styles.processButton, { backgroundColor: tc.tint }]}
           onPress={() => setShowProcessing(true)}
-          hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={`${t('inbox.processButton')} (${inboxTasks.length})`}
         >
-          <ListChecks size={17} color={tc.onTint} strokeWidth={2.2} />
-          <View style={[styles.processCountBadge, { backgroundColor: tc.bg, borderColor: tc.tint }]}>
-            <Text style={[styles.processCountText, { color: tc.tint }]} numberOfLines={1}>
-              {inboxTasks.length > 99 ? '99+' : inboxTasks.length}
-            </Text>
-          </View>
+          <ListChecks size={18} color={tc.onTint} strokeWidth={2.2} />
+          <Text style={[styles.actionLabel, { color: tc.onTint }]} numberOfLines={1}>
+            {t('inbox.processButton')} ({processCount})
+          </Text>
         </TouchableOpacity>
-      ) : null}
+      ) : (
+        <TouchableOpacity
+          style={[styles.processButton, { backgroundColor: tc.tint }]}
+          onPress={() => router.push('/mind-sweep-modal')}
+          accessibilityRole="button"
+          accessibilityLabel={t('mindSweep.launchButton')}
+        >
+          <Brain size={18} color={tc.onTint} strokeWidth={2.2} />
+          <Text style={[styles.actionLabel, { color: tc.onTint }]} numberOfLines={1}>
+            {t('mindSweep.launchButton')}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -90,7 +112,8 @@ export default function InboxScreen() {
         emptyHint={emptyHint}
         emptyActionLabel={emptyActionLabel}
         onEmptyAction={() => openQuickCapture({ autoRecord: defaultCaptureMethod === 'audio' })}
-        headerAccessory={headerButtons}
+        headerAccessory={hasInboxTasks ? mindSweepPill : undefined}
+        primaryActionRow={primaryActionRow}
         defaultEditTab="task"
       />
       <ErrorBoundary>
@@ -107,38 +130,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerButtonsRow: {
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  processButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 12,
   },
-  headerIconButton: {
-    width: 36,
-    height: 36,
+  actionLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  mindSweepPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 36,
+    paddingHorizontal: 12,
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  processHeaderButton: {
-    position: 'relative',
-  },
-  mindSweepButton: {
     borderWidth: 1,
   },
-  processCountBadge: {
-    position: 'absolute',
-    minWidth: 17,
-    height: 17,
-    borderRadius: 9,
-    paddingHorizontal: 4,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    right: -5,
-    top: -5,
-  },
-  processCountText: {
-    fontSize: 9,
-    fontWeight: '700',
+  mindSweepLabel: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

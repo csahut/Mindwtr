@@ -119,6 +119,7 @@ export interface TaskListProps {
   emptyActionLabel?: string;
   onEmptyAction?: () => void;
   headerAccessory?: React.ReactNode;
+  primaryActionRow?: React.ReactNode;
   showFilterButton?: boolean;
   onFilterStateChange?: (state: { activeCount: number; hasActive: boolean }) => void;
   enableCopilot?: boolean;
@@ -160,6 +161,7 @@ function TaskListComponent({
   emptyActionLabel,
   onEmptyAction,
   headerAccessory,
+  primaryActionRow,
   showFilterButton = true,
   onFilterStateChange,
   enableCopilot = true,
@@ -1557,6 +1559,8 @@ function TaskListComponent({
         themeColors={themeColorsMemo}
         title={title}
       />
+
+      {primaryActionRow}
 
       <TaskListFiltersSheet
         energyLevelOptions={ENERGY_LEVEL_OPTIONS}

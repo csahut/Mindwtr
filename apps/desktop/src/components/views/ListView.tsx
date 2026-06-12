@@ -26,7 +26,6 @@ import { ListEmptyState } from './list/ListEmptyState';
 import { ListControlsPanel } from './list/ListControlsPanel';
 import { PromptModal } from '../PromptModal';
 import { InboxProcessor } from './InboxProcessor';
-import { MindSweepLauncher } from '../MindSweepModal';
 import { TaskBulkOrganizeModal } from './list/TaskBulkOrganizeModal';
 import { useLanguage } from '../../contexts/language-context';
 import { useKeybindings } from '../../contexts/keybinding-context';
@@ -865,24 +864,22 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                     onOpenProject={handleOpenProject}
                     onReactivateProject={handleReactivateProject}
                     inboxProcessor={(
-                        <>
-                            <InboxProcessor
-                                t={t}
-                                isInbox={isInbox}
-                                tasks={tasks}
-                                projects={projects}
-                                areas={areas}
-                                settings={settings}
-                                addProject={addProject}
-                                updateTask={updateTask}
-                                deleteTask={deleteTask}
-                                allContexts={allContexts}
-                                allTags={allTags}
-                                isProcessing={isProcessing}
-                                setIsProcessing={setIsProcessing}
-                            />
-                            {isInbox && !isProcessing && <MindSweepLauncher t={t} addTask={addTask} />}
-                        </>
+                        <InboxProcessor
+                            t={t}
+                            isInbox={isInbox}
+                            tasks={tasks}
+                            projects={projects}
+                            areas={areas}
+                            settings={settings}
+                            addTask={addTask}
+                            addProject={addProject}
+                            updateTask={updateTask}
+                            deleteTask={deleteTask}
+                            allContexts={allContexts}
+                            allTags={allTags}
+                            isProcessing={isProcessing}
+                            setIsProcessing={setIsProcessing}
+                        />
                     )}
                     showViewFilterInput={showViewFilterInput}
                     searchQuery={searchQuery}
