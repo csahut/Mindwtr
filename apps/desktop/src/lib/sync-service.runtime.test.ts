@@ -791,10 +791,16 @@ describe('desktop sync-service runtime', () => {
         expect(headFetchMock.mock.calls.some(([input, init]) =>
             init?.method === 'HEAD' || (typeof Request !== 'undefined' && input instanceof Request && input.method === 'HEAD')
         )).toBe(true);
-        expect(storeStateRef.current.updateSettings).toHaveBeenCalledWith(expect.objectContaining({
-            lastSyncStatus: 'success',
-            lastSyncError: undefined,
-        }));
+        const saveDataCall = invokeMock.mock.calls.find(([command]) => command === 'save_data');
+        expect(saveDataCall?.[1]).toMatchObject({
+            data: {
+                settings: expect.objectContaining({
+                    lastSyncStatus: 'success',
+                    lastSyncError: undefined,
+                }),
+            },
+        });
+        expect(storeStateRef.current.updateSettings).not.toHaveBeenCalled();
     });
 
     it('reuses the fast-check local snapshot when falling back to a full WebDAV sync', async () => {
