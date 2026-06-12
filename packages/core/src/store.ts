@@ -221,27 +221,25 @@ const normalizeEntityCollectionUpdate = <T extends { id: string }>(
     const currentRecord = state as unknown as Record<string, unknown>;
     const enforceWriteContract = shouldEnforceStoreWriteContract();
     const visibleItems = record[visibleKey];
+    const currentAll = currentRecord[allKey];
     const canUseVisibleCompatibilityUpdate =
         !enforceWriteContract &&
         touchesVisible &&
         Array.isArray(visibleItems) &&
+        Array.isArray(currentAll) &&
+        currentAll.length > 0 &&
         record[visibleKey] !== currentRecord[visibleKey] &&
         (!touchesAll || record[allKey] === currentRecord[allKey]);
     if (canUseVisibleCompatibilityUpdate) {
-        const currentAll = currentRecord[allKey];
         const visibleArray = visibleItems as T[];
-        const allItems = Array.isArray(currentAll)
-            ? (() => {
-                const currentItems = currentAll as T[];
-                const visibleIds = new Set(visibleArray.map((item) => item.id));
-                const currentVisibleIds = new Set(selectVisible(currentItems).map((item) => item.id));
-                const hiddenItems = currentItems.filter((item) => {
-                    if (visibleIds.has(item.id)) return false;
-                    return !currentVisibleIds.has(item.id);
-                });
-                return [...visibleArray, ...hiddenItems];
-            })()
-            : visibleArray;
+        const currentItems = currentAll as T[];
+        const visibleIds = new Set(visibleArray.map((item) => item.id));
+        const currentVisibleIds = new Set(selectVisible(currentItems).map((item) => item.id));
+        const hiddenItems = currentItems.filter((item) => {
+            if (visibleIds.has(item.id)) return false;
+            return !currentVisibleIds.has(item.id);
+        });
+        const allItems = [...visibleArray, ...hiddenItems];
         record[allKey] = allItems;
         record[visibleKey] = selectVisible(allItems);
         record[mapKey] = buildEntityMap(allItems);

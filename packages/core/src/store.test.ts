@@ -886,7 +886,7 @@ describe('TaskStore', () => {
         }
     });
 
-    it('keeps visible-only production compat setState inserts when all tasks is empty', () => {
+    it('ignores visible-only production compat setState inserts when all tasks is empty', () => {
         const originalNodeEnv = process.env.NODE_ENV;
         const visibleTask = createStoreTask('task-visible');
 
@@ -895,9 +895,9 @@ describe('TaskStore', () => {
             useTaskStore.setState({ tasks: [visibleTask] });
 
             const state = useTaskStore.getState();
-            expect(state.tasks).toEqual([visibleTask]);
-            expect(state._allTasks).toEqual([visibleTask]);
-            expect(state._tasksById.get('task-visible')).toBe(visibleTask);
+            expect(state.tasks).toEqual([]);
+            expect(state._allTasks).toEqual([]);
+            expect(state._tasksById.has('task-visible')).toBe(false);
         } finally {
             process.env.NODE_ENV = originalNodeEnv;
         }
