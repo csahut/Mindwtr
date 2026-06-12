@@ -56,9 +56,9 @@ describe('ListView', () => {
     useUiStore.setState(initialUiState, true);
 
     useTaskStore.setState({
-      tasks: [],
-      projects: [],
-      areas: [],
+      _allTasks: [],
+      _allProjects: [],
+      _allAreas: [],
       settings: {},
       lastDataChangeAt: 0,
     });
@@ -105,7 +105,7 @@ describe('ListView', () => {
       vi.setSystemTime(new Date('2026-04-16T10:00:00Z'));
 
       useTaskStore.setState({
-        tasks: [
+        _allTasks: [
           makeTask('inbox-future', {
             title: 'Future inbox task',
             status: 'inbox',
@@ -134,7 +134,7 @@ describe('ListView', () => {
 
   it('does not show filtering feedback after a background task refresh settles', async () => {
     useTaskStore.setState({
-      tasks: [makeTask('1')],
+      _allTasks: [makeTask('1')],
       lastDataChangeAt: 1,
     });
 
@@ -143,7 +143,7 @@ describe('ListView', () => {
 
     act(() => {
       useTaskStore.setState({
-        tasks: [makeTask('1'), makeTask('2')],
+        _allTasks: [makeTask('1'), makeTask('2')],
         lastDataChangeAt: 2,
       });
     });
@@ -155,8 +155,8 @@ describe('ListView', () => {
 
   it('defaults reference tasks to area grouping', () => {
     useTaskStore.setState({
-      areas: [{ id: 'area-1', name: 'Work', color: '#2563eb', order: 0, createdAt: now, updatedAt: now }],
-      tasks: [
+      _allAreas: [{ id: 'area-1', name: 'Work', color: '#2563eb', order: 0, createdAt: now, updatedAt: now }],
+      _allTasks: [
         makeTask('1', { title: 'Work reference', status: 'reference', areaId: 'area-1' }),
         makeTask('2', { title: 'Loose reference', status: 'reference' }),
       ],
@@ -172,7 +172,7 @@ describe('ListView', () => {
 
   it('groups reference tasks by each tag when tag grouping is selected', () => {
     useTaskStore.setState({
-      tasks: [
+      _allTasks: [
         makeTask('1', { title: 'Dual-tag reference', status: 'reference', tags: ['#alpha', '#beta'] }),
         makeTask('2', { title: 'Untagged reference', status: 'reference' }),
       ],
@@ -200,7 +200,6 @@ describe('ListView', () => {
       description: 'Expanded task note',
     });
     useTaskStore.setState({
-      tasks: [expandedTask],
       _allTasks: [expandedTask],
       lastDataChangeAt: 1,
     });
@@ -228,7 +227,7 @@ describe('ListView', () => {
 
   it('applies token filters from the UI store', async () => {
     useTaskStore.setState({
-      tasks: [
+      _allTasks: [
         makeTask('1', { title: 'Work task', contexts: ['@work'] }),
         makeTask('2', { title: 'Home task', contexts: ['@home'] }),
       ],
@@ -249,7 +248,7 @@ describe('ListView', () => {
 
   it('selects and clears all visible tasks from the shared list toolbar', async () => {
     useTaskStore.setState({
-      tasks: [
+      _allTasks: [
         makeTask('1', { title: 'First visible task' }),
         makeTask('2', { title: 'Second visible task' }),
       ],
@@ -276,7 +275,7 @@ describe('ListView', () => {
 
   it('selects a visible range with shift-click in selection mode', async () => {
     useTaskStore.setState({
-      tasks: [
+      _allTasks: [
         makeTask('1', { title: 'First range task' }),
         makeTask('2', { title: 'Second range task' }),
         makeTask('3', { title: 'Third range task' }),
@@ -307,7 +306,7 @@ describe('ListView', () => {
     });
 
     useTaskStore.setState({
-      tasks: [makeTask('1'), makeTask('2')],
+      _allTasks: [makeTask('1'), makeTask('2')],
       lastDataChangeAt: 1,
     });
 
@@ -321,7 +320,7 @@ describe('ListView', () => {
 
     act(() => {
       useTaskStore.setState({
-        tasks: [makeTask('1'), makeTask('2'), makeTask('3')],
+        _allTasks: [makeTask('1'), makeTask('2'), makeTask('3')],
         lastDataChangeAt: 2,
       });
     });

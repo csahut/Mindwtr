@@ -216,7 +216,7 @@ describe('KeybindingProvider (vim)', () => {
     it('switches the global area filter with a number chord in sidebar order', async () => {
         useTaskStore.setState((state) => ({
             ...state,
-            areas: [
+            _allAreas: [
                 { id: 'area-work', name: 'Work', order: 2, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
                 { id: 'area-home', name: 'Home', order: 0, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
                 { id: 'area-errands', name: 'Errands', order: 1, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
@@ -249,7 +249,7 @@ describe('KeybindingProvider (vim)', () => {
     it('clears the global area filter with a0', async () => {
         useTaskStore.setState((state) => ({
             ...state,
-            areas: [
+            _allAreas: [
                 { id: 'area-home', name: 'Home', order: 0, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
             ],
             settings: {
@@ -328,7 +328,7 @@ describe('KeybindingProvider (vim)', () => {
         useUiStore.setState({ showToast });
         useTaskStore.setState((state) => ({
             ...state,
-            tasks: [{
+            _allTasks: [{
                 id: '1',
                 title: 'Task 1',
                 status: 'next',

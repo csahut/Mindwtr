@@ -714,12 +714,14 @@ describe('InboxProcessor', () => {
         const contextsInput = getByLabelText('taskEdit.contextsLabel') as HTMLInputElement;
         const tagsInput = getByLabelText('taskEdit.tagsLabel') as HTMLInputElement;
         await user.type(contextsInput, 'of');
+        fireEvent.keyDown(contextsInput, { key: 'ArrowDown' });
         fireEvent.keyDown(contextsInput, { key: 'Tab' });
         await waitFor(() => {
             expect(contextsInput.value).toBe('@office, ');
         });
 
         await user.type(tagsInput, 'wr');
+        fireEvent.keyDown(tagsInput, { key: 'ArrowDown' });
         fireEvent.keyDown(tagsInput, { key: 'Tab' });
         await waitFor(() => {
             expect(tagsInput.value).toBe('#writing, ');

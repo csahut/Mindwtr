@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useTaskStore, type Task } from '@mindwtr/core';
+import { resetForTests, useTaskStore, type Task } from '@mindwtr/core';
 
 import { DailyReviewGuideModal } from './DailyReviewModal';
 
@@ -57,6 +57,7 @@ vi.mock('../InboxProcessor', () => ({
 
 const storageKey = 'mindwtr:dailyReview:currentStep';
 const now = '2026-02-01T00:00:00.000Z';
+const initialTaskState = useTaskStore.getState();
 
 const makeTask = (overrides: Partial<Task>): Task => ({
     id: 'task-1',
@@ -70,11 +71,15 @@ const makeTask = (overrides: Partial<Task>): Task => ({
 describe('DailyReviewGuideModal', () => {
     beforeEach(() => {
         vi.useRealTimers();
+        resetForTests();
         window.localStorage.clear();
+        useTaskStore.setState(initialTaskState, true);
         useTaskStore.setState({
-            tasks: [],
-            projects: [],
-            areas: [],
+            _allTasks: [],
+            _allProjects: [],
+            _allSections: [],
+            _allAreas: [],
+            _allPeople: [],
             settings: { gtd: { dailyReview: { includeFocusStep: true } } },
             addProject: vi.fn(),
             updateTask: vi.fn(),
@@ -97,7 +102,7 @@ describe('DailyReviewGuideModal', () => {
 
     it('persists the current step across modal remounts and clears it when finished', async () => {
         useTaskStore.setState({
-            tasks: [makeTask({ id: 'inbox-1', title: 'Inbox task', status: 'inbox' })],
+            _allTasks: [makeTask({ id: 'inbox-1', title: 'Inbox task', status: 'inbox' })],
         });
 
         const { unmount } = render(<DailyReviewGuideModal onClose={vi.fn()} />);
@@ -117,7 +122,7 @@ describe('DailyReviewGuideModal', () => {
     it('does not restore a completed step when new daily review work appears', async () => {
         window.localStorage.setItem(storageKey, 'completed');
         useTaskStore.setState({
-            tasks: [makeTask({ id: 'inbox-1', title: 'Inbox task', status: 'inbox' })],
+            _allTasks: [makeTask({ id: 'inbox-1', title: 'Inbox task', status: 'inbox' })],
         });
 
         render(<DailyReviewGuideModal onClose={vi.fn()} />);
@@ -131,7 +136,7 @@ describe('DailyReviewGuideModal', () => {
         vi.setSystemTime(new Date(2026, 1, 15, 10, 30, 0));
         const updateTask = vi.fn();
         useTaskStore.setState({
-            tasks: [
+            _allTasks: [
                 makeTask({
                     id: 'waiting-1',
                     title: 'Waiting for invoice',

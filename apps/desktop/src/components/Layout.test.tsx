@@ -84,9 +84,9 @@ beforeEach(() => {
     act(() => {
         useTaskStore.setState((state) => ({
             ...state,
-            tasks: [],
-            projects: [],
-            areas: [],
+            _allTasks: [],
+            _allProjects: [],
+            _allAreas: [],
             settings: {
                 ...state.settings,
                 sidebarCollapsed: false,
@@ -266,7 +266,7 @@ describe('Layout collapsed sidebar area filter', () => {
         act(() => {
             useTaskStore.setState((state) => ({
                 ...state,
-                areas: [
+                _allAreas: [
                     { id: 'area-work', name: 'Work', color: '#3b82f6', order: 0, createdAt: '', updatedAt: '' },
                 ],
                 settings: {

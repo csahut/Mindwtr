@@ -85,8 +85,8 @@ beforeEach(() => {
         useTaskStore.setState(initialTaskState, true);
         useTaskStore.setState((state) => ({
             ...state,
-            projects: [],
-            areas: [],
+            _allProjects: [],
+            _allAreas: [],
             settings: {
                 ...state.settings,
                 filters: {
@@ -205,7 +205,7 @@ describe('QuickAddModal', () => {
                 ...state,
                 addProject,
                 addTask,
-                areas: [{
+                _allAreas: [{
                     id: 'area-work',
                     name: 'Work',
                     color: '#3b82f6',

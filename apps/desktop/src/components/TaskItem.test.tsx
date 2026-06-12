@@ -1033,11 +1033,10 @@ describe('TaskItem', () => {
         act(() => {
             useTaskStore.setState((state) => ({
                 ...state,
-                tasks: [task],
                 _allTasks: [task],
-                projects: [project, otherProject],
-                sections: [],
-                areas: [],
+                _allProjects: [project, otherProject],
+                _allSections: [],
+                _allAreas: [],
             }));
         });
 
@@ -1054,7 +1053,7 @@ describe('TaskItem', () => {
         act(() => {
             useTaskStore.setState((state) => ({
                 ...state,
-                projects: [
+                _allProjects: [
                     project,
                     {
                         ...otherProject,
@@ -1089,11 +1088,10 @@ describe('TaskItem', () => {
         act(() => {
             useTaskStore.setState((state) => ({
                 ...state,
-                tasks: [task],
                 _allTasks: [task],
-                projects: [project],
-                sections: [],
-                areas: [],
+                _allProjects: [project],
+                _allSections: [],
+                _allAreas: [],
             }));
         });
 
@@ -1110,7 +1108,7 @@ describe('TaskItem', () => {
         act(() => {
             useTaskStore.setState((state) => ({
                 ...state,
-                projects: [{
+                _allProjects: [{
                     ...project,
                     title: 'Renamed primary project',
                     updatedAt: new Date(Date.parse(project.updatedAt) + 1_000).toISOString(),
