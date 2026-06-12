@@ -232,6 +232,28 @@ describe('Sync Logic', () => {
             expect(attachment?.cloudKey).toBe('attachments/att-file-uri.txt');
         });
 
+        it('sanitizes attachment uris on one-sided incoming tasks', () => {
+            const incomingTask: Task = {
+                ...createMockTask('incoming-only', '2023-01-03'),
+                attachments: [{
+                    id: 'att-one-sided',
+                    kind: 'file',
+                    title: 'secret.txt',
+                    uri: 'file:///safe/%252e%252e/secret.txt',
+                    cloudKey: 'attachments/att-one-sided.txt',
+                    localStatus: 'available',
+                    createdAt: '2023-01-01T00:00:00.000Z',
+                    updatedAt: '2023-01-03T00:00:00.000Z',
+                }],
+            };
+
+            const merged = mergeAppData(mockAppData([]), mockAppData([incomingTask]));
+            const attachment = merged.tasks[0].attachments?.find((item) => item.id === 'att-one-sided');
+
+            expect(attachment?.uri).toBe('');
+            expect(attachment?.cloudKey).toBe('attachments/att-one-sided.txt');
+        });
+
         it('detaches live tasks and tombstones stale sections when their project is deleted', () => {
             vi.useFakeTimers();
             vi.setSystemTime(new Date('2026-02-01T00:00:00.000Z'));
