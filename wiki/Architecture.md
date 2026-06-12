@@ -295,7 +295,7 @@ setStorageAdapter(mobileStorage);
 
 The canonical type surface lives in [[Core API]] and `packages/core/src/types.ts`.
 
-- Use [[Core API]] for current field-level docs for `Task`, `Project`, `Section`, `Area`, `Attachment`, and `AppData`.
+- Use [[Core API]] for current field-level docs for `Task`, `Project`, `Section`, `Area`, `Person`, `Attachment`, and `AppData`.
 - Sync-sensitive fields such as `rev`, `revBy`, `purgedAt`, `orderNum`, `mimeType`, `size`, `cloudKey`, and `localStatus` evolve more often than this architecture overview.
 - Keeping the detailed type dump in one page avoids architecture docs drifting from the code.
 

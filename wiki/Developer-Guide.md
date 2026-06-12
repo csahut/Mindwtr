@@ -188,6 +188,8 @@ Contributors should treat the snapshot transport as a deliberate product choice,
 6. Commit with descriptive message
 7. Open a pull request
 
+When adding a new top-level entity type, update the full persistence and sync surface in the same change: core `AppData` types and normalization, desktop SQLite schema/storage round-trip tests, mobile SQLite schema/backup restore, cloud validation/normalization, MCP tools if exposed, and the wiki/Core API docs.
+
 ### Code Style
 
 - TypeScript for all code
