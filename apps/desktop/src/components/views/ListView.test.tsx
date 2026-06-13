@@ -18,6 +18,7 @@ vi.mock('../../lib/report-error', () => ({
 const initialTaskState = useTaskStore.getState();
 const initialUiState = useUiStore.getState();
 const now = new Date().toISOString();
+const referenceViewStateStorageKey = 'mindwtr:view:reference:v1';
 
 const makeTask = (id: string, overrides: Partial<Task> = {}): Task => ({
   id,
@@ -51,6 +52,7 @@ const renderListView = (statusFilter: 'inbox' | 'next' | 'done' | 'archived' | '
 describe('ListView', () => {
   beforeEach(() => {
     reportErrorMock.mockReset();
+    window.localStorage.removeItem(referenceViewStateStorageKey);
 
     useTaskStore.setState(initialTaskState, true);
     useUiStore.setState(initialUiState, true);
@@ -192,6 +194,75 @@ describe('ListView', () => {
     expect(queryByText('#beta')).toBeInTheDocument();
     expect(queryByText('No tags')).toBeInTheDocument();
     expect(getAllByText('Dual-tag reference')).toHaveLength(2);
+  });
+
+  it('groups reference tasks by context when context grouping is selected', () => {
+    useTaskStore.setState({
+      _allTasks: [
+        makeTask('1', { title: 'Work reference', status: 'reference', contexts: ['@work'] }),
+        makeTask('2', { title: 'Home reference', status: 'reference', contexts: ['@home'] }),
+        makeTask('3', { title: 'Loose reference', status: 'reference' }),
+      ],
+      lastDataChangeAt: 1,
+    });
+    useUiStore.setState((state) => ({
+      ...state,
+      listOptions: {
+        ...state.listOptions,
+        referenceGroupBy: 'context',
+      },
+    }));
+
+    const { getByRole, queryByText } = renderListView('reference', 'Reference');
+
+    expect(getByRole('combobox', { name: 'Group' })).toHaveValue('context');
+    expect(queryByText('@home')).toBeInTheDocument();
+    expect(queryByText('@work')).toBeInTheDocument();
+    expect(queryByText('No context')).toBeInTheDocument();
+  });
+
+  it('persists collapsed reference groups by grouping mode', () => {
+    useTaskStore.setState({
+      _allTasks: [
+        makeTask('1', { title: 'Work reference', status: 'reference', contexts: ['@work'] }),
+        makeTask('2', { title: 'Home reference', status: 'reference', contexts: ['@home'] }),
+      ],
+      lastDataChangeAt: 1,
+    });
+    useUiStore.setState((state) => ({
+      ...state,
+      listOptions: {
+        ...state.listOptions,
+        referenceGroupBy: 'context',
+      },
+    }));
+
+    const firstRender = renderListView('reference', 'Reference');
+    const groupSelect = firstRender.getByRole('combobox', { name: 'Group' }) as HTMLSelectElement;
+    const workGroup = firstRender.getByRole('button', { name: /@work\s*1/i });
+
+    fireEvent.click(workGroup);
+
+    expect(firstRender.getByRole('button', { name: /@work\s*1/i })).toHaveAttribute('aria-expanded', 'false');
+    expect(firstRender.queryByText('Work reference')).not.toBeInTheDocument();
+    expect(firstRender.getByText('Home reference')).toBeInTheDocument();
+
+    const persisted = JSON.parse(window.localStorage.getItem(referenceViewStateStorageKey) ?? '{}') as {
+      collapsedGroups?: Record<string, string[]>;
+    };
+    expect(persisted.collapsedGroups?.context).toEqual(['context:@work']);
+    expect(persisted.collapsedGroups?.tag ?? []).toEqual([]);
+
+    fireEvent.change(groupSelect, { target: { value: 'tag' } });
+    expect(firstRender.getByRole('button', { name: /No tags\s*2/i })).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.change(groupSelect, { target: { value: 'context' } });
+    firstRender.unmount();
+
+    const secondRender = renderListView('reference', 'Reference');
+    expect(secondRender.getByRole('button', { name: /@work\s*1/i })).toHaveAttribute('aria-expanded', 'false');
+    expect(secondRender.queryByText('Work reference')).not.toBeInTheDocument();
+    expect(secondRender.getByText('Home reference')).toBeInTheDocument();
   });
 
   it('collapses expanded task details when page details are turned off', async () => {

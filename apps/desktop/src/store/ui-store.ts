@@ -3,7 +3,7 @@ import type { TaskPriority, TimeEstimate } from '@mindwtr/core';
 
 const toastTimeouts = new Map<string, number>();
 type ListNextGroupBy = 'none' | 'context' | 'area' | 'project' | 'energy' | 'priority' | 'person';
-type ListReferenceGroupBy = 'none' | 'area' | 'project' | 'tag';
+type ListReferenceGroupBy = 'none' | 'context' | 'area' | 'project' | 'tag';
 type ListOptions = {
     showDetails: boolean;
     nextGroupBy: ListNextGroupBy;
@@ -32,6 +32,7 @@ function isListNextGroupBy(value: unknown): value is ListNextGroupBy {
 
 function isListReferenceGroupBy(value: unknown): value is ListReferenceGroupBy {
     return value === 'none'
+        || value === 'context'
         || value === 'area'
         || value === 'project'
         || value === 'tag';

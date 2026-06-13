@@ -10,7 +10,7 @@ describe('useUiStore list options', () => {
         window.localStorage.setItem('mindwtr:list-options:v1', JSON.stringify({
             showDetails: true,
             nextGroupBy: 'project',
-            referenceGroupBy: 'tag',
+            referenceGroupBy: 'context',
             focusTop3Only: true,
         }));
 
@@ -19,7 +19,7 @@ describe('useUiStore list options', () => {
         expect(useUiStore.getState().listOptions).toEqual({
             showDetails: true,
             nextGroupBy: 'project',
-            referenceGroupBy: 'tag',
+            referenceGroupBy: 'context',
             focusTop3Only: true,
         });
     });

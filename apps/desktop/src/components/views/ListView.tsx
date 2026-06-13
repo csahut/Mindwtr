@@ -1,5 +1,6 @@
 import React, { memo, useState, useMemo, useDeferredValue, useEffect, useRef, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
     buildBulkOrganizeTaskUpdates,
     DEFAULT_AREA_COLOR,
@@ -35,6 +36,7 @@ import { useUiStore } from '../../store/ui-store';
 import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import { checkBudget } from '../../config/performanceBudgets';
 import { useListViewOptimizations } from '../../hooks/useListViewOptimizations';
+import { usePersistedViewState } from '../../hooks/usePersistedViewState';
 import { dispatchNavigateEvent } from '../../lib/navigation-events';
 import { reportError } from '../../lib/report-error';
 import { AREA_FILTER_ALL, AREA_FILTER_NONE, projectMatchesAreaFilter, resolveAreaFilter, taskMatchesAreaFilter } from '@mindwtr/core';
@@ -53,12 +55,51 @@ interface ListViewProps {
 
 const EMPTY_PRIORITIES: TaskPriority[] = [];
 const EMPTY_ESTIMATES: TimeEstimate[] = [];
+const REFERENCE_VIEW_STATE_STORAGE_KEY = 'mindwtr:view:reference:v1';
+type ReferenceGroupCollapseKey = Exclude<ReferenceGroupBy, 'none'>;
+type ReferencePersistedViewState = {
+    collapsedGroups: Partial<Record<ReferenceGroupCollapseKey, string[]>>;
+};
+const DEFAULT_REFERENCE_VIEW_STATE: ReferencePersistedViewState = {
+    collapsedGroups: {
+        context: [],
+        area: [],
+        project: [],
+        tag: [],
+    },
+};
 type ShowToast = (
     message: string,
     tone?: 'success' | 'error' | 'info',
     durationMs?: number,
     action?: { label: string; onClick: () => void }
 ) => void;
+
+function sanitizeReferenceViewState(value: unknown, fallback: ReferencePersistedViewState): ReferencePersistedViewState {
+    const parsed = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Partial<ReferencePersistedViewState>
+        : {};
+    const collapsedGroups = parsed.collapsedGroups && typeof parsed.collapsedGroups === 'object' && !Array.isArray(parsed.collapsedGroups)
+        ? parsed.collapsedGroups as Partial<Record<ReferenceGroupCollapseKey, unknown>>
+        : {};
+    const sanitizeGroupIds = (ids: unknown, fallbackIds: string[] | undefined = []) => (
+        Array.isArray(ids)
+            ? Array.from(new Set(ids.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)))
+            : fallbackIds ?? []
+    );
+    return {
+        collapsedGroups: {
+            context: sanitizeGroupIds(collapsedGroups.context, fallback.collapsedGroups.context),
+            area: sanitizeGroupIds(collapsedGroups.area, fallback.collapsedGroups.area),
+            project: sanitizeGroupIds(collapsedGroups.project, fallback.collapsedGroups.project),
+            tag: sanitizeGroupIds(collapsedGroups.tag, fallback.collapsedGroups.tag),
+        },
+    };
+}
+
+function getListDomIdSegment(value: string): string {
+    return value.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'group';
+}
 
 export function reportArchivedTaskQueryFailure(error: unknown, showToast: ShowToast): void {
     reportError('Failed to load archived tasks', error);
@@ -143,6 +184,11 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
     const addInputRef = useRef<HTMLInputElement>(null);
     const viewFilterInputRef = useRef<HTMLInputElement>(null);
     const listScrollRef = useRef<HTMLDivElement>(null);
+    const [referenceViewState, setReferenceViewState] = usePersistedViewState(
+        REFERENCE_VIEW_STATE_STORAGE_KEY,
+        DEFAULT_REFERENCE_VIEW_STATE,
+        sanitizeReferenceViewState,
+    );
     const prioritiesEnabled = settings?.features?.priorities !== false;
     const timeEstimatesEnabled = settings?.features?.timeEstimates !== false;
     const undoNotificationsEnabled = settings?.undoNotificationsEnabled !== false;
@@ -438,12 +484,18 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
     const activeReferenceGroupBy: ReferenceGroupBy = statusFilter === 'reference' ? (referenceGroupBy ?? 'area') : 'none';
     const activeGroupBy: TaskListGroupBy = statusFilter === 'reference' ? activeReferenceGroupBy : activeNextGroupBy;
     const groupByOptions: TaskListGroupBy[] = statusFilter === 'reference'
-        ? ['none', 'area', 'project', 'tag']
+        ? ['none', 'context', 'area', 'project', 'tag']
         : ['none', 'context', 'area', 'project', 'energy', 'priority', 'person'];
     const isReferenceGrouping = statusFilter === 'reference' && activeReferenceGroupBy !== 'none';
     const isNextGrouping = statusFilter === 'next' && activeNextGroupBy !== 'none';
-    const referenceAreaGroups = useMemo(() => {
+    const referenceGroups = useMemo(() => {
         if (!isReferenceGrouping) return [] as TaskGroup[];
+        if (activeReferenceGroupBy === 'context') {
+            return groupTasksByContext({
+                tasks: filteredTasks,
+                noContextLabel: resolveText('contexts.none', 'No context'),
+            });
+        }
         if (activeReferenceGroupBy === 'project') {
             return groupTasksByProject({
                 tasks: filteredTasks,
@@ -506,7 +558,32 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
             noContextLabel: resolveText('contexts.none', 'No context'),
         });
     }, [activeNextGroupBy, areas, filteredTasks, isNextGrouping, projectMap, resolveText, t]);
-    const groupedTasks = isReferenceGrouping ? referenceAreaGroups : nextGroups;
+    const groupedTasks = isReferenceGrouping ? referenceGroups : nextGroups;
+    const activeReferenceCollapseKey: ReferenceGroupCollapseKey | null = isReferenceGrouping
+        ? activeReferenceGroupBy as ReferenceGroupCollapseKey
+        : null;
+    const collapsedReferenceGroupIds = useMemo(() => {
+        if (!activeReferenceCollapseKey) return new Set<string>();
+        return new Set(referenceViewState.collapsedGroups[activeReferenceCollapseKey] ?? []);
+    }, [activeReferenceCollapseKey, referenceViewState.collapsedGroups]);
+    const toggleReferenceGroup = useCallback((groupId: string) => {
+        if (!activeReferenceCollapseKey) return;
+        setReferenceViewState((current) => {
+            const currentIds = current.collapsedGroups[activeReferenceCollapseKey] ?? [];
+            const nextIds = new Set(currentIds);
+            if (nextIds.has(groupId)) {
+                nextIds.delete(groupId);
+            } else {
+                nextIds.add(groupId);
+            }
+            return {
+                collapsedGroups: {
+                    ...current.collapsedGroups,
+                    [activeReferenceCollapseKey]: Array.from(nextIds),
+                },
+            };
+        });
+    }, [activeReferenceCollapseKey, setReferenceViewState]);
     const taskIndexById = useMemo(() => {
         const map = new Map<string, number>();
         filteredTasks.forEach((task, index) => map.set(task.id, index));
@@ -1017,43 +1094,77 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
                     </div>
                 ) : isReferenceGrouping || isNextGrouping ? (
                     <div className="space-y-2">
-                        {groupedTasks.map((group) => (
-                            <div key={group.id} className="rounded-md border border-border/40 bg-card/30">
-                                <div className={cn(
-                                    'px-3 py-2 text-xs font-semibold uppercase tracking-wide border-b border-border/30',
-                                    group.muted ? 'text-muted-foreground' : 'text-foreground/90',
-                                )}>
-                                    <span className="inline-flex items-center gap-1.5">
-                                        {group.dotColor && (
-                                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: group.dotColor }} aria-hidden="true" />
-                                        )}
-                                        <span>{group.title}</span>
-                                    </span>
-                                    <span className="ml-2 text-muted-foreground">{group.tasks.length}</span>
+                        {groupedTasks.map((group, groupIndex) => {
+                            const collapsed = isReferenceGrouping && collapsedReferenceGroupIds.has(group.id);
+                            const controlsId = `reference-group-${getListDomIdSegment(activeReferenceGroupBy)}-${groupIndex}-${getListDomIdSegment(group.id)}`;
+                            const groupTitle = (
+                                <span className="inline-flex min-w-0 items-center gap-1.5">
+                                    {isReferenceGrouping && (
+                                        collapsed ? (
+                                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                        ) : (
+                                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                        )
+                                    )}
+                                    {group.dotColor && (
+                                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group.dotColor }} aria-hidden="true" />
+                                    )}
+                                    <span className="truncate">{group.title}</span>
+                                </span>
+                            );
+                            return (
+                                <div key={group.id} className="rounded-md border border-border/40 bg-card/30">
+                                    {isReferenceGrouping ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleReferenceGroup(group.id)}
+                                            aria-expanded={!collapsed}
+                                            aria-controls={controlsId}
+                                            className={cn(
+                                                'flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide transition-colors hover:bg-muted/30',
+                                                'focus:outline-none focus:ring-2 focus:ring-primary/30',
+                                                !collapsed && 'border-b border-border/30',
+                                                group.muted ? 'text-muted-foreground' : 'text-foreground/90',
+                                            )}
+                                        >
+                                            {groupTitle}
+                                            <span className="shrink-0 text-muted-foreground">{group.tasks.length}</span>
+                                        </button>
+                                    ) : (
+                                        <div className={cn(
+                                            'flex items-center justify-between gap-3 border-b border-border/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide',
+                                            group.muted ? 'text-muted-foreground' : 'text-foreground/90',
+                                        )}>
+                                            {groupTitle}
+                                            <span className="shrink-0 text-muted-foreground">{group.tasks.length}</span>
+                                        </div>
+                                    )}
+                                    {!collapsed && (
+                                        <div id={isReferenceGrouping ? controlsId : undefined} className="divide-y divide-border/30">
+                                            {group.tasks.map((task) => {
+                                                const index = taskIndexById.get(task.id) ?? 0;
+                                                return (
+                                                    <StoreTaskItem
+                                                        key={task.id}
+                                                        taskId={task.id}
+                                                        isSelected={index === selectedIndex}
+                                                        index={index}
+                                                        onSelectIndex={handleSelectIndex}
+                                                        selectionMode={selectionMode}
+                                                        isMultiSelected={multiSelectedIds.has(task.id)}
+                                                        onToggleSelectId={toggleMultiSelect}
+                                                        showQuickDone={showQuickDone}
+                                                        readOnly={readOnly}
+                                                        compactMetaEnabled={showListDetails}
+                                                        showProjectBadgeInActions={false}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="divide-y divide-border/30">
-                                    {group.tasks.map((task) => {
-                                        const index = taskIndexById.get(task.id) ?? 0;
-                                        return (
-                                            <StoreTaskItem
-                                                key={task.id}
-                                                taskId={task.id}
-                                                isSelected={index === selectedIndex}
-                                                index={index}
-                                                onSelectIndex={handleSelectIndex}
-                                                selectionMode={selectionMode}
-                                                isMultiSelected={multiSelectedIds.has(task.id)}
-                                                onToggleSelectId={toggleMultiSelect}
-                                                showQuickDone={showQuickDone}
-                                                readOnly={readOnly}
-                                                compactMetaEnabled={showListDetails}
-                                                showProjectBadgeInActions={false}
-                                            />
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 ) : (
                     <div className="divide-y divide-border/30">

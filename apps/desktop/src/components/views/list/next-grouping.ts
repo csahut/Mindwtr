@@ -3,7 +3,7 @@ import type { Area, Project, Task, TaskEnergyLevel, TaskPriority } from '@mindwt
 import { getContextColor } from '../../../lib/context-color';
 
 export type NextGroupBy = 'none' | 'context' | 'area' | 'project' | 'energy' | 'priority' | 'person';
-export type ReferenceGroupBy = 'none' | 'area' | 'project' | 'tag';
+export type ReferenceGroupBy = 'none' | 'context' | 'area' | 'project' | 'tag';
 export type TaskListGroupBy = NextGroupBy | ReferenceGroupBy;
 
 export interface TaskGroup {
