@@ -37,6 +37,7 @@ type CaptureSearchParams = {
   initialProps?: string;
   initialValue?: string;
   project?: string;
+  returnTo?: string;
   text?: string;
   title?: string;
 };
@@ -56,6 +57,14 @@ const decodeSearchParam = (value: string | string[] | undefined): string => {
   } catch {
     return raw;
   }
+};
+
+export const sanitizeCaptureReturnToParam = (value: string | string[] | undefined): string | null => {
+  const decoded = decodeSearchParam(value).trim();
+  if (!decoded || !decoded.startsWith('/') || decoded.startsWith('//')) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(decoded)) return null;
+  if (/[\u0000-\u001F\u007F]/.test(decoded)) return null;
+  return decoded;
 };
 
 const getCreatedTaskId = (result: unknown): string | null => {
@@ -151,6 +160,10 @@ export default function CaptureScreen() {
   const initialProps = React.useMemo(
     () => sanitizeInitialPropsParam(params.initialProps, projects, areas),
     [areas, params.initialProps, projects]
+  );
+  const returnTo = React.useMemo(
+    () => sanitizeCaptureReturnToParam(params.returnTo),
+    [params.returnTo]
   );
   const initialDescription = String(initialProps.description ?? '');
   const initialProjectTitle = decodeSearchParam(params.project).trim();
@@ -292,12 +305,20 @@ export default function CaptureScreen() {
 
   const placeholderColor = tc.secondaryText;
 
-  const handleCancel = () => {
+  const closeCapture = React.useCallback(() => {
+    if (returnTo) {
+      router.replace(returnTo as never);
+      return;
+    }
     if (router.canGoBack()) {
       router.back();
     } else {
       router.replace('/inbox');
     }
+  }, [returnTo, router]);
+
+  const handleCancel = () => {
+    closeCapture();
   };
 
   const handleSave = async ({ openAfterSave = false }: { openAfterSave?: boolean } = {}) => {
@@ -391,7 +412,7 @@ export default function CaptureScreen() {
       openTaskScreen(createdTaskId, taskProps.projectId, 'task');
       return;
     }
-    router.replace('/inbox');
+    closeCapture();
   };
 
   return (

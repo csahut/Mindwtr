@@ -1090,6 +1090,9 @@ function RootLayoutContentInner() {
           if (initialProps) {
             params.set('initialProps', encodeURIComponent(JSON.stringify(initialProps)));
           }
+          if (options?.returnTo) {
+            params.set('returnTo', options.returnTo);
+          }
           const query = params.toString();
           router.push((query ? `/capture-modal?${query}` : '/capture-modal') as never);
         },

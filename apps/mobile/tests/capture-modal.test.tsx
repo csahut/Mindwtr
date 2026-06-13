@@ -3,7 +3,7 @@ import { Keyboard, KeyboardAvoidingView, ScrollView, Text, TouchableOpacity } fr
 import { act, create } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import CaptureScreen from '@/app/capture-modal';
+import CaptureScreen, { sanitizeCaptureReturnToParam } from '@/app/capture-modal';
 
 const { openTaskScreen, parseQuickAdd, routerMocks, routeParams, storeState } = vi.hoisted(() => {
   const parseQuickAdd = vi.fn<(value: string) => any>((value: string) => ({ title: value, props: {}, invalidDateCommands: [] }));
@@ -147,6 +147,28 @@ describe('CaptureScreen', () => {
     expect(routerMocks.replace).toHaveBeenCalledWith('/inbox');
   });
 
+  it('returns to a requested internal route when cancelling', () => {
+    routeParams.current = {
+      text: encodeURIComponent('Shared text'),
+      returnTo: encodeURIComponent('/projects-screen?projectId=project-1'),
+    };
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<CaptureScreen />);
+    });
+
+    const cancelButton = tree.root.findAllByType(TouchableOpacity)[1];
+
+    act(() => {
+      cancelButton.props.onPress();
+    });
+
+    expect(routerMocks.back).not.toHaveBeenCalled();
+    expect(routerMocks.replace).toHaveBeenCalledWith('/projects-screen?projectId=project-1');
+  });
+
   it('goes back when cancelling from a stacked navigation flow', () => {
     routerMocks.canGoBack.mockReturnValue(true);
 
@@ -262,6 +284,49 @@ describe('CaptureScreen', () => {
       status: 'next',
       projectId: 'project-1',
     });
+  });
+
+  it('returns to the requested project route after saving a project task', async () => {
+    routeParams.current = {
+      initialValue: encodeURIComponent('Project task'),
+      initialProps: encodeURIComponent(JSON.stringify({
+        projectId: 'project-1',
+        status: 'next',
+      })),
+      returnTo: encodeURIComponent('/projects-screen?projectId=project-1'),
+    };
+    storeState.projects = [{
+      id: 'project-1',
+      title: 'Launch',
+      status: 'active',
+    }];
+
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<CaptureScreen />);
+    });
+
+    const saveButton = findTouchableByText(tree, 'Save');
+
+    await act(async () => {
+      await saveButton.props.onPress();
+    });
+
+    expect(storeState.addTask).toHaveBeenCalledWith('Project task', {
+      status: 'next',
+      projectId: 'project-1',
+    });
+    expect(routerMocks.replace).toHaveBeenCalledWith('/projects-screen?projectId=project-1');
+    expect(routerMocks.replace).not.toHaveBeenCalledWith('/inbox');
+  });
+
+  it('sanitizes capture return routes to app-internal paths', () => {
+    expect(sanitizeCaptureReturnToParam(encodeURIComponent('/projects-screen?projectId=project-1')))
+      .toBe('/projects-screen?projectId=project-1');
+    expect(sanitizeCaptureReturnToParam(encodeURIComponent('//example.com/path'))).toBeNull();
+    expect(sanitizeCaptureReturnToParam(encodeURIComponent('https://example.com/path'))).toBeNull();
+    expect(sanitizeCaptureReturnToParam('')).toBeNull();
   });
 
   it('ignores unsupported URL-controlled initial props', async () => {

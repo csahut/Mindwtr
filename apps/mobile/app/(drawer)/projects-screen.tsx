@@ -9,6 +9,7 @@ import { ChevronDown, ChevronRight, Plus } from 'lucide-react-native';
 
 import { projectsScreenStyles as styles } from '@/components/projects-screen/projects-screen.styles';
 import {
+  buildProjectQuickCaptureReturnTo,
   formatProjectDate,
   normalizeProjectTag,
   resolveAttachmentValidationMessage,
@@ -379,6 +380,7 @@ export default function ProjectsScreen() {
         projectId: projectToAddTo.id,
         status: 'next',
       },
+      returnTo: buildProjectQuickCaptureReturnTo(projectToAddTo.id),
     });
   }, [openQuickCapture]);
 
