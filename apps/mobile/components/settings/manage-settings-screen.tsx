@@ -1,10 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Linking, Modal, Pressable, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AREA_PRESET_COLORS, DEFAULT_AREA_COLOR, formatI18nTemplate, type Area, useTaskStore } from '@mindwtr/core';
+import {
+    AREA_PRESET_COLORS,
+    DEFAULT_AREA_COLOR,
+    formatI18nTemplate,
+    getPersonNameKey,
+    type Area,
+    type Person,
+    useTaskStore,
+} from '@mindwtr/core';
 
 import { useThemeColors } from '@/hooks/use-theme-colors';
 
@@ -12,12 +20,26 @@ import { useSettingsLocalization, useSettingsScrollContent } from './settings.ho
 import { SettingsTopBar } from './settings.shell';
 import { styles } from './settings.styles';
 
-type ManageSectionKey = 'areas' | 'contexts' | 'tags';
+type ManageSectionKey = 'areas' | 'people' | 'contexts' | 'tags';
 const MANAGE_OPEN_SECTIONS_STORAGE_KEY = 'mindwtr:settings:manage:openSections';
 const DEFAULT_OPEN_SECTIONS: Record<ManageSectionKey, boolean> = {
     areas: false,
+    people: false,
     contexts: false,
     tags: false,
+};
+
+const SAFE_PERSON_REFERENCE_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:', 'obsidian:']);
+
+const isSafePersonReferenceLink = (value: string | undefined): value is string => {
+    const trimmed = value?.trim();
+    if (!trimmed) return false;
+    try {
+        const url = new URL(trimmed);
+        return SAFE_PERSON_REFERENCE_PROTOCOLS.has(url.protocol);
+    } catch {
+        return false;
+    }
 };
 
 const normalizeOpenSections = (value: unknown): Record<ManageSectionKey, boolean> => {
@@ -27,6 +49,7 @@ const normalizeOpenSections = (value: unknown): Record<ManageSectionKey, boolean
     const record = value as Record<string, unknown>;
     return {
         areas: record.areas === true,
+        people: record.people === true,
         contexts: record.contexts === true,
         tags: record.tags === true,
     };
@@ -78,7 +101,9 @@ export function ManageSettingsScreen() {
     const { t } = useSettingsLocalization();
     const scrollContentStyle = useSettingsScrollContent();
     const areas = useTaskStore((state) => state.areas);
+    const people = useTaskStore((state) => state.people);
     const settings = useTaskStore((state) => state.settings);
+    const tasks = useTaskStore((state) => state.tasks);
     const derivedState = useTaskStore((state) => state.getDerivedState());
     const deleteArea = useTaskStore((state) => state.deleteArea);
     const updateArea = useTaskStore((state) => state.updateArea);
@@ -87,16 +112,38 @@ export function ManageSettingsScreen() {
     const renameTag = useTaskStore((state) => state.renameTag);
     const deleteContext = useTaskStore((state) => state.deleteContext);
     const renameContext = useTaskStore((state) => state.renameContext);
+    const addPerson = useTaskStore((state) => state.addPerson);
+    const updatePerson = useTaskStore((state) => state.updatePerson);
+    const renamePerson = useTaskStore((state) => state.renamePerson);
+    const deletePerson = useTaskStore((state) => state.deletePerson);
     const sortedAreas = [...areas].sort((a, b) => a.order - b.order);
+    const sortedPeople = useMemo(
+        () => [...people].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+        [people],
+    );
+    const assignedTaskCountByPerson = useMemo(() => {
+        const counts = new Map<string, number>();
+        tasks.forEach((task) => {
+            if (task.deletedAt) return;
+            const key = getPersonNameKey(task.assignedTo);
+            if (!key) return;
+            counts.set(key, (counts.get(key) ?? 0) + 1);
+        });
+        return counts;
+    }, [tasks]);
     const { allContexts, allTags } = derivedState;
     const [editorTarget, setEditorTarget] = useState<
         | { type: 'area'; id: string; name: string; color?: string }
         | { type: 'unassignedArea'; color?: string }
+        | { type: 'newPerson' }
+        | { type: 'person'; id: string; name: string; note?: string; referenceLink?: string }
         | { type: 'context' | 'tag'; name: string }
         | null
     >(null);
     const [editorName, setEditorName] = useState('');
     const [editorColor, setEditorColor] = useState(DEFAULT_AREA_COLOR);
+    const [editorNote, setEditorNote] = useState('');
+    const [editorReferenceLink, setEditorReferenceLink] = useState('');
     const [openSections, setOpenSections] = useState<Record<ManageSectionKey, boolean>>(() => ({ ...DEFAULT_OPEN_SECTIONS }));
     const openSectionsHydratedRef = useRef(false);
 
@@ -152,24 +199,64 @@ export function ManageSettingsScreen() {
         setEditorTarget(null);
         setEditorName('');
         setEditorColor(DEFAULT_AREA_COLOR);
+        setEditorNote('');
+        setEditorReferenceLink('');
     };
 
     const openUnassignedAreaEditor = () => {
         setEditorTarget({ type: 'unassignedArea', color: unassignedAreaColor });
         setEditorName('');
         setEditorColor(unassignedAreaColor);
+        setEditorNote('');
+        setEditorReferenceLink('');
     };
 
     const openValueEditor = (type: 'context' | 'tag', name: string) => {
         setEditorTarget({ type, name });
         setEditorName(name);
         setEditorColor(DEFAULT_AREA_COLOR);
+        setEditorNote('');
+        setEditorReferenceLink('');
     };
 
     const openAreaEditor = (area: Area) => {
         setEditorTarget({ type: 'area', id: area.id, name: area.name, color: area.color });
         setEditorName(area.name);
         setEditorColor(area.color || DEFAULT_AREA_COLOR);
+        setEditorNote('');
+        setEditorReferenceLink('');
+    };
+
+    const openNewPersonEditor = () => {
+        setEditorTarget({ type: 'newPerson' });
+        setEditorName('');
+        setEditorColor(DEFAULT_AREA_COLOR);
+        setEditorNote('');
+        setEditorReferenceLink('');
+    };
+
+    const openPersonEditor = (person: Person) => {
+        setEditorTarget({
+            type: 'person',
+            id: person.id,
+            name: person.name,
+            note: person.note,
+            referenceLink: person.referenceLink,
+        });
+        setEditorName(person.name);
+        setEditorColor(DEFAULT_AREA_COLOR);
+        setEditorNote(person.note ?? '');
+        setEditorReferenceLink(person.referenceLink ?? '');
+    };
+
+    const openPersonReferenceLink = (referenceLink: string | undefined) => {
+        if (!isSafePersonReferenceLink(referenceLink)) return;
+        Linking.openURL(referenceLink).catch(() => {
+            Alert.alert(
+                resolveText('people.openReference', 'Open reference link'),
+                resolveText('people.openReferenceFailed', 'Could not open this reference link.'),
+            );
+        });
     };
 
     const saveEditor = async () => {
@@ -188,6 +275,37 @@ export function ManageSettingsScreen() {
         }
 
         if (!trimmed) return;
+
+        if (editorTarget.type === 'newPerson') {
+            const note = editorNote.trim();
+            const referenceLink = editorReferenceLink.trim();
+            const initialProps: Partial<Person> = {};
+            if (note) initialProps.note = note;
+            if (referenceLink) initialProps.referenceLink = referenceLink;
+            await addPerson(trimmed, Object.keys(initialProps).length > 0 ? initialProps : undefined);
+            closeEditor();
+            return;
+        }
+
+        if (editorTarget.type === 'person') {
+            const note = editorNote.trim();
+            const referenceLink = editorReferenceLink.trim();
+            const updates: Partial<Person> = {};
+            if ((editorTarget.note ?? '') !== note) {
+                updates.note = note || undefined;
+            }
+            if ((editorTarget.referenceLink ?? '') !== referenceLink) {
+                updates.referenceLink = referenceLink || undefined;
+            }
+            if (Object.keys(updates).length > 0) {
+                await updatePerson(editorTarget.id, updates);
+            }
+            if (trimmed !== editorTarget.name) {
+                await renamePerson(editorTarget.id, trimmed, { updateTasks: true });
+            }
+            closeEditor();
+            return;
+        }
 
         if (editorTarget.type === 'area') {
             const updates: Partial<Area> = {};
@@ -230,6 +348,72 @@ export function ManageSettingsScreen() {
             </TouchableOpacity>
         </View>
     );
+
+    const PersonRow = ({ person }: { person: Person }) => {
+        const taskCount = assignedTaskCountByPerson.get(getPersonNameKey(person.name)) ?? 0;
+        const referenceLink = person.referenceLink?.trim();
+        const canOpenReferenceLink = isSafePersonReferenceLink(referenceLink);
+        const initial = person.name.trim().slice(0, 1).toUpperCase() || '?';
+        const detail = person.note?.trim() || person.referenceLink?.trim() || `${taskCount} ${t('common.tasks')}`;
+
+        return (
+            <View
+                testID={`manage-person-row-${person.id}`}
+                style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: tc.border }]}
+            >
+                <View
+                    style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 17,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: tc.bg,
+                        borderWidth: 1,
+                        borderColor: tc.border,
+                    }}
+                >
+                    <Text style={{ color: tc.text, fontSize: 14, fontWeight: '700' }}>{initial}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.settingLabel, { color: tc.text }]} numberOfLines={1}>{person.name}</Text>
+                    <Text style={[styles.settingDescription, { color: tc.secondaryText }]} numberOfLines={1}>
+                        {detail}
+                    </Text>
+                </View>
+                {canOpenReferenceLink ? (
+                    <TouchableOpacity
+                        accessibilityLabel={resolveText('people.openReference', 'Open reference link')}
+                        accessibilityRole="button"
+                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                        onPress={() => openPersonReferenceLink(referenceLink)}
+                        style={{ padding: 8 }}
+                    >
+                        <Ionicons name="open-outline" size={18} color={tc.secondaryText} />
+                    </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                    accessibilityLabel={t('common.edit')}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                    onPress={() => openPersonEditor(person)}
+                    style={{ padding: 8 }}
+                    testID={`manage-person-edit-${person.id}`}
+                >
+                    <Ionicons name="pencil-outline" size={18} color={tc.secondaryText} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                    accessibilityLabel={t('common.delete')}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                    onPress={() => confirmDelete(person.name, () => void deletePerson(person.id))}
+                    style={{ padding: 8 }}
+                >
+                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                </TouchableOpacity>
+            </View>
+        );
+    };
 
     const UnassignedAreaRow = () => (
         <View
@@ -292,6 +476,53 @@ export function ManageSettingsScreen() {
                     {sortedAreas.map((area) => (
                         <AreaRow key={area.id} area={area} />
                     ))}
+                </CollapsibleSection>
+
+                <CollapsibleSection
+                    testID="manage-section-toggle-people"
+                    title={resolveText('people.title', 'People')}
+                    count={sortedPeople.length}
+                    open={openSections.people}
+                    onToggle={() => setOpenSections((current) => ({ ...current, people: !current.people }))}
+                    tc={tc}
+                >
+                    {sortedPeople.length === 0 && (
+                        <View style={styles.settingRow}>
+                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]}>
+                                {resolveText('people.empty', 'No people yet')}
+                            </Text>
+                        </View>
+                    )}
+                    {sortedPeople.map((person) => (
+                        <PersonRow key={person.id} person={person} />
+                    ))}
+                    <View style={styles.settingRow}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={[styles.settingLabel, { color: tc.text }]} numberOfLines={1}>
+                                {resolveText('people.new', 'New Person')}
+                            </Text>
+                            <Text style={[styles.settingDescription, { color: tc.secondaryText }]} numberOfLines={2}>
+                                {resolveText('people.newHint', 'Add someone you delegate or wait on.')}
+                            </Text>
+                        </View>
+                        <Pressable
+                            accessibilityLabel={resolveText('people.new', 'New Person')}
+                            accessibilityRole="button"
+                            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                            onPress={openNewPersonEditor}
+                            style={[
+                                styles.manageEditorButton,
+                                styles.manageEditorButtonPrimary,
+                                { minWidth: 86, flexDirection: 'row', gap: 6 },
+                            ]}
+                            testID="manage-person-add"
+                        >
+                            <Ionicons name="add" size={17} color="#FFFFFF" />
+                            <Text style={[styles.manageEditorButtonText, styles.manageEditorButtonPrimaryText]}>
+                                {resolveText('common.add', 'Add')}
+                            </Text>
+                        </Pressable>
+                    </View>
                 </CollapsibleSection>
 
                 <CollapsibleSection
@@ -358,15 +589,22 @@ export function ManageSettingsScreen() {
                                 ? t('areas.edit')
                                 : editorTarget?.type === 'unassignedArea'
                                     ? unassignedAreaColorLabel
+                                : editorTarget?.type === 'newPerson'
+                                    ? resolveText('people.new', 'New Person')
+                                : editorTarget?.type === 'person'
+                                    ? resolveText('people.edit', 'Edit person')
                                 : t('common.rename')}
                         </Text>
                         {editorTarget?.type !== 'unassignedArea' ? (
                             <TextInput
+                                testID={editorTarget?.type === 'newPerson' || editorTarget?.type === 'person' ? 'manage-person-name-input' : undefined}
                                 value={editorName}
                                 onChangeText={setEditorName}
                                 placeholder={
                                     editorTarget?.type === 'area'
                                         ? t('projects.areaLabel')
+                                        : editorTarget?.type === 'newPerson' || editorTarget?.type === 'person'
+                                            ? resolveText('people.namePlaceholder', 'Person name')
                                         : t('common.name')
                                 }
                                 placeholderTextColor={tc.secondaryText}
@@ -381,6 +619,43 @@ export function ManageSettingsScreen() {
                                 ]}
                                 autoFocus
                             />
+                        ) : null}
+                        {editorTarget?.type === 'newPerson' || editorTarget?.type === 'person' ? (
+                            <>
+                                <TextInput
+                                    testID="manage-person-note-input"
+                                    value={editorNote}
+                                    onChangeText={setEditorNote}
+                                    placeholder={resolveText('people.notePlaceholder', 'Note')}
+                                    placeholderTextColor={tc.secondaryText}
+                                    style={[
+                                        styles.textInput,
+                                        {
+                                            backgroundColor: tc.bg,
+                                            borderColor: tc.border,
+                                            color: tc.text,
+                                        },
+                                    ]}
+                                />
+                                <TextInput
+                                    testID="manage-person-reference-input"
+                                    value={editorReferenceLink}
+                                    onChangeText={setEditorReferenceLink}
+                                    placeholder={resolveText('people.referencePlaceholder', 'Reference link, including obsidian://')}
+                                    placeholderTextColor={tc.secondaryText}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    keyboardType="url"
+                                    style={[
+                                        styles.textInput,
+                                        {
+                                            backgroundColor: tc.bg,
+                                            borderColor: tc.border,
+                                            color: tc.text,
+                                        },
+                                    ]}
+                                />
+                            </>
                         ) : null}
                         {editorTarget?.type === 'area' || editorTarget?.type === 'unassignedArea' ? (
                             <View style={styles.manageColorPicker}>
