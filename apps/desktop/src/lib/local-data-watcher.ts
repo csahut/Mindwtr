@@ -50,12 +50,16 @@ const persistMergedDataThroughStore = async (merged: AppData): Promise<void> => 
     const allProjects = Array.isArray(merged.projects) ? merged.projects : [];
     const allSections = Array.isArray(merged.sections) ? merged.sections : [];
     const allAreas = Array.isArray(merged.areas) ? merged.areas : [];
+    const allPeople = Array.isArray(merged.people) ? merged.people : [];
 
     useTaskStore.setState((state) => ({
         _allTasks: allTasks,
         _allProjects: allProjects,
         _allSections: allSections,
         _allAreas: allAreas,
+        people: allPeople.filter((person) => !person.deletedAt),
+        _allPeople: allPeople,
+        _peopleById: new Map(allPeople.map((person) => [person.id, person] as const)),
         settings: merged.settings ?? state.settings,
         lastDataChangeAt: Date.now(),
     }));

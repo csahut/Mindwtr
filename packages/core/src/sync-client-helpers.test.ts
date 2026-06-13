@@ -21,13 +21,16 @@ describe('sync-client-helpers', () => {
             _allProjects: [{ id: 'p1', title: 'Project', status: 'active', color: '#000000', createdAt: now, updatedAt: now }],
             _allSections: [],
             _allAreas: [],
+            _allPeople: [{ id: 'person-1', name: 'Alex', createdAt: now, updatedAt: now }],
             settings: { gtd: { autoArchiveDays: 7 } },
         }));
 
         const snapshot = getInMemoryAppDataSnapshot();
         snapshot.tasks[0]!.title = 'Changed';
+        snapshot.people![0]!.name = 'Changed';
 
         expect(useTaskStore.getState()._allTasks[0]!.title).toBe('Task');
+        expect(useTaskStore.getState()._allPeople[0]!.name).toBe('Alex');
     });
 
     it('evaluates attachment cleanup windows', () => {

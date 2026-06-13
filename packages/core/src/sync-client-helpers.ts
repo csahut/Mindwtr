@@ -21,6 +21,7 @@ export const getInMemoryAppDataSnapshot = (): AppData => {
         projects: state._allProjects ?? state.projects ?? [],
         sections: state._allSections ?? state.sections ?? [],
         areas: state._allAreas ?? state.areas ?? [],
+        people: state._allPeople ?? state.people ?? [],
         settings: state.settings ?? {},
     });
 };

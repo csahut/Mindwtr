@@ -353,6 +353,7 @@ const readLocalDataForSync = async (): Promise<AppData> => {
         projects: [...state._allProjects],
         sections: [...state._allSections],
         areas: [...state._allAreas],
+        people: [...state._allPeople],
         settings: state.settings ?? {},
     });
 };

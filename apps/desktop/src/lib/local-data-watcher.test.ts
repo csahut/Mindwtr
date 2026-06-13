@@ -77,6 +77,7 @@ const emptyData = (): AppData => ({
     projects: [],
     sections: [],
     areas: [],
+    people: [],
     settings: { deviceId: 'dev-local' },
 });
 
@@ -108,10 +109,13 @@ beforeEach(() => {
         projects: [],
         sections: [],
         areas: [],
+        people: [],
         _allTasks: [],
         _allProjects: [],
         _allSections: [],
         _allAreas: [],
+        _allPeople: [],
+        _peopleById: new Map(),
         settings: { deviceId: 'dev-local' },
         lastDataChangeAt: 0,
         error: null,
@@ -466,6 +470,29 @@ describe('local-data-watcher', () => {
         expect(invokeMock.mock.calls.some(([command]) => command === 'save_data')).toBe(false);
         expect(saveCalls).toHaveLength(1);
         expect(saveCalls[0]?.tasks.some((task) => task.id === 'ext-2')).toBe(true);
+    });
+
+    it('preserves merged people when writing external data through the store', async () => {
+        externalData = {
+            ...emptyData(),
+            people: [
+                {
+                    id: 'person-1',
+                    name: 'Alex',
+                    createdAt: '2026-01-02T00:00:00.000Z',
+                    updatedAt: '2026-01-02T00:00:00.000Z',
+                },
+            ],
+        };
+
+        await __localDataWatcherTestUtils.triggerChangeForTests();
+        await flushScheduledTimers();
+
+        expect(saveCalls).toHaveLength(1);
+        expect(saveCalls[0]?.people?.some((person) => person.id === 'person-1')).toBe(true);
+        expect(useTaskStore.getState().people.some((person) => person.id === 'person-1')).toBe(true);
+        expect(useTaskStore.getState()._allPeople.some((person) => person.id === 'person-1')).toBe(true);
+        expect(useTaskStore.getState()._peopleById.get('person-1')?.name).toBe('Alex');
     });
 
     it('skips merge work when the external payload already matches the local snapshot', async () => {
