@@ -10,9 +10,9 @@ This is a **local stdio** server (no HTTP). MCP clients launch it as a subproces
 
 ## App Binaries vs. MCP Helper
 
-The desktop and mobile app binaries include the Mindwtr app, but they do **not** currently include a desktop start/stop toggle or a standalone `mindwtr-mcp` command on your `PATH`.
+The desktop and mobile app binaries include the Mindwtr app, but they do **not** currently include a desktop start/stop toggle. The standalone MCP helper is published as [`mindwtr-mcp`](https://www.npmjs.com/package/mindwtr-mcp) and listed in the public [MCP Registry](https://registry.modelcontextprotocol.io/).
 
-You do **not** need to run the whole app from source to use MCP. You can use the normal desktop app binary for your tasks, then run the separate MCP helper from this repository with Bun, or build the helper once and run it with Node. Point the helper at the desktop app's local `mindwtr.db`.
+You do **not** need to run the whole app from source to use MCP. Use the normal desktop app binary for your tasks, then let your MCP client launch `mindwtr-mcp` with `npx`, or install it globally with npm. Point the helper at the desktop app's local `mindwtr.db`.
 
 On desktop, the app shows the exact local data path in **Settings -> Sync -> Local Data**. Mobile binaries do not expose a local MCP server surface.
 
@@ -21,8 +21,9 @@ On desktop, the app shows the exact local data path in **Settings -> Sync -> Loc
 ## Requirements
 
 - **Node.js 18+** (for the MCP client that spawns the server)
-- **Bun** (recommended for running/building the server)
+- **npm** or another Node package runner for the published `mindwtr-mcp` package
 - A local Mindwtr database (`mindwtr.db`)
+- **Bun** only if you are running the helper from the source tree
 
 ### Default Database Locations
 
@@ -45,6 +46,29 @@ You can override the database location with:
 
 MCP clients run the server as a subprocess. You point them to **the command** and pass arguments.
 
+Recommended install-free command for MCP clients:
+
+```json
+{
+  "command": "npx",
+  "args": [
+    "-y",
+    "mindwtr-mcp",
+    "--db",
+    "/path/to/mindwtr.db"
+  ]
+}
+```
+
+The package is read-only by default. Add `--write` only when you explicitly want an AI client to add, update, complete, or delete local Mindwtr data.
+
+For a global install instead:
+
+```bash
+npm install -g mindwtr-mcp
+mindwtr-mcp --db "/path/to/mindwtr.db"
+```
+
 ### Key Arguments
 
 - `--db "/path/to/mindwtr.db"`: Path to your SQLite database.
@@ -61,9 +85,10 @@ Add a server entry to your Claude Desktop configuration file.
 {
   "mcpServers": {
     "mindwtr": {
-      "command": "bun",
+      "command": "npx",
       "args": [
-        "/absolute/path/to/Mindwtr/apps/mcp-server/src/index.ts",
+        "-y",
+        "mindwtr-mcp",
         "--db",
         "/home/dd/.local/share/mindwtr/mindwtr.db",
         "--write"
@@ -73,7 +98,7 @@ Add a server entry to your Claude Desktop configuration file.
 }
 ```
 
-_Note: Replace `/absolute/path/to/Mindwtr` and the DB path with your actual paths._
+_Note: Replace the DB path with your actual local Mindwtr database path._
 
 ### 2. Claude Code (CLI)
 
@@ -81,7 +106,7 @@ You can add the server via the CLI:
 
 ```bash
 claude mcp add mindwtr -- \
-  bun /path/to/Mindwtr/apps/mcp-server/src/index.ts --db "/path/to/mindwtr.db" --write
+  npx -y mindwtr-mcp --db "/path/to/mindwtr.db" --write
 ```
 
 ### 3. Gemini CLI
@@ -92,7 +117,7 @@ Gemini CLI uses `settings.json` (User: `~/.gemini/settings.json` or Project: `.g
 
 ```bash
 gemini mcp add mindwtr \
-  bun /absolute/path/to/Mindwtr/apps/mcp-server/src/index.ts \
+  npx -y mindwtr-mcp \
   --db "/path/to/mindwtr.db" --write
 ```
 
@@ -102,9 +127,10 @@ gemini mcp add mindwtr \
 {
   "mcpServers": {
     "mindwtr": {
-      "command": "bun",
+      "command": "npx",
       "args": [
-        "/absolute/path/to/Mindwtr/apps/mcp-server/src/index.ts",
+        "-y",
+        "mindwtr-mcp",
         "--db",
         "/path/to/mindwtr.db",
         "--write"
@@ -119,6 +145,16 @@ gemini mcp add mindwtr \
 ## Running Manually
 
 You usually don't need to run this manually (the MCP client does it), but it's useful for testing.
+
+### From npm
+
+```bash
+# Read-only
+npx -y mindwtr-mcp --db "/path/to/mindwtr.db"
+
+# With write access
+npx -y mindwtr-mcp --db "/path/to/mindwtr.db" --write
+```
 
 ### From Source (Bun)
 
@@ -668,5 +704,5 @@ If you need more than 500 tasks, page with `limit` + `offset` instead of expecti
 
 ## Troubleshooting
 
-- **"Command not found"**: `mindwtr-mcp` is not a global command. Use `bun run mindwtr:mcp` or the full path to the built script.
-- **Client Connection Issues**: Ensure you are NOT using `bun run` as the command in your MCP client config, as it may output extra text. Run `bun` directly on the source file or `node` on the built file.
+- **"Command not found"**: Use `npx -y mindwtr-mcp` in MCP client configs, or install the package globally with `npm install -g mindwtr-mcp`.
+- **Client Connection Issues**: Ensure you are NOT using `bun run` as the command in your MCP client config, as it may output extra text. Prefer `npx -y mindwtr-mcp`; for source checkouts, run `bun` directly on the source file or `node` on the built file.

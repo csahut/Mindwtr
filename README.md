@@ -107,7 +107,7 @@ _Don't show me a cockpit when I just want to ride a bike._
 - Obsidian vault import with note deep links on desktop.
 - Optional AI copilot (BYOK + local/self-hosted compatible models).
 - Cross-platform apps for desktop and mobile, plus PWA.
-- Optional automation helpers with desktop local REST API, CLI, and MCP server.
+- Optional automation helpers with desktop local REST API, CLI, and the published [`mindwtr-mcp`](https://www.npmjs.com/package/mindwtr-mcp) server.
 
 <details>
 <summary>See all features</summary>
@@ -167,9 +167,9 @@ _Don't show me a cockpit when I just want to ride a bike._
 - 🔌 **CLI** - Add, list, complete, search from terminal by running the repo helper
 - 🌐 **REST API** - Optional desktop localhost API server for token-authenticated scripting
 - 🌍 **Web App (PWA)** - Browser access with offline support
-- 🧠 **MCP Server** - Optional local stdio Model Context Protocol server for LLM automation
+- 🧠 **MCP Server** - Optional local stdio Model Context Protocol server for LLM automation, available as [`mindwtr-mcp`](https://www.npmjs.com/package/mindwtr-mcp) and in the [MCP Registry](https://registry.modelcontextprotocol.io/)
 
-Desktop builds can start the local REST API from **Settings -> Advanced** on `127.0.0.1` with default port `3456` and a generated bearer token. The CLI and stdio MCP server remain separate repo helpers for now.
+Desktop builds can start the local REST API from **Settings -> Advanced** on `127.0.0.1` with default port `3456` and a generated bearer token. The CLI remains a repo helper; the stdio MCP server can be installed from npm with `npm install -g mindwtr-mcp` or launched by MCP clients with `npx -y mindwtr-mcp`.
 
 ### Cross-Platform
 

@@ -79,18 +79,50 @@ jobs:
           fi
 
       - name: Clean-room package smoke test
+        id: package
         run: |
           set -euo pipefail
           rm -rf /tmp/mindwtr-mcp-pack /tmp/mindwtr-mcp-clean
           mkdir -p /tmp/mindwtr-mcp-pack /tmp/mindwtr-mcp-clean
           cd apps/mcp-server
-          npm pack --pack-destination /tmp/mindwtr-mcp-pack
+          npm pack --json --pack-destination /tmp/mindwtr-mcp-pack > /tmp/mindwtr-mcp-pack/pack.json
+
+          PACKAGE_NAME=$(node -e "const data = require('/tmp/mindwtr-mcp-pack/pack.json'); process.stdout.write(data[0].name)")
+          PACKAGE_VERSION=$(node -e "const data = require('/tmp/mindwtr-mcp-pack/pack.json'); process.stdout.write(data[0].version)")
+          LOCAL_INTEGRITY=$(node -e "const data = require('/tmp/mindwtr-mcp-pack/pack.json'); process.stdout.write(data[0].integrity)")
+          TARBALL=$(node -e "const data = require('/tmp/mindwtr-mcp-pack/pack.json'); process.stdout.write(data[0].filename)")
+
           cd /tmp/mindwtr-mcp-clean
           npm init -y
-          npm install /tmp/mindwtr-mcp-pack/mindwtr-mcp-*.tgz
+          npm install "/tmp/mindwtr-mcp-pack/$TARBALL"
           node "$GITHUB_WORKSPACE/scripts/ci/smoke-mcp-stdio.mjs" "$PWD/node_modules/.bin/mindwtr-mcp" "$PWD/data/mindwtr.db"
 
+          echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "local_integrity=$LOCAL_INTEGRITY" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether npm version already exists
+        id: npm_version
+        run: |
+          set -euo pipefail
+          PACKAGE="${{ steps.package.outputs.package_name }}@${{ steps.package.outputs.package_version }}"
+          if PUBLISHED_JSON=$(npm view "$PACKAGE" dist.integrity --json 2>/dev/null); then
+            PUBLISHED_INTEGRITY=$(node -e "const value = JSON.parse(process.argv[1]); process.stdout.write(value || '')" "$PUBLISHED_JSON")
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "published_integrity=$PUBLISHED_INTEGRITY" >> "$GITHUB_OUTPUT"
+            if [ "$PUBLISHED_INTEGRITY" != "${{ steps.package.outputs.local_integrity }}" ]; then
+              echo "npm package $PACKAGE already exists, but its tarball integrity differs from this checkout."
+              echo "Bump apps/mcp-server/package.json and apps/mcp-server/server.json before publishing a changed MCP package."
+              exit 1
+            fi
+            echo "$PACKAGE already exists on npm with matching integrity; skipping npm publish."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "$PACKAGE has not been published yet."
+          fi
+
       - name: Publish npm package with trusted publishing
+        if: steps.npm_version.outputs.published != 'true'
         env:
           NPM_DIST_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.npm_tag || 'latest' }}
         run: |
@@ -98,12 +130,42 @@ jobs:
           cd apps/mcp-server
           npm publish --access public --provenance --tag "$NPM_DIST_TAG"
 
+      - name: Verify public npm package
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/mindwtr-mcp-public-clean
+          mkdir -p /tmp/mindwtr-mcp-public-clean
+          cd /tmp/mindwtr-mcp-public-clean
+          npm init -y
+          npm install "${{ steps.package.outputs.package_name }}@${{ steps.package.outputs.package_version }}"
+          node "$GITHUB_WORKSPACE/scripts/ci/smoke-mcp-stdio.mjs" "$PWD/node_modules/.bin/mindwtr-mcp" "$PWD/data/mindwtr.db"
+
       - name: Install mcp-publisher
         run: |
           set -euo pipefail
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
+      - name: Validate MCP Registry metadata
+        run: |
+          set -euo pipefail
+          cd apps/mcp-server
+          ../../mcp-publisher validate
+
+      - name: Check whether MCP Registry version already exists
+        id: registry_version
+        run: |
+          set -euo pipefail
+          SERVER_NAME=$(node -p "require('./apps/mcp-server/server.json').name")
+          SERVER_VERSION=$(node -p "require('./apps/mcp-server/server.json').version")
+          RESPONSE=$(curl -fsSL --get --data-urlencode "search=$SERVER_NAME" "https://registry.modelcontextprotocol.io/v0.1/servers")
+          EXISTS=$(printf '%s' "$RESPONSE" | node -e "const fs = require('fs'); const data = JSON.parse(fs.readFileSync(0, 'utf8')); const name = process.argv[1]; const version = process.argv[2]; const found = Array.isArray(data.servers) && data.servers.some((entry) => entry.server?.name === name && entry.server?.version === version); process.stdout.write(found ? 'true' : 'false');" "$SERVER_NAME" "$SERVER_VERSION")
+          echo "exists=$EXISTS" >> "$GITHUB_OUTPUT"
+          if [ "$EXISTS" = "true" ]; then
+            echo "$SERVER_NAME version $SERVER_VERSION already exists in the MCP Registry; skipping registry publish."
+          fi
+
       - name: Publish MCP Registry metadata
+        if: steps.registry_version.outputs.exists != 'true'
         run: |
           set -euo pipefail
           ./mcp-publisher login github-oidc
