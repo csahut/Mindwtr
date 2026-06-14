@@ -110,6 +110,7 @@ import {
     uploadDropboxAppData,
 } from './dropbox-sync';
 import {
+    CLOUD_REMEMBER_TOKEN_KEY,
     CLOUD_TOKEN_KEY,
     CLOUD_URL_KEY,
     SYNC_BACKEND_KEY,
@@ -973,6 +974,7 @@ export class SyncService {
                 localStorage.removeItem(WEBDAV_PASSWORD_KEY);
                 localStorage.removeItem(CLOUD_URL_KEY);
                 localStorage.removeItem(CLOUD_TOKEN_KEY);
+                localStorage.removeItem(CLOUD_REMEMBER_TOKEN_KEY);
                 sessionStorage.removeItem(WEBDAV_PASSWORD_KEY);
                 sessionStorage.removeItem(CLOUD_TOKEN_KEY);
             }
@@ -1022,7 +1024,7 @@ export class SyncService {
         return readCloudConfig(getSyncConfigDeps(), options);
     }
 
-    static async setCloudConfig(config: { url: string; token?: string; allowInsecureHttp?: boolean }): Promise<void> {
+    static async setCloudConfig(config: { url: string; token?: string; allowInsecureHttp?: boolean; rememberToken?: boolean }): Promise<void> {
         return writeCloudConfig(config, getSyncConfigDeps());
     }
 

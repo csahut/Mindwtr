@@ -64,6 +64,7 @@ export type CloudConfig = {
     url: string;
     token: string;
     allowInsecureHttp?: boolean;
+    rememberToken?: boolean;
 };
 
 export type AttachmentBackendDeps = {

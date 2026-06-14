@@ -69,6 +69,7 @@ export const useSyncSettings = ({
     const [webdavTestState, setWebdavTestState] = useState<WebDavTestState>('idle');
     const [cloudUrl, setCloudUrl] = useState('');
     const [cloudToken, setCloudToken] = useState('');
+    const [cloudRememberToken, setCloudRememberToken] = useState(false);
     const [cloudAllowInsecureHttp, setCloudAllowInsecureHttp] = useState(false);
     const [cloudProvider, setCloudProvider] = useState<CloudProvider>('selfhosted');
     const [dropboxAppKey, setDropboxAppKey] = useState('');
@@ -190,6 +191,7 @@ export const useSyncSettings = ({
             .then((cfg) => {
                 setCloudUrl(cfg.url);
                 setCloudToken(cfg.token);
+                setCloudRememberToken(cfg.rememberToken === true);
                 setCloudAllowInsecureHttp(cfg.allowInsecureHttp === true);
             })
             .catch((error) => {
@@ -377,10 +379,11 @@ export const useSyncSettings = ({
         await SyncService.setCloudConfig({
             url: trimmedUrl,
             token: cloudToken.trim(),
+            rememberToken: !isTauri && cloudRememberToken,
             allowInsecureHttp: cloudAllowInsecureHttp,
         });
         showSaved();
-    }, [cloudAllowInsecureHttp, cloudUrl, cloudToken, showSaved, validateSyncHttpUrl]);
+    }, [cloudAllowInsecureHttp, cloudRememberToken, cloudUrl, cloudToken, isTauri, showSaved, validateSyncHttpUrl]);
 
     const handleSetCloudProvider = useCallback(async (provider: CloudProvider) => {
         setCloudProvider(provider);
@@ -852,6 +855,8 @@ export const useSyncSettings = ({
         setCloudUrl,
         cloudToken,
         setCloudToken,
+        cloudRememberToken,
+        setCloudRememberToken,
         cloudAllowInsecureHttp,
         setCloudAllowInsecureHttp,
         cloudProvider,

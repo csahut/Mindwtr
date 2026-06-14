@@ -167,6 +167,8 @@ vi.mock('./settings/useSyncSettings', () => ({
         setCloudUrl: vi.fn(),
         cloudToken: '',
         setCloudToken: vi.fn(),
+        cloudRememberToken: false,
+        setCloudRememberToken: vi.fn(),
         cloudProvider: 'mindwtr-cloud',
         dropboxAppKey: '',
         dropboxConfigured: false,

@@ -68,6 +68,8 @@ export type SettingsSyncLabels = {
     cloudUrl: string;
     cloudHint: string;
     cloudToken: string;
+    cloudRememberToken: string;
+    cloudRememberTokenHint: string;
     cloudSave: string;
     cloudProvider: string;
     cloudProviderSelfHosted: string;
@@ -155,6 +157,7 @@ export type SettingsSyncPageProps = {
     onTestWebDavConnection: () => Promise<void> | void;
     cloudUrl: string;
     cloudToken: string;
+    cloudRememberToken: boolean;
     cloudAllowInsecureHttp: boolean;
     cloudProvider: CloudProvider;
     dropboxAppKey: string;
@@ -166,6 +169,7 @@ export type SettingsSyncPageProps = {
     dropboxTestState: DropboxTestState;
     onCloudUrlChange: (value: string) => void;
     onCloudTokenChange: (value: string) => void;
+    onCloudRememberTokenChange: (value: boolean) => void;
     onCloudAllowInsecureHttpChange: (value: boolean) => void;
     onCloudProviderChange: (provider: CloudProvider) => void;
     onSaveCloud: () => Promise<void> | void;

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppData, Attachment } from '@mindwtr/core';
 import { DropboxUnauthorizedError } from './dropbox-sync';
 import { fallbackHashString, getFileSyncDir, hashString, normalizeSyncBackend } from './sync-service-utils';
+import { CLOUD_REMEMBER_TOKEN_KEY, CLOUD_TOKEN_KEY } from './sync-service-config';
 import { useUiStore } from '../store/ui-store';
 
 const markLocalWriteMock = vi.hoisted(() => vi.fn());
@@ -220,6 +221,52 @@ describe('SyncService testability hooks', () => {
         });
         expect(markLocalWriteMock).not.toHaveBeenCalled();
         expect(markLocalSqliteWriteMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps browser self-hosted tokens session-only by default', async () => {
+        await SyncService.setCloudConfig({
+            url: 'https://sync.example.com',
+            token: 'session-secret',
+            allowInsecureHttp: false,
+        });
+
+        expect(sessionStorage.getItem(CLOUD_TOKEN_KEY)).toBe('session-secret');
+        expect(localStorage.getItem(CLOUD_TOKEN_KEY)).toBeNull();
+        expect(localStorage.getItem(CLOUD_REMEMBER_TOKEN_KEY)).toBeNull();
+        expect(await SyncService.getCloudConfig()).toMatchObject({
+            url: 'https://sync.example.com',
+            token: 'session-secret',
+            rememberToken: false,
+        });
+
+        sessionStorage.clear();
+
+        expect(await SyncService.getCloudConfig()).toMatchObject({
+            url: 'https://sync.example.com',
+            token: '',
+            rememberToken: false,
+        });
+    });
+
+    it('persists browser self-hosted tokens when remember token is enabled', async () => {
+        await SyncService.setCloudConfig({
+            url: 'https://sync.example.com',
+            token: 'persistent-secret',
+            rememberToken: true,
+            allowInsecureHttp: false,
+        });
+
+        expect(localStorage.getItem(CLOUD_TOKEN_KEY)).toBe('persistent-secret');
+        expect(localStorage.getItem(CLOUD_REMEMBER_TOKEN_KEY)).toBe('true');
+        expect(sessionStorage.getItem(CLOUD_TOKEN_KEY)).toBeNull();
+
+        sessionStorage.clear();
+
+        expect(await SyncService.getCloudConfig()).toMatchObject({
+            url: 'https://sync.example.com',
+            token: 'persistent-secret',
+            rememberToken: true,
+        });
     });
 
     it('defaults cloud provider to selfhosted and persists selection', async () => {

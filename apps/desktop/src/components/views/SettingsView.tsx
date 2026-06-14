@@ -986,6 +986,8 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
     setCloudUrl,
     cloudToken,
     setCloudToken,
+    cloudRememberToken,
+    setCloudRememberToken,
     cloudAllowInsecureHttp,
     setCloudAllowInsecureHttp,
     cloudProvider,
@@ -1280,6 +1282,7 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
           onTestWebDavConnection={handleTestWebDavConnection}
           cloudUrl={cloudUrl}
           cloudToken={cloudToken}
+          cloudRememberToken={cloudRememberToken}
           cloudAllowInsecureHttp={cloudAllowInsecureHttp}
           cloudProvider={cloudProvider}
           dropboxAppKey={dropboxAppKey}
@@ -1291,6 +1294,7 @@ export function SettingsView({ initialPage, onboardingHintPage, onResumeOnboardi
           dropboxTestState={dropboxTestState}
           onCloudUrlChange={setCloudUrl}
           onCloudTokenChange={setCloudToken}
+          onCloudRememberTokenChange={setCloudRememberToken}
           onCloudAllowInsecureHttpChange={setCloudAllowInsecureHttp}
           onCloudProviderChange={handleSetCloudProvider}
           onSaveCloud={handleSaveCloud}
