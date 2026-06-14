@@ -9,7 +9,7 @@ import { markStartupPhase, measureStartupPhase } from './startup-profiler';
 
 const DATA_KEY = WIDGET_DATA_KEY;
 const LEGACY_DATA_KEYS = ['focus-gtd-data', 'gtd-todo-data', 'gtd-data'];
-const EMPTY_APP_DATA: AppData = { tasks: [], projects: [], sections: [], areas: [], settings: {} };
+const EMPTY_APP_DATA: AppData = { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} };
 const SQLITE_STARTUP_TIMEOUT_MS = 3_500;
 const SQLITE_QUERY_TIMEOUT_MS = 2_500;
 const SQLITE_RETRY_COOLDOWN_MS = 60_000;
@@ -245,6 +245,7 @@ const normalizeStoredAppData = (data: AppData): AppData => ({
     projects: Array.isArray(data.projects) ? data.projects : [],
     sections: Array.isArray(data.sections) ? data.sections : [],
     areas: Array.isArray(data.areas) ? data.areas : [],
+    people: Array.isArray(data.people) ? data.people : [],
     settings: data.settings && typeof data.settings === 'object' ? data.settings : {},
 });
 
@@ -343,7 +344,7 @@ const createStorage = (): StorageAdapter => {
         return {
             getData: async (): Promise<AppData> => {
                 if (typeof window === 'undefined') {
-                    return { tasks: [], projects: [], sections: [], areas: [], settings: {} };
+                    return { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} };
                 }
                 let jsonValue = localStorage.getItem(DATA_KEY);
                 if (jsonValue == null) {
@@ -357,7 +358,7 @@ const createStorage = (): StorageAdapter => {
                     }
                 }
                 if (jsonValue == null) {
-                    return { tasks: [], projects: [], sections: [], areas: [], settings: {} };
+                    return { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} };
                 }
                 try {
                     const data = parseStoredAppDataJson(jsonValue);
