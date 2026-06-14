@@ -15,8 +15,9 @@ This uses Dropbox OAuth with **App Folder** access, so Mindwtr only reads/writes
 - **Mobile (official builds):** Supported
 - **Expo Go:** Not supported for Dropbox OAuth
 - **FOSS builds:** Dropbox sync may be disabled
+- **Docker/PWA web build:** not supported; use a native desktop/mobile build, self-hosted sync, or WebDAV instead
 
-If Dropbox is disabled in your build, use [[Data and Sync]] (File Sync) or [[Cloud Deployment]] (self-hosted) instead.
+If Dropbox is disabled in your build, or you are using the Docker-served PWA, use [[Data and Sync]] (File Sync), [[Cloud Deployment]] (self-hosted), or WebDAV instead.
 
 ---
 
