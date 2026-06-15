@@ -444,4 +444,45 @@ describe('quick-add', () => {
         expect(result.props.tags).toEqual(['#project']);
         expect(result.props.status).toBe('next');
     });
+
+    it('preserveText keeps the original title but still applies detected metadata (#742)', () => {
+        const now = new Date('2025-01-01T10:00:00Z');
+        const input = 'Call mom @phone #family /due:tomorrow';
+        const result = parseQuickAdd(input, undefined, now, undefined, { preserveText: true });
+
+        expect(result.title).toBe(input);
+        expect(result.props.contexts).toEqual(['@phone']);
+        expect(result.props.tags).toEqual(['#family']);
+        expect(result.props.dueDate).toBeTruthy();
+    });
+
+    it('preserveText leaves a pasted URL untouched and extracts no implicit date (#742)', () => {
+        const now = new Date('2025-01-01T10:00:00Z');
+        const input = 'Read https://en.wikipedia.org/wiki/Foo_(bar) tomorrow';
+        const result = parseQuickAdd(input, undefined, now, undefined, { preserveText: true });
+
+        expect(result.title).toBe(input);
+        expect(result.detectedDate).toBeUndefined();
+        expect(result.props.dueDate).toBeUndefined();
+    });
+
+    it('default mode still strips recognized tokens (preserve is opt-in)', () => {
+        const result = parseQuickAdd('Buy milk #grocery', undefined, undefined, undefined, {
+            knownTags: ['#grocery'],
+        });
+
+        expect(result.title).toBe('Buy milk');
+        expect(result.props.tags).toEqual(['#grocery']);
+    });
+
+    it('parseQuickAddDateCommands preserves the title when requested (#742)', () => {
+        const now = new Date('2025-01-01T10:00:00Z');
+        const stripped = parseQuickAddDateCommands('Submit report /due:tomorrow', now);
+        expect(stripped.title).toBe('Submit report');
+        expect(stripped.props.dueDate).toBeTruthy();
+
+        const preserved = parseQuickAddDateCommands('Submit report /due:tomorrow', now, { preserveText: true });
+        expect(preserved.title).toBe('Submit report /due:tomorrow');
+        expect(preserved.props.dueDate).toBeTruthy();
+    });
 });

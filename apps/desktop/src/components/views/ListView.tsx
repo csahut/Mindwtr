@@ -221,8 +221,12 @@ export const ListView = memo(function ListView({ title, statusFilter }: ListView
     } = useListViewOptimizations(tasks, baseTasks, statusFilter, perf);
     const allTokens = Array.from(new Set([...allContexts, ...allTags])).sort();
     const quickAddParseOptions = useMemo(
-        () => ({ knownContexts: allContexts, knownTags: allTags }),
-        [allContexts, allTags],
+        () => ({
+            knownContexts: allContexts,
+            knownTags: allTags,
+            preserveText: settings.quickAddAutoClean !== true,
+        }),
+        [allContexts, allTags, settings.quickAddAutoClean],
     );
 
     const {

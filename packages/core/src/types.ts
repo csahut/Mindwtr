@@ -450,6 +450,14 @@ export interface AppSettings extends NotificationSettings {
     calendar?: CalendarSettings;
     keybindingStyle?: 'vim' | 'emacs';
     globalQuickAddShortcut?: string;
+    // Quick-add: when true, recognized tokens (dates, tags, contexts) are removed
+    // from the title after being applied. Default (unset) preserves text as typed
+    // and only copies metadata out, so pasted URLs/notes are never mangled (#742).
+    quickAddAutoClean?: boolean;
+    // Markdown editor typing helpers (bracket/backtick auto-pairing, list
+    // continuation, reference autocomplete). Default on; false types plain text
+    // without the editor injecting characters (#742).
+    markdownEditorAssist?: boolean;
     window?: WindowSettings;
     ai?: AiSettings;
     savedSearches?: SavedSearch[];

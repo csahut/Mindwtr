@@ -390,7 +390,9 @@ export function QuickCaptureSheet({
       | undefined;
 
     if (trimmed) {
-      const parsed = parseQuickAdd(trimmed, projects, new Date(), areas);
+      const parsed = parseQuickAdd(trimmed, projects, new Date(), areas, {
+        preserveText: settings.quickAddAutoClean !== true,
+      });
       finalTitle = parsed.title || trimmed;
       parsedProps = parsed.props;
       if (
@@ -446,7 +448,7 @@ export function QuickCaptureSheet({
     if (startTime) initialPropsMerged.startTime = startTime.toISOString();
 
     return { title: finalTitle, props: initialPropsMerged, invalidDateCommands };
-  }, [addProject, areas, contextTags, dueDate, dueDateHasTime, initialProps, prioritiesEnabled, priority, projectId, projects, selectedAreaId, startTime, value]);
+  }, [addProject, areas, contextTags, dueDate, dueDateHasTime, initialProps, prioritiesEnabled, priority, projectId, projects, selectedAreaId, settings.quickAddAutoClean, startTime, value]);
 
   const resetState = useCallback(() => {
     clearAndroidOptionsExpand();

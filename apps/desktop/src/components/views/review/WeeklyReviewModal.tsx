@@ -473,7 +473,9 @@ export function WeeklyReviewGuideModal({ onClose }: WeeklyReviewGuideModalProps)
         const trimmed = value.trim();
         if (!trimmed) return;
 
-        const { title, props, invalidDateCommands } = parseQuickAddDateCommands(trimmed, new Date());
+        const { title, props, invalidDateCommands } = parseQuickAddDateCommands(trimmed, new Date(), {
+            preserveText: settings.quickAddAutoClean !== true,
+        });
         if (invalidDateCommands && invalidDateCommands.length > 0) {
             showToast(`${t('quickAdd.invalidDateCommand')}: ${invalidDateCommands.join(', ')}`, 'error');
             return;

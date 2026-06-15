@@ -22,6 +22,10 @@ export interface QuickAddResult {
 export interface QuickAddParseOptions {
     knownContexts?: readonly string[];
     knownTags?: readonly string[];
+    // When true, keep the user's text exactly as entered: recognized metadata
+    // (dates, tags, contexts, ...) is still detected and applied, but never
+    // stripped out of the title. Default strips recognized tokens. See #742.
+    preserveText?: boolean;
 }
 
 export function getQuickAddProjectInitialProps(
@@ -398,7 +402,11 @@ function parseLinkCommandsFromWorking(
     };
 }
 
-export function parseQuickAddDateCommands(input: string, now: Date = new Date()): QuickAddDateCommandsResult {
+export function parseQuickAddDateCommands(
+    input: string,
+    now: Date = new Date(),
+    options: { preserveText?: boolean } = {},
+): QuickAddDateCommandsResult {
     const protectedInput = protectEscapes(input.trim());
     const {
         working,
@@ -409,7 +417,9 @@ export function parseQuickAddDateCommands(input: string, now: Date = new Date())
     } = parseDateCommandsFromWorking(protectedInput, now);
 
     return {
-        title: restoreEscapes(working.replace(/\s{2,}/g, ' ').trim()),
+        title: options.preserveText === true
+            ? input.trim()
+            : restoreEscapes(working.replace(/\s{2,}/g, ' ').trim()),
         props: {
             ...(startTime ? { startTime } : {}),
             ...(dueDate ? { dueDate } : {}),
@@ -427,6 +437,7 @@ export function parseQuickAdd(
     options: QuickAddParseOptions = {},
 ): QuickAddResult {
     let working = protectEscapes(input.trim());
+    const preserveText = options.preserveText === true;
     const hadExplicitDueCommand = /(?:^|\s)\/due:/i.test(working);
 
     const contexts = new Set<string>();
@@ -531,8 +542,8 @@ export function parseQuickAdd(
             const rawProject = restoreEscapes((plusMatch[1] || '').replace(/\s+/g, ' ').trim());
             if (!rawProject) {
                 working = stripToken(working, plusMatch[0]);
-                const title = restoreEscapes(working.replace(/\s{2,}/g, ' ').trim());
-                return { title, props: {} };
+                const strippedTitle = restoreEscapes(working.replace(/\s{2,}/g, ' ').trim());
+                return { title: preserveText ? input.trim() : strippedTitle, props: {} };
             }
             if (projects && projects.length > 0) {
                 const found = projects.find(
@@ -549,8 +560,13 @@ export function parseQuickAdd(
         }
     }
 
-    const title = restoreEscapes(working.replace(/\s{2,}/g, ' ').trim());
-    const detectedDate = !dueDate && !hadExplicitDueCommand ? detectTrailingDate(title, now) : undefined;
+    const cleanedTitle = restoreEscapes(working.replace(/\s{2,}/g, ' ').trim());
+    // Preserve mode keeps the original text and never strips a recognized
+    // trailing date; explicit metadata in props is still applied (copy-out).
+    const title = preserveText ? input.trim() : cleanedTitle;
+    const detectedDate = preserveText || dueDate || hadExplicitDueCommand
+        ? undefined
+        : detectTrailingDate(cleanedTitle, now);
 
     const props: Partial<Task> = {};
     if (status) props.status = status;

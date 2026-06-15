@@ -164,8 +164,12 @@ export function QuickAddModal({ standaloneWindow = false }: QuickAddModalProps) 
         ? resolvedAreaFilter
         : '';
     const quickAddParseOptions = useMemo(
-        () => ({ knownContexts: allContexts, knownTags: allTags }),
-        [allContexts, allTags],
+        () => ({
+            knownContexts: allContexts,
+            knownTags: allTags,
+            preserveText: settings.quickAddAutoClean !== true,
+        }),
+        [allContexts, allTags, settings.quickAddAutoClean],
     );
     const parsedInput = useMemo(
         () => parseQuickAdd(value, projects, new Date(), areas, quickAddParseOptions),

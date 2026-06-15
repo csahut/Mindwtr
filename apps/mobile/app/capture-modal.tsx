@@ -223,8 +223,12 @@ export default function CaptureScreen() {
     return getUsedTaskTokens(tasks, (task) => task.tags, { prefix: '#' });
   }, [tasks]);
   const quickAddParseOptions = React.useMemo(
-    () => ({ knownContexts: contextOptions, knownTags: tagOptions }),
-    [contextOptions, tagOptions]
+    () => ({
+      knownContexts: contextOptions,
+      knownTags: tagOptions,
+      preserveText: settings.quickAddAutoClean !== true,
+    }),
+    [contextOptions, tagOptions, settings.quickAddAutoClean]
   );
 
   useEffect(() => {

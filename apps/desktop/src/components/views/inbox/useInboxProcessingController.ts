@@ -285,6 +285,7 @@ export function useInboxProcessingController({
         const { title: parsedTitle, props: parsedDateProps, invalidDateCommands } = parseQuickAddDateCommands(
             titleInput,
             new Date(),
+            { preserveText: settings?.quickAddAutoClean !== true },
         );
         if (invalidDateCommands && invalidDateCommands.length > 0) {
             showToast(`${t('quickAdd.invalidDateCommand')}: ${invalidDateCommands.join(', ')}`, 'error');
@@ -300,7 +301,7 @@ export function useInboxProcessingController({
             ...parsedDateProps,
         });
         return true;
-    }, [processingDescription, processingTask, processingTitle, showToast, t, updateTask]);
+    }, [processingDescription, processingTask, processingTitle, settings?.quickAddAutoClean, showToast, t, updateTask]);
 
     const handleNotActionable = useCallback((action: 'trash' | 'someday' | 'reference') => {
         if (!processingTask) return;
@@ -393,13 +394,15 @@ export function useInboxProcessingController({
     }, [continueFromProjectCheck]);
 
     const handleProjectCheckYes = useCallback(() => {
-        const { title: parsedTitle } = parseQuickAddDateCommands(processingTitle, new Date());
+        const { title: parsedTitle } = parseQuickAddDateCommands(processingTitle, new Date(), {
+            preserveText: settings?.quickAddAutoClean !== true,
+        });
         const baseTitle = parsedTitle.trim() || processingTitle.trim() || processingTask?.title || '';
         setConvertToProject(true);
         setProjectTitleDraft(baseTitle);
         setNextActionDraft(baseTitle);
         goToStep('project');
-    }, [goToStep, processingTask?.title, processingTitle]);
+    }, [goToStep, processingTask?.title, processingTitle, settings?.quickAddAutoClean]);
 
     const handleTwoMinDone = useCallback(() => {
         if (!processingTask) return;
