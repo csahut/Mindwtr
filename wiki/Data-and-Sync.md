@@ -565,6 +565,11 @@ The `data.json` file structure:
       "contexts": ["@home"],
       "tags": ["#focused"],
       "dueDate": "2025-01-15T09:00:00Z",
+      "recurrence": {
+        "rule": "weekly",
+        "strategy": "strict",
+        "byDay": ["MO", "WE"]
+      },
       "createdAt": "2025-01-01T10:00:00Z",
       "updatedAt": "2025-01-10T15:30:00Z",
       "deletedAt": null

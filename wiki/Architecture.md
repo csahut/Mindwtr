@@ -98,11 +98,13 @@ The core package contains all shared business logic:
 | `contexts.ts`       | Preset contexts and tags                      |
 | `quick-add.ts`      | Natural language task parser                  |
 | `recurrence.ts`     | Recurring task logic (RFC 5545 partial)       |
-| `sync.ts` + `sync-*.ts` | Sync orchestration, normalization, signatures, settings merge, and tombstones |
+| `sync.ts` + `sync-*.ts` | Sync merge core plus shared sync helpers; see module list below |
 | `date.ts`           | Safe date parsing utilities                   |
 | `ai/`               | AI integration (Gemini/OpenAI/Anthropic)      |
 | `sqlite-adapter.ts` | Local storage adapter interface               |
 | `webdav.ts`         | WebDAV sync client                            |
+
+Current sync sub-modules split the protocol by responsibility: `sync-orchestrator.ts` runs cycles, `sync-normalization.ts` repairs payload shape, `sync-signatures.ts` computes comparable content signatures, `sync-merge-settings.ts` merges settings groups, `sync-tombstones.ts` handles retention cleanup, `sync-revision.ts` stamps revisions, and `sync-client-helpers.ts` / `sync-service-utils.ts` hold platform service helpers.
 
 ### Design Principles
 

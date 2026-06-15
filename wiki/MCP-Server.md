@@ -605,7 +605,7 @@ If you need more than 500 tasks, page with `limit` + `offset` instead of expecti
 
 **Notes**
 
-- Use `null` to clear fields like `projectId`, `dueDate`, `startTime`, `contexts`, and `tags`.
+- Use `null` to clear nullable fields. This applies to task fields such as `projectId`, `dueDate`, `startTime`, `contexts`, and `tags`; project fields such as `areaId`, `dueDate`, `reviewAt`, and `supportNotes`; section `description`; area `color` and `icon`; and person `note` and `referenceLink`.
 
 **Example**
 
