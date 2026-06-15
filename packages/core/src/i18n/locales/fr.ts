@@ -1,5 +1,5 @@
 // Split from i18n-translations.ts to make community translation contributions easier.
-export const fr: Record<string, string> = {
+export const frOverrides: Record<string, string> = {
         // App
         'app.name': 'Mindwtr',
         'markdown.copyCode': 'Copier le code',
@@ -501,6 +501,7 @@ export const fr: Record<string, string> = {
         'projects.colorPink': 'Rose',
         'projects.create': 'Créer',
         'areas.create': 'Créer',
+	'areas.deleteConfirm': 'Supprimer ce domaine? Les projets et tâches dans ce domaine seront gardés et marqués comme non assigné.',
         'projects.deleteConfirm': 'Êtes-vous sûr de vouloir supprimer ce projet ?',
         'projects.deleted': 'Projet déplacé dans la corbeille',
         'projects.deleteFailed': 'Impossible de supprimer le projet.',
@@ -1125,6 +1126,7 @@ export const fr: Record<string, string> = {
         'common.rename': 'Renommer',
         'common.name': 'Nom',
         'settings.deleteNamed': 'Supprimer « {{name}} » ?',
+	'people.deleteConfirm': 'Supprimer cette personne? Les tâches qui lui sont assigné seront gardées et marquées comme non assignées.',
         'settings.unassignedAreaColor': 'Couleur de domaine non assignée',
         'settings.unassignedAreaColorDesc': 'Utilisée pour les tâches et projets sans domaine.',
         'contexts.empty': 'Aucun contexte',
