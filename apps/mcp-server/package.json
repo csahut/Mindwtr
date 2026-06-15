@@ -1,7 +1,7 @@
 {
   "name": "mindwtr-mcp",
   "description": "Local stdio MCP server for Mindwtr task and project automation.",
-  "version": "0.9.10",
+  "version": "1.0.0",
   "license": "AGPL-3.0-only",
   "type": "module",
   "mcpName": "io.github.dongdongbh/mindwtr",

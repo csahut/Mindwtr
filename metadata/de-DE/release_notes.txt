@@ -1,3 +1,3 @@
-- Guided Mind Sweep erfasst private und berufliche Punkte direkt in der Inbox.
-- Personenplanung, Board-Sortierung, Inbox-Verarbeitung und Heute-Follow-ups verbessern die Organisation.
-- iOS-Dateisync, Anhangsbereinigung, Obsidian-Dataview-Import, mobile Inbox-Aktionen und Teilen-Text sind stabiler.
+- Sync und Backups erhalten Personen- und Verantwortlichen-Daten zuverlaessiger, mit Fixes fuer doppelte Personen und sicherere Projektloeschungen.
+- Quick Capture, Projektansichten und Kalenderplanung laufen ruhiger mit besserer Tastaturfuehrung, Barrierefreiheit und Aktualisierung.
+- Grosse Aufgabenlisten, Markdown-Links, Wiederholungen und Speicherfaelle sind stabiler.

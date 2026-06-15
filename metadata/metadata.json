@@ -30,7 +30,7 @@
           "完全离线可用，无需互联网连接",
           "完全开源，安全透明"
         ],
-        "ReleaseNotes": "• Guided Mind Sweep 可将个人和工作事项直接捕获到收件箱。\n• 人员/负责人规划、看板列排序、收件箱处理和今日跟进让组织更清晰。\n• 同步、附件清理、Obsidian Dataview 导入、快速处理和分享文本捕获更稳定。",
+        "ReleaseNotes": "• 同步和本地存储更安全地处理人员、项目删除、共用附件和重复任务。\n• 任务输入和自动补全更稳定，容器删除结果更清晰，Markdown 链接查找更快。\n• 本地自动化和云同步路径加强了写入处理与测试覆盖。",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -82,7 +82,7 @@
           "No internet connection required to function",
           "Open source and transparent"
         ],
-        "ReleaseNotes": "• Guided Mind Sweep helps capture personal and work items directly into Inbox.\n• People/assignee planning, board column ordering, weekly inbox processing, and follow-up-today review actions improve organization.\n• Sync, attachment cleanup, Obsidian Dataview import, quick process submit, and shared text capture are steadier.",
+        "ReleaseNotes": "• Sync and local storage now preserve people, project deletes, shared attachments, and recurring tasks more safely.\n• Task input and autocomplete are steadier, with clearer container delete outcomes and faster Markdown link lookups.\n• Local automation and cloud sync paths received stronger write handling and test coverage.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",
@@ -131,7 +131,7 @@
           "Offline nutzbar ohne staendige Internetverbindung",
           "Open Source und transparent"
         ],
-        "ReleaseNotes": "• Guided Mind Sweep erfasst private und berufliche Punkte direkt in der Inbox.\n• Personenplanung, Board-Sortierung, Inbox-Verarbeitung und Heute-Follow-ups verbessern die Organisation.\n• Sync, Anhangsbereinigung, Obsidian-Dataview-Import, Schnellverarbeitung und Teilen-Text sind stabiler.",
+        "ReleaseNotes": "• Sync und lokaler Speicher behandeln Personen, Projektloeschungen, gemeinsame Anhaenge und Wiederholungen sicherer.\n• Aufgabeneingabe und Autovervollstaendigung sind stabiler, mit klareren Container-Loeschungen und schnelleren Markdown-Links.\n• Lokale Automation und Cloud-Sync haben staerkere Schreiblogik und Tests.",
         "Images": [],
         "RecommendedHardware": [],
         "MinimumHardware": [],
@@ -161,7 +161,7 @@
           "Projets, contextes, revue et tableau Kanban",
           "Open source et transparent"
         ],
-        "ReleaseNotes": "• Guided Mind Sweep capture les elements personnels et de travail directement dans l'Inbox.\n• Personnes, ordre du tableau, traitement d'inbox et suivis du jour ameliorent l'organisation.\n• Sync, nettoyage des pieces jointes, import Dataview, traitement rapide et texte partage sont plus stables.",
+        "ReleaseNotes": "• Sync et stockage local gerent mieux personnes, suppressions de projets, pieces jointes partagees et taches recurrentes.\n• Saisie et autocompletion sont plus stables, avec suppressions de conteneurs plus claires et liens Markdown plus rapides.\n• Automation locale et sync cloud ont des ecritures et tests renforces.",
         "Images": [],
         "RecommendedHardware": [],
         "MinimumHardware": [],
@@ -190,7 +190,7 @@
           "No requiere conexión a internet para funcionar",
           "Código abierto y transparente"
         ],
-        "ReleaseNotes": "• Guided Mind Sweep captura asuntos personales y de trabajo directamente en Bandeja.\n• Personas, orden del tablero, procesamiento de bandeja y seguimientos para hoy mejoran la organizacion.\n• Sync, limpieza de adjuntos, importacion Dataview, procesamiento rapido y texto compartido son mas estables.",
+        "ReleaseNotes": "• Sync y almacenamiento local manejan mejor personas, borrados de proyectos, adjuntos compartidos y tareas recurrentes.\n• Entrada de tareas y autocompletado son mas estables, con borrados de contenedores mas claros y enlaces Markdown mas rapidos.\n• Automatizacion local y sync en la nube tienen escrituras y pruebas mas solidas.",
         "Images": [
           {
             "FileName": "2026-01-27_22-59-40.png",

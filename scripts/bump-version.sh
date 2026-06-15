@@ -9,7 +9,7 @@ if [ -n "$1" ]; then
     NEW_VERSION="$1"
 else
     echo "Current versions:"
-    grep '"version"' package.json apps/*/package.json packages/*/package.json apps/mobile/app.json apps/desktop/src-tauri/tauri.conf.json 2>/dev/null | head -10
+    grep '"version"' package.json apps/*/package.json packages/*/package.json apps/mobile/app.json apps/mcp-server/server.json apps/desktop/src-tauri/tauri.conf.json 2>/dev/null | head -10
     echo ""
     read -p "Enter new version (e.g., 0.2.5): " NEW_VERSION
 fi

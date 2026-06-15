@@ -88,6 +88,23 @@
   <url type="bugtracker">https://github.com/dongdongbh/Mindwtr/issues</url>
   <url type="vcs-browser">https://github.com/dongdongbh/Mindwtr</url>
   <releases>
+    <release version="1.0.0" date="2026-06-15">
+      <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v1.0.0</url>
+      <description>
+        <p>Mindwtr 1.0.0 improves desktop sync safety, local storage, task editing, and published local automation helpers.</p>
+        <p xml:lang="de">Mindwtr 1.0.0 verbessert Desktop-Sync-Sicherheit, lokalen Speicher, Aufgabenbearbeitung und veroeffentlichte lokale Automationshelfer.</p>
+        <ul>
+          <li>Preserved people data, shared attachments, project delete outcomes, and recurring task creation more reliably.</li>
+          <li xml:lang="de">Personendaten, gemeinsame Anhaenge, Projektloeschungen und wiederkehrende Aufgaben zuverlaessiger erhalten.</li>
+          <li>Made desktop task input, autocomplete, Markdown link lookup, and container-delete feedback steadier.</li>
+          <li xml:lang="de">Aufgabeneingabe, Autovervollstaendigung, Markdown-Linksuche und Container-Loeschhinweise im Desktop stabiler gemacht.</li>
+          <li>Published the local MCP helper as an npm package with registry metadata for local automation setups.</li>
+          <li xml:lang="de">Den lokalen MCP-Helfer als npm-Paket mit Registry-Metadaten fuer lokale Automationsumgebungen veroeffentlicht.</li>
+          <li>Added stricter PWA security headers plus broader sync, cloud, recurrence, and write-path tests.</li>
+          <li xml:lang="de">Strengere PWA-Sicherheitsheader sowie breitere Tests fuer Sync, Cloud, Wiederholungen und Schreibpfade hinzugefuegt.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.9.10" date="2026-06-11">
       <url type="details">https://github.com/dongdongbh/Mindwtr/releases/tag/v0.9.10</url>
       <description>

@@ -3,7 +3,7 @@
   "name": "io.github.dongdongbh/mindwtr",
   "title": "Mindwtr",
   "description": "Local task and project automation for Mindwtr.",
-  "version": "0.9.10",
+  "version": "1.0.0",
   "websiteUrl": "https://github.com/dongdongbh/Mindwtr/wiki/MCP-Server",
   "repository": {
     "url": "https://github.com/dongdongbh/Mindwtr",
@@ -15,7 +15,7 @@
     {
       "registryType": "npm",
       "identifier": "mindwtr-mcp",
-      "version": "0.9.10",
+      "version": "1.0.0",
       "transport": {
         "type": "stdio"
       },

@@ -13,6 +13,7 @@ const jsonFiles = [
     'apps/mobile/package.json',
     'apps/cloud/package.json',
     'apps/mcp-server/package.json',
+    'apps/mcp-server/server.json',
     'packages/core/package.json',
     'apps/mobile/app.json',
     'apps/desktop/src-tauri/tauri.conf.json'
@@ -42,6 +43,18 @@ jsonFiles.forEach(file => {
                 console.log(`Updating ${file} version from ${json.version} to ${newVersion}`);
                 json.version = newVersion;
                 updated = true;
+            }
+
+            // Handle MCP Registry package metadata
+            if (Array.isArray(json.packages)) {
+                json.packages.forEach((pkg, index) => {
+                    if (pkg && pkg.version) {
+                        const label = pkg.identifier || pkg.name || `package ${index + 1}`;
+                        console.log(`Updating ${file} ${label} version from ${pkg.version} to ${newVersion}`);
+                        pkg.version = newVersion;
+                        updated = true;
+                    }
+                });
             }
 
             // Handle app.json (Expo)

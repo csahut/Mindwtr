@@ -338,14 +338,25 @@ jobs:
           notes_dir = pathlib.Path(sys.argv[1])
           notes_file = sys.argv[2]
           limit = 500
+          required_locales = {"en-US", "de-DE", "es-ES", "fr-FR", "zh-CN"}
           violations = []
+          found_locales = set()
 
           for path in sorted(notes_dir.glob("whatsnew-*")):
+              locale = path.name.replace("whatsnew-", "", 1)
+              found_locales.add(locale)
               text = path.read_text(encoding="utf-8").strip()
               length = len(text)
               print(f"{path.name}: {length}/{limit}")
               if length > limit:
-                  violations.append((path.name.replace("whatsnew-", "", 1), length))
+                  violations.append((locale, length))
+
+          missing = sorted(required_locales - found_locales)
+          if missing:
+              raise SystemExit(
+                  f"Google Play release notes missing required locales: {', '.join(missing)}. "
+                  f"Update {notes_file} before publishing."
+              )
 
           if violations:
               formatted = ", ".join(f"{locale}={length}" for locale, length in violations)
