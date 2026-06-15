@@ -1127,6 +1127,8 @@ describe('startCalendarPushSync', () => {
         const makeTaskMap = (items: ReturnType<typeof makeTask>[]) => new Map(items.map((item) => [item.id, item]));
         let storeState = {
             tasks: [task],
+            projects: [],
+            sections: [],
             _allTasks: [task],
             _tasksById: makeTaskMap([task]),
         };
@@ -1145,6 +1147,8 @@ describe('startCalendarPushSync', () => {
 
         storeState = {
             tasks: [updatedTask],
+            projects: [],
+            sections: [],
             _allTasks: [updatedTask],
             _tasksById: makeTaskMap([updatedTask]),
         };
@@ -1178,6 +1182,8 @@ describe('startCalendarPushSync', () => {
         const makeTaskMap = (items: ReturnType<typeof makeTask>[]) => new Map(items.map((item) => [item.id, item]));
         let storeState = {
             tasks: [task],
+            projects: [],
+            sections: [],
             _allTasks: [task],
             _tasksById: makeTaskMap([task]),
         };
@@ -1200,6 +1206,8 @@ describe('startCalendarPushSync', () => {
 
         storeState = {
             tasks: [updatedTask],
+            projects: [],
+            sections: [],
             _allTasks: [updatedTask],
             _tasksById: makeTaskMap([updatedTask]),
         };
@@ -1232,6 +1240,8 @@ describe('startCalendarPushSync', () => {
         const makeTaskMap = (items: ReturnType<typeof makeTask>[]) => new Map(items.map((task) => [task.id, task]));
         let storeState = {
             tasks: [taskOne, taskTwo],
+            projects: [],
+            sections: [],
             _allTasks: [taskOne, taskTwo],
             _tasksById: makeTaskMap([taskOne, taskTwo]),
         };
@@ -1256,6 +1266,8 @@ describe('startCalendarPushSync', () => {
 
         storeState = {
             tasks: [taskTwo],
+            projects: [],
+            sections: [],
             _allTasks: [taskOneDeleted, taskTwo],
             _tasksById: makeTaskMap([taskOneDeleted, taskTwo]),
         };
@@ -1263,6 +1275,8 @@ describe('startCalendarPushSync', () => {
 
         storeState = {
             tasks: [taskTwoUpdated],
+            projects: [],
+            sections: [],
             _allTasks: [taskOneDeleted, taskTwoUpdated],
             _tasksById: makeTaskMap([taskOneDeleted, taskTwoUpdated]),
         };
