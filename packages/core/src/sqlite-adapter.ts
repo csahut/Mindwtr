@@ -1259,7 +1259,8 @@ export class SqliteAdapter {
                  revBy=excluded.revBy,
                  createdAt=excluded.createdAt,
                  updatedAt=excluded.updatedAt,
-                 deletedAt=excluded.deletedAt`,
+                 deletedAt=excluded.deletedAt
+                 WHERE areas.rev IS NULL OR areas.rev <= excluded.rev`,
             );
 
             await upsertBatch(
@@ -1326,7 +1327,8 @@ export class SqliteAdapter {
                  revBy=excluded.revBy,
                  createdAt=excluded.createdAt,
                  updatedAt=excluded.updatedAt,
-                 deletedAt=excluded.deletedAt`,
+                 deletedAt=excluded.deletedAt
+                 WHERE projects.rev IS NULL OR projects.rev <= excluded.rev`,
             );
 
             const people = Array.isArray(data.people) ? data.people : [];
@@ -1365,7 +1367,8 @@ export class SqliteAdapter {
                  revBy=excluded.revBy,
                  createdAt=excluded.createdAt,
                  updatedAt=excluded.updatedAt,
-                 deletedAt=excluded.deletedAt`,
+                 deletedAt=excluded.deletedAt
+                 WHERE people.rev IS NULL OR people.rev <= excluded.rev`,
             );
 
             await upsertBatch(
@@ -1411,7 +1414,8 @@ export class SqliteAdapter {
                  updatedAt=excluded.updatedAt,
                  deletedAt=excluded.deletedAt,
                  deletedAtBeforeProjectArchive=excluded.deletedAtBeforeProjectArchive,
-                 projectArchivedAt=excluded.projectArchivedAt`,
+                 projectArchivedAt=excluded.projectArchivedAt
+                 WHERE sections.rev IS NULL OR sections.rev <= excluded.rev`,
             );
 
             await upsertBatch(

@@ -462,6 +462,115 @@ describeSqlite('SqliteAdapter', () => {
         });
     });
 
+    it('guards container upserts with revision ordering', async () => {
+        const now = '2026-06-10T08:00:00.000Z';
+        const baseArea = {
+            id: 'area-1',
+            name: 'Current area',
+            color: '#2563EB',
+            icon: 'briefcase',
+            order: 0,
+            createdAt: now,
+            updatedAt: now,
+            rev: 10,
+            revBy: 'device-new',
+        };
+        const baseProject = {
+            id: 'project-1',
+            title: 'Current project',
+            status: 'active' as const,
+            color: '#2563EB',
+            order: 0,
+            createdAt: now,
+            updatedAt: now,
+            rev: 10,
+            revBy: 'device-new',
+        };
+        const baseSection = {
+            id: 'section-1',
+            projectId: 'project-1',
+            title: 'Current section',
+            description: 'current description',
+            order: 0,
+            createdAt: now,
+            updatedAt: now,
+            rev: 10,
+            revBy: 'device-new',
+        };
+        const basePerson = {
+            id: 'person-1',
+            name: 'Current person',
+            note: 'current note',
+            referenceLink: 'https://example.com/current',
+            createdAt: now,
+            updatedAt: now,
+            rev: 10,
+            revBy: 'device-new',
+        };
+        const baseData: AppData = {
+            tasks: [],
+            projects: [baseProject],
+            sections: [baseSection],
+            areas: [baseArea],
+            people: [basePerson],
+            settings: {},
+        };
+        const loadContainers = async () => {
+            const loaded = await adapter.getData();
+            return {
+                area: loaded.areas.find((area) => area.id === baseArea.id),
+                project: loaded.projects.find((project) => project.id === baseProject.id),
+                section: loaded.sections.find((section) => section.id === baseSection.id),
+                person: loaded.people?.find((person) => person.id === basePerson.id),
+            };
+        };
+
+        await adapter.saveData(baseData);
+        await adapter.saveData({
+            ...baseData,
+            areas: [{ ...baseArea, name: 'Stale area', updatedAt: '2026-06-10T08:00:30.000Z', rev: 1, revBy: 'device-old' }],
+            projects: [{ ...baseProject, title: 'Stale project', updatedAt: '2026-06-10T08:00:30.000Z', rev: 1, revBy: 'device-old' }],
+            sections: [{ ...baseSection, title: 'Stale section', updatedAt: '2026-06-10T08:00:30.000Z', rev: 1, revBy: 'device-old' }],
+            people: [{ ...basePerson, name: 'Stale person', updatedAt: '2026-06-10T08:00:30.000Z', rev: 1, revBy: 'device-old' }],
+        });
+
+        let loaded = await loadContainers();
+        expect(loaded.area).toMatchObject({ name: 'Current area', rev: 10, revBy: 'device-new' });
+        expect(loaded.project).toMatchObject({ title: 'Current project', rev: 10, revBy: 'device-new' });
+        expect(loaded.section).toMatchObject({ title: 'Current section', rev: 10, revBy: 'device-new' });
+        expect(loaded.person).toMatchObject({ name: 'Current person', rev: 10, revBy: 'device-new' });
+
+        const equalUpdatedAt = '2026-06-10T08:02:00.000Z';
+        const equalData: AppData = {
+            ...baseData,
+            areas: [{ ...baseArea, name: 'Equal area', updatedAt: equalUpdatedAt, revBy: 'device-equal' }],
+            projects: [{ ...baseProject, title: 'Equal project', updatedAt: equalUpdatedAt, revBy: 'device-equal' }],
+            sections: [{ ...baseSection, title: 'Equal section', updatedAt: equalUpdatedAt, revBy: 'device-equal' }],
+            people: [{ ...basePerson, name: 'Equal person', updatedAt: equalUpdatedAt, revBy: 'device-equal' }],
+        };
+        await adapter.saveData(equalData);
+
+        loaded = await loadContainers();
+        expect(loaded.area).toMatchObject({ name: 'Equal area', rev: 10, revBy: 'device-equal', updatedAt: equalUpdatedAt });
+        expect(loaded.project).toMatchObject({ title: 'Equal project', rev: 10, revBy: 'device-equal', updatedAt: equalUpdatedAt });
+        expect(loaded.section).toMatchObject({ title: 'Equal section', rev: 10, revBy: 'device-equal', updatedAt: equalUpdatedAt });
+        expect(loaded.person).toMatchObject({ name: 'Equal person', rev: 10, revBy: 'device-equal', updatedAt: equalUpdatedAt });
+
+        await adapter.saveData({
+            ...equalData,
+            areas: [{ ...equalData.areas[0], name: 'Missing rev area', rev: undefined, revBy: undefined }],
+            projects: [{ ...equalData.projects[0], title: 'Missing rev project', rev: undefined, revBy: undefined }],
+            sections: [{ ...equalData.sections[0], title: 'Missing rev section', rev: undefined, revBy: undefined }],
+            people: [{ ...equalData.people![0], name: 'Missing rev person', rev: undefined, revBy: undefined }],
+        });
+
+        loaded = await loadContainers();
+        expect(loaded.area).toMatchObject({ name: 'Equal area', rev: 10, revBy: 'device-equal' });
+        expect(loaded.project).toMatchObject({ title: 'Equal project', rev: 10, revBy: 'device-equal' });
+        expect(loaded.section).toMatchObject({ title: 'Equal section', rev: 10, revBy: 'device-equal' });
+        expect(loaded.person).toMatchObject({ name: 'Equal person', rev: 10, revBy: 'device-equal' });
+    });
+
     it('normalizes legacy string recurrence values when loading tasks', async () => {
         const now = new Date().toISOString();
         await adapter.saveData({
