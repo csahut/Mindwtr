@@ -10,6 +10,8 @@ type MockCalendarSyncEntry = {
 
 type MockCalendarStoreState = {
     tasks: unknown[];
+    projects: { id: string; title: string }[];
+    sections: { id: string; title: string }[];
     _allTasks: unknown[];
     _tasksById: Map<string, unknown>;
 };
@@ -69,7 +71,13 @@ const {
     mockUpsertCalendarSyncEntry: vi.fn(async () => {}),
     mockDeleteCalendarSyncEntry: vi.fn<(taskId: string, platform: string) => Promise<void>>(async () => {}),
     mockGetAllCalendarSyncEntries: vi.fn<(platform: string) => Promise<MockCalendarSyncEntry[]>>(async () => []),
-    mockGetState: vi.fn<() => MockCalendarStoreState>(() => ({ tasks: [], _allTasks: [], _tasksById: new Map() })),
+    mockGetState: vi.fn<() => MockCalendarStoreState>(() => ({
+        tasks: [],
+        projects: [],
+        sections: [],
+        _allTasks: [],
+        _tasksById: new Map(),
+    })),
     mockSubscribe: vi.fn((
         _selectorOrListener: ((state: MockCalendarStoreState) => unknown) | ((state: MockCalendarStoreState) => void),
         _listener?: (selected: unknown) => void
@@ -126,6 +134,21 @@ vi.mock('@mindwtr/core', () => ({
         subscribe: mockSubscribe,
     },
     createProjectedRecurringTask: mockCreateProjectedRecurringTask,
+    buildCalendarPushEventFields: (
+        task: { description?: string; attachments?: { kind?: string; uri?: string; deletedAt?: string }[] },
+        context: { leadingNote?: string | null } = {},
+    ) => {
+        const links = (task.attachments ?? [])
+            .filter((attachment) => !attachment.deletedAt && attachment.kind === 'link')
+            .map((attachment) => typeof attachment.uri === 'string' ? attachment.uri.trim() : '')
+            .filter((uri) => uri.startsWith('http://') || uri.startsWith('https://') || uri.startsWith('mailto:'));
+        const blocks = [
+            context.leadingNote?.trim() || '',
+            task.description?.trim() || '',
+            links.length > 0 ? links.map((uri) => 'Link: ' + uri).join('\n') : '',
+        ].filter(Boolean);
+        return { notes: blocks.join('\n\n'), url: links[0] ?? null };
+    },
     expandCalendarRecurringTasks: (task: unknown, projectedAtIso?: string): unknown[] => {
         const projectedTask = mockCreateProjectedRecurringTask(task, projectedAtIso);
         return projectedTask ? [task, projectedTask] : [task];
@@ -255,6 +278,8 @@ function setupEnabled(calendarId = 'cal-1', targetCalendarId: string | null = nu
 function setStoreTasks(tasks: unknown[], allTasks: unknown[] = tasks) {
     mockGetState.mockReturnValue({
         tasks,
+        projects: [],
+        sections: [],
         _allTasks: allTasks,
         _tasksById: new Map(allTasks.map((task) => [(task as { id: string }).id, task])),
     });
