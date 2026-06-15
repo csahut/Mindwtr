@@ -26,12 +26,14 @@ import {
     getClientIp,
     getToken,
     isAuthorizedToken,
+    normalizeAllowedAuthTokens,
     parseAllowedAuthTokens,
     parseBoolEnv,
     parseTrustedProxyIps,
     resolveAllowedAuthTokensFromEnv,
     toRateLimitRoute,
     tokenToKey,
+    type AllowedAuthTokenInput,
 } from './server-auth';
 import {
     AUTH_FAILURE_RATE_MAX,
@@ -780,7 +782,7 @@ type CloudServerOptions = {
     maxBodyBytes?: number;
     maxAttachmentBytes?: number;
     requestTimeoutMs?: number;
-    allowedAuthTokens?: Set<string> | null;
+    allowedAuthTokens?: AllowedAuthTokenInput;
     trustProxyHeaders?: boolean;
     trustedProxyIps?: Set<string> | null;
     maxAnyTokenNamespaces?: number;
@@ -807,9 +809,11 @@ export async function startCloudServer(options: CloudServerOptions = {}): Promis
     const maxAttachmentBytes = Number(
         options.maxAttachmentBytes ?? process.env.MINDWTR_CLOUD_MAX_ATTACHMENT_BYTES ?? 50_000_000
     );
-    const allowedAuthTokens = options.allowedAuthTokens === undefined
-        ? resolveAllowedAuthTokensFromEnv(process.env)
-        : options.allowedAuthTokens;
+    const allowedAuthTokens = normalizeAllowedAuthTokens(
+        options.allowedAuthTokens === undefined
+            ? resolveAllowedAuthTokensFromEnv(process.env)
+            : options.allowedAuthTokens
+    );
     const trustProxyHeaders = options.trustProxyHeaders ?? parseBoolEnv(process.env.MINDWTR_CLOUD_TRUST_PROXY_HEADERS);
     const trustedProxyIps = options.trustedProxyIps ?? parseTrustedProxyIps(process.env.MINDWTR_CLOUD_TRUSTED_PROXY_IPS);
     const rawMaxAnyTokenNamespaces = Number(

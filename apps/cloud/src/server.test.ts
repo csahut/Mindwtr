@@ -49,6 +49,7 @@ describe('cloud server utils', () => {
         expect(__cloudTestUtils.parseAllowedAuthTokens('')).toBeNull();
         const tokens = __cloudTestUtils.parseAllowedAuthTokens('alpha, beta ,gamma');
         expect(tokens?.size).toBe(3);
+        expect(tokens?.digests.every((digest) => digest.length === 32)).toBe(true);
         expect(__cloudTestUtils.isAuthorizedToken('beta', tokens || null)).toBe(true);
         expect(__cloudTestUtils.isAuthorizedToken('delta', tokens || null)).toBe(false);
         expect(__cloudTestUtils.isAuthorizedToken('any', null)).toBe(true);
@@ -66,40 +67,40 @@ describe('cloud server utils', () => {
                 MINDWTR_CLOUD_AUTH_TOKENS: 'alpha,beta',
             });
             expect(primaryOnly).not.toBeNull();
-            expect(primaryOnly?.has('alpha')).toBe(true);
-            expect(primaryOnly?.has('beta')).toBe(true);
+            expect(__cloudTestUtils.isAuthorizedToken('alpha', primaryOnly)).toBe(true);
+            expect(__cloudTestUtils.isAuthorizedToken('beta', primaryOnly)).toBe(true);
 
             const legacyOnly = __cloudTestUtils.resolveAllowedAuthTokensFromEnv({
                 MINDWTR_CLOUD_TOKEN: 'legacy-token',
             });
             expect(legacyOnly).not.toBeNull();
-            expect(legacyOnly?.has('legacy-token')).toBe(true);
+            expect(__cloudTestUtils.isAuthorizedToken('legacy-token', legacyOnly)).toBe(true);
 
             const combined = __cloudTestUtils.resolveAllowedAuthTokensFromEnv({
                 MINDWTR_CLOUD_AUTH_TOKENS: 'new-token',
                 MINDWTR_CLOUD_TOKEN: 'legacy-token',
             });
-            expect(combined?.has('new-token')).toBe(true);
-            expect(combined?.has('legacy-token')).toBe(true);
+            expect(__cloudTestUtils.isAuthorizedToken('new-token', combined)).toBe(true);
+            expect(__cloudTestUtils.isAuthorizedToken('legacy-token', combined)).toBe(true);
 
             const fileOnly = __cloudTestUtils.resolveAllowedAuthTokensFromEnv({
                 MINDWTR_CLOUD_AUTH_TOKENS_FILE: authTokensFile,
             });
-            expect(fileOnly?.has('file-alpha')).toBe(true);
-            expect(fileOnly?.has('file-beta')).toBe(true);
+            expect(__cloudTestUtils.isAuthorizedToken('file-alpha', fileOnly)).toBe(true);
+            expect(__cloudTestUtils.isAuthorizedToken('file-beta', fileOnly)).toBe(true);
 
             const legacyFileOnly = __cloudTestUtils.resolveAllowedAuthTokensFromEnv({
                 MINDWTR_CLOUD_TOKEN_FILE: legacyTokenFile,
             });
-            expect(legacyFileOnly?.has('legacy-file-token')).toBe(true);
+            expect(__cloudTestUtils.isAuthorizedToken('legacy-file-token', legacyFileOnly)).toBe(true);
 
             const mixedWithFile = __cloudTestUtils.resolveAllowedAuthTokensFromEnv({
                 MINDWTR_CLOUD_AUTH_TOKENS: 'inline-token',
                 MINDWTR_CLOUD_AUTH_TOKENS_FILE: authTokensFile,
             });
-            expect(mixedWithFile?.has('inline-token')).toBe(true);
-            expect(mixedWithFile?.has('file-alpha')).toBe(true);
-            expect(mixedWithFile?.has('file-beta')).toBe(true);
+            expect(__cloudTestUtils.isAuthorizedToken('inline-token', mixedWithFile)).toBe(true);
+            expect(__cloudTestUtils.isAuthorizedToken('file-alpha', mixedWithFile)).toBe(true);
+            expect(__cloudTestUtils.isAuthorizedToken('file-beta', mixedWithFile)).toBe(true);
 
             const allowAny = __cloudTestUtils.resolveAllowedAuthTokensFromEnv({
                 MINDWTR_CLOUD_ALLOW_ANY_TOKEN: 'true',
