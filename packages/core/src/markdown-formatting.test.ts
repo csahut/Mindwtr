@@ -203,6 +203,14 @@ describe('applyMarkdownPairInsertion', () => {
         ).toBeNull();
     });
 
+    it('does not auto-close quotes, angle brackets, or braces at the cursor', () => {
+        // Only Markdown-relevant pairs auto-close; these fight prose and pasted URLs (discussion #742).
+        expect(applyMarkdownPairInsertion('say ', 'say "', { start: 4, end: 4 })).toBeNull();
+        expect(applyMarkdownPairInsertion('say ', "say '", { start: 4, end: 4 })).toBeNull();
+        expect(applyMarkdownPairInsertion('say ', 'say <', { start: 4, end: 4 })).toBeNull();
+        expect(applyMarkdownPairInsertion('say ', 'say {', { start: 4, end: 4 })).toBeNull();
+    });
+
     it('supports repeated backtick wrapping for fenced code', () => {
         const replaceSelectionWithBacktick = (value: string, selection: { start: number; end: number }) => (
             `${value.slice(0, selection.start)}\`${value.slice(selection.end)}`

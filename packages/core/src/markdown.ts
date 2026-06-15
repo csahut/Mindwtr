@@ -898,14 +898,14 @@ const MARKDOWN_INSERTION_PAIRS: Record<string, string> = {
     '~': '~~',
 };
 
+// Auto-close only the characters that carry Markdown meaning (links and code).
+// Quotes, angle brackets, and braces were removed: auto-closing them while typing
+// fights normal prose and pasted URLs with no Markdown benefit (discussion #742).
+// Selection wrapping (MARKDOWN_INSERTION_PAIRS) still supports the full set.
 const MARKDOWN_AUTO_INSERTION_PAIRS: Record<string, string> = {
     '[': ']',
     '(': ')',
-    '{': '}',
-    '<': '>',
     '`': '`',
-    "'": "'",
-    '"': '"',
 };
 
 const MARKDOWN_CLOSING_INSERTIONS = new Set<string>([
