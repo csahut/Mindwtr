@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, create } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
-import type { Task } from '@mindwtr/core';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useTaskStore, type Task } from '@mindwtr/core';
 
 import { useTaskDescriptionEditor, type TaskDescriptionEditor } from './use-task-description-editor';
 
@@ -49,6 +49,10 @@ function DescriptionEditorHarness({
 }
 
 describe('useTaskDescriptionEditor', () => {
+  afterEach(() => {
+    useTaskStore.setState({ settings: {} });
+  });
+
   it('keeps inline Android description pairs through repeated stale native changes', () => {
     const expose = React.createRef<HarnessApi | null>();
     let tree!: ReturnType<typeof create>;
@@ -79,6 +83,37 @@ describe('useTaskDescriptionEditor', () => {
     });
 
     expect(expose.current!.draft).toBe('()');
+
+    act(() => {
+      tree.unmount();
+    });
+  });
+
+  it('types plain text without auto-pairing when editor assist is disabled', () => {
+    useTaskStore.setState({ settings: { markdownEditorAssist: false } });
+    const expose = React.createRef<HarnessApi | null>();
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<DescriptionEditorHarness expose={expose} />);
+    });
+
+    const preventDefault = vi.fn();
+    act(() => {
+      expose.current!.editor.handleDescriptionKeyPress({
+        nativeEvent: { key: '(' },
+        preventDefault,
+      } as any);
+    });
+
+    // No auto-pair: the key press is left to the native input, nothing injected.
+    expect(preventDefault).not.toHaveBeenCalled();
+
+    act(() => {
+      expose.current!.editor.handleDescriptionChange('(');
+    });
+
+    expect(expose.current!.draft).toBe('(');
 
     act(() => {
       tree.unmount();

@@ -64,6 +64,8 @@ type Labels = {
     captureSaveAudioDesc: string;
     quickAddAutoClean: string;
     quickAddAutoCleanDesc: string;
+    markdownEditorAssist: string;
+    markdownEditorAssistDesc: string;
     taskEditorLayout: string;
     taskEditorLayoutDesc: string;
     taskEditorLayoutHint: string;
@@ -224,6 +226,7 @@ export function SettingsGtdPage({
     const defaultCaptureMethod = safeSettings.gtd?.defaultCaptureMethod ?? 'text';
     const saveAudioAttachments = safeSettings.gtd?.saveAudioAttachments !== false;
     const quickAddAutoClean = safeSettings.quickAddAutoClean === true;
+    const markdownEditorAssist = safeSettings.markdownEditorAssist !== false;
     const speechEnabled = safeSettings.ai?.speechToText?.enabled === true;
     const inboxProcessing = safeSettings.gtd?.inboxProcessing ?? {};
     const inboxDefaultMode = inboxProcessing.defaultMode === 'quick' ? 'quick' : 'guided';
@@ -883,6 +886,33 @@ export function SettingsGtdPage({
                             className={cn(
                                 'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
                                 quickAddAutoClean ? 'translate-x-4' : 'translate-x-1'
+                            )}
+                        />
+                    </button>
+                </div>
+                <div className="p-4 flex items-center justify-between gap-6">
+                    <div className="min-w-0">
+                        <div className="text-sm font-medium">{t.markdownEditorAssist}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{t.markdownEditorAssistDesc}</div>
+                    </div>
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={markdownEditorAssist}
+                        onClick={() => {
+                            updateSettings({ markdownEditorAssist: !markdownEditorAssist })
+                                .then(showSaved)
+                                .catch((error) => reportError('Failed to update editor settings', error));
+                        }}
+                        className={cn(
+                            'relative inline-flex h-5 w-9 items-center rounded-full border transition-colors',
+                            markdownEditorAssist ? 'bg-primary border-primary' : 'bg-muted/50 border-border'
+                        )}
+                    >
+                        <span
+                            className={cn(
+                                'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+                                markdownEditorAssist ? 'translate-x-4' : 'translate-x-1'
                             )}
                         />
                     </button>

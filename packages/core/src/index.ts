@@ -664,6 +664,7 @@ export {
     getActiveMarkdownReferenceQuery,
     getInlineMarkdownPreview,
     insertMarkdownReferenceAtQuery,
+    isMarkdownEditorAssistEnabled,
     MARKDOWN_TOOLBAR_ACTIONS,
     normalizeMarkdownInternalLinks,
     parseInlineMarkdown,
@@ -680,6 +681,7 @@ export {
 export type {
     ActiveMarkdownReferenceQuery,
     InlineToken,
+    MarkdownAssistOptions,
     MarkdownChecklistItem,
     MarkdownReference,
     MarkdownReferenceEntityType,

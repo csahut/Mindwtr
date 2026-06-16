@@ -1,6 +1,7 @@
 import {
     applyMarkdownPairInsertion,
     applyMarkdownUrlPaste,
+    type MarkdownAssistOptions,
     type MarkdownSelection,
     type MarkdownToolbarResult,
 } from '@mindwtr/core';
@@ -105,8 +106,15 @@ export const applyMarkdownUrlPasteWithSelectionFallback = (
     nextValue: string,
     primarySelection: MarkdownSelection,
     fallbackSelection?: MarkdownSelection | null,
+    options?: MarkdownAssistOptions,
 ): MarkdownSelectionReplacement | null => (
-    applyWithSelectionCandidates(previousValue, nextValue, primarySelection, fallbackSelection, applyMarkdownUrlPaste)
+    applyWithSelectionCandidates(
+        previousValue,
+        nextValue,
+        primarySelection,
+        fallbackSelection,
+        (prev, next, selection) => applyMarkdownUrlPaste(prev, next, selection, options),
+    )
 );
 
 export const applyMarkdownPairInsertionWithSelectionFallback = (
@@ -114,8 +122,15 @@ export const applyMarkdownPairInsertionWithSelectionFallback = (
     nextValue: string,
     primarySelection: MarkdownSelection,
     fallbackSelection?: MarkdownSelection | null,
+    options?: MarkdownAssistOptions,
 ): MarkdownSelectionReplacement | null => (
-    applyWithSelectionCandidates(previousValue, nextValue, primarySelection, fallbackSelection, applyMarkdownPairInsertion)
+    applyWithSelectionCandidates(
+        previousValue,
+        nextValue,
+        primarySelection,
+        fallbackSelection,
+        (prev, next, selection) => applyMarkdownPairInsertion(prev, next, selection, options),
+    )
 );
 
 export const applyMarkdownPairKeyPressWithSelectionFallback = (
@@ -123,8 +138,10 @@ export const applyMarkdownPairKeyPressWithSelectionFallback = (
     key: string,
     primarySelection: MarkdownSelection,
     fallbackSelection?: MarkdownSelection | null,
+    options?: MarkdownAssistOptions,
 ): MarkdownSelectionReplacement | null => {
     if (!key || key.length > 1) return null;
+    if (options?.assist === false) return null;
 
     const selections = getSelectionCandidates(primarySelection, fallbackSelection);
     const orderedSelections = [

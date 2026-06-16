@@ -286,4 +286,35 @@ describe('markdown selection replacement fallbacks', () => {
             ),
         ).toBeNull();
     });
+
+    it('skips every fallback helper when editor assist is disabled', () => {
+        const assistOff = { assist: false };
+        expect(
+            applyMarkdownUrlPasteWithSelectionFallback(
+                'read docs today',
+                'read https://example.com today',
+                { start: 24, end: 24 },
+                { start: 5, end: 9 },
+                assistOff,
+            ),
+        ).toBeNull();
+        expect(
+            applyMarkdownPairInsertionWithSelectionFallback(
+                'read docs',
+                'read [',
+                { start: 6, end: 6 },
+                { start: 5, end: 9 },
+                assistOff,
+            ),
+        ).toBeNull();
+        expect(
+            applyMarkdownPairKeyPressWithSelectionFallback(
+                '',
+                '(',
+                { start: 0, end: 0 },
+                null,
+                assistOff,
+            ),
+        ).toBeNull();
+    });
 });

@@ -20,7 +20,9 @@ import {
     applyMarkdownKeyboardShortcut,
     applyMarkdownPairInsertion,
     generateUUID,
+    isMarkdownEditorAssistEnabled,
     syncMarkdownChecklistWithCanonical,
+    useTaskStore,
     type MarkdownSelection,
     type MarkdownToolbarResult,
     type Task,
@@ -154,6 +156,7 @@ export function ChecklistField({
     updateTask,
     resetTaskChecklist,
 }: ChecklistFieldProps) {
+    const markdownEditorAssist = useTaskStore((state) => isMarkdownEditorAssistEnabled(state.settings));
     const [checklistDraft, setChecklistDraft] = useState<Task['checklist']>(checklist || []);
     const checklistDraftRef = useRef<Task['checklist']>(checklist || []);
     const checklistDirtyRef = useRef(false);
@@ -340,6 +343,7 @@ export function ChecklistField({
                                                     item.title,
                                                     event.target.value,
                                                     previousSelection,
+                                                    { assist: markdownEditorAssist },
                                                 );
                                                 if (pairedInsertion) {
                                                     applyChecklistMarkdownResult(index, pairedInsertion, event.currentTarget, true);
@@ -388,6 +392,7 @@ export function ChecklistField({
                                                         currentValue,
                                                         `${currentValue.slice(0, selection.start)}${event.key}${currentValue.slice(selection.end)}`,
                                                         selection,
+                                                        { assist: markdownEditorAssist },
                                                     );
                                                     if (!next) return;
                                                     event.preventDefault();

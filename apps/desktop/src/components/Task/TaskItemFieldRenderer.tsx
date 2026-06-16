@@ -16,6 +16,7 @@ import {
     getTaskDateCoherenceIssues,
     hasTimeComponent,
     isJalaliCalendarLocale,
+    isMarkdownEditorAssistEnabled,
     normalizeClockTimeInput,
     normalizeDateFormatSetting,
     parseCalendarInputDate,
@@ -25,6 +26,7 @@ import {
     safeParseDate,
     startOfCalendarMonth,
     tFallback,
+    useTaskStore,
     type Attachment,
     type MarkdownSelection,
     type MarkdownToolbarActionId,
@@ -630,6 +632,8 @@ export function TaskItemFieldRenderer({
         assignedToOptions,
     } = data;
 
+    const markdownEditorAssist = useTaskStore((state) => isMarkdownEditorAssistEnabled(state.settings));
+
     const [reviewTimeDraft, setReviewTimeDraft] = useState('');
     const [descriptionExpanded, setDescriptionExpanded] = useState(false);
     const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -900,6 +904,7 @@ export function TaskItemFieldRenderer({
                     currentValue,
                     `${currentValue.slice(0, pairSelection.start)}${event.key}${currentValue.slice(pairSelection.end)}`,
                     pairSelection,
+                    { assist: markdownEditorAssist },
                 );
             if (!next) return;
             event.preventDefault();
@@ -908,7 +913,7 @@ export function TaskItemFieldRenderer({
         }
 
         if (event.key !== 'Enter' || event.shiftKey || event.altKey) return;
-        const next = continueMarkdownOnEnter(currentValue, selection);
+        const next = continueMarkdownOnEnter(currentValue, selection, { assist: markdownEditorAssist });
         if (!next) return;
 
         event.preventDefault();
@@ -928,6 +933,7 @@ export function TaskItemFieldRenderer({
             currentValue,
             `${currentValue.slice(0, selection.start)}${pastedText}${currentValue.slice(selection.end)}`,
             selection,
+            { assist: markdownEditorAssist },
         );
         if (!next) return;
         event.preventDefault();
@@ -945,7 +951,7 @@ export function TaskItemFieldRenderer({
         source: HTMLTextAreaElement,
     ) => {
         const previousSelection = descriptionSelectionRef.current;
-        const pairedInsertion = applyMarkdownPairInsertion(editDescription, value, previousSelection);
+        const pairedInsertion = applyMarkdownPairInsertion(editDescription, value, previousSelection, { assist: markdownEditorAssist });
         if (pairedInsertion) {
             applyDescriptionValue(pairedInsertion.value, {
                 baseSelection: previousSelection,

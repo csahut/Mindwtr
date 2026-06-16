@@ -236,10 +236,30 @@ export function normalizeMarkdownInternalLinks(markdown: string): string {
     ));
 }
 
+// Typing helpers that fire automatically as the user edits (auto-pairing,
+// url-to-link paste, list continuation, reference autocomplete). They are
+// gated by a single setting so the description can act as a plain-text field
+// with nothing injected (discussion #742). Explicit actions (toolbar buttons,
+// keyboard shortcuts) are deliberate and stay enabled regardless.
+export type MarkdownAssistOptions = {
+    assist?: boolean;
+};
+
+// Single source of truth for the default-on semantics. Only an explicit
+// `false` turns the helpers off; unset keeps them on (the maintainer's #742
+// commitment that pairing stays on by default).
+export function isMarkdownEditorAssistEnabled(
+    settings?: { markdownEditorAssist?: boolean } | null,
+): boolean {
+    return settings?.markdownEditorAssist !== false;
+}
+
 export function getActiveMarkdownReferenceQuery(
     value: string,
     selection: MarkdownSelection,
+    options?: MarkdownAssistOptions,
 ): ActiveMarkdownReferenceQuery | null {
+    if (options?.assist === false) return null;
     const normalizedSelection = normalizeSelection(value, selection);
     if (normalizedSelection.start !== normalizedSelection.end) return null;
 
@@ -1070,7 +1090,9 @@ export function applyMarkdownPairInsertion(
     previousValue: string,
     nextValue: string,
     selection: MarkdownSelection,
+    options?: MarkdownAssistOptions,
 ): MarkdownToolbarResult | null {
+    if (options?.assist === false) return null;
     const replacement = detectSelectionReplacement(previousValue, nextValue, selection);
     if (!replacement) {
         return applyCollapsedPairInsertion(previousValue, nextValue, selection);
@@ -1104,7 +1126,9 @@ export function applyMarkdownUrlPaste(
     previousValue: string,
     nextValue: string,
     selection: MarkdownSelection,
+    options?: MarkdownAssistOptions,
 ): MarkdownToolbarResult | null {
+    if (options?.assist === false) return null;
     const replacement = detectSelectionReplacement(previousValue, nextValue, selection);
     if (!replacement) return null;
     const href = sanitizeLinkHref(replacement.insertedText);
@@ -1185,7 +1209,9 @@ export function applyMarkdownToolbarAction(
 export function continueMarkdownOnEnter(
     value: string,
     selection: MarkdownSelection,
+    options?: MarkdownAssistOptions,
 ): MarkdownToolbarResult | null {
+    if (options?.assist === false) return null;
     const normalizedSelection = normalizeSelection(value, selection);
     if (normalizedSelection.start !== normalizedSelection.end) {
         return null;
@@ -1212,7 +1238,9 @@ export function continueMarkdownOnTextChange(
     previousValue: string,
     nextValue: string,
     selection: MarkdownSelection,
+    options?: MarkdownAssistOptions,
 ): MarkdownToolbarResult | null {
+    if (options?.assist === false) return null;
     const normalizedSelection = normalizeSelection(previousValue, selection);
     if (normalizedSelection.start !== normalizedSelection.end) {
         return null;
@@ -1223,5 +1251,5 @@ export function continueMarkdownOnTextChange(
         return null;
     }
 
-    return continueMarkdownOnEnter(previousValue, normalizedSelection);
+    return continueMarkdownOnEnter(previousValue, normalizedSelection, options);
 }

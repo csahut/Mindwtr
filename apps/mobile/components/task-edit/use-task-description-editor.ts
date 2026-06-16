@@ -4,6 +4,8 @@ import {
     applyMarkdownKeyboardShortcut,
     applyMarkdownToolbarAction,
     continueMarkdownOnTextChange,
+    isMarkdownEditorAssistEnabled,
+    useTaskStore,
     type MarkdownSelection,
     type MarkdownToolbarActionId,
     type MarkdownToolbarResult,
@@ -203,11 +205,13 @@ export function useTaskDescriptionEditor({
         const currentSelection = descriptionSelectionRef.current;
         const previousValue = descriptionDraftRef.current;
         const fallbackSelection = lastDescriptionRangeRef.current;
+        const assistEnabled = isMarkdownEditorAssistEnabled(useTaskStore.getState().settings);
         const pastedUrl = applyMarkdownUrlPasteWithSelectionFallback(
             previousValue,
             text,
             currentSelection,
             fallbackSelection,
+            { assist: assistEnabled },
         );
         if (pastedUrl) {
             lastDescriptionRangeRef.current = null;
@@ -223,6 +227,7 @@ export function useTaskDescriptionEditor({
             text,
             currentSelection,
             fallbackSelection,
+            { assist: assistEnabled },
         );
         if (pairedInsertion) {
             lastDescriptionRangeRef.current = isRangeSelection(pairedInsertion.result.selection)
@@ -239,6 +244,7 @@ export function useTaskDescriptionEditor({
             descriptionDraftRef.current,
             text,
             descriptionSelectionRef.current,
+            { assist: assistEnabled },
         );
         if (continued) {
             lastDescriptionRangeRef.current = null;
@@ -254,11 +260,13 @@ export function useTaskDescriptionEditor({
     }, [applyDescriptionValue, descriptionDraftRef, restoreDescriptionSelection]);
 
     const handleDescriptionKeyPress = React.useCallback((event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+        const assistEnabled = isMarkdownEditorAssistEnabled(useTaskStore.getState().settings);
         const pairedInsertion = applyMarkdownPairKeyPressWithSelectionFallback(
             descriptionDraftRef.current,
             event.nativeEvent.key,
             descriptionSelectionRef.current,
             lastDescriptionRangeRef.current,
+            { assist: assistEnabled },
         );
         if (pairedInsertion) {
             event.preventDefault?.();

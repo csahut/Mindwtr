@@ -192,6 +192,13 @@ describe('markdown references', () => {
         });
     });
 
+    it('does not detect the active [[ query when editor assist is disabled', () => {
+        const value = 'Link to [[la';
+        expect(
+            getActiveMarkdownReferenceQuery(value, { start: value.length, end: value.length }, { assist: false }),
+        ).toBeNull();
+    });
+
     it('inserts a stable markdown reference token', () => {
         const value = 'Link to [[la';
         const activeQuery = getActiveMarkdownReferenceQuery(value, { start: value.length, end: value.length });

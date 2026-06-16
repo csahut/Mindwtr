@@ -21,6 +21,8 @@ import {
     applyMarkdownKeyboardShortcut,
     applyMarkdownToolbarAction,
     continueMarkdownOnTextChange,
+    isMarkdownEditorAssistEnabled,
+    useTaskStore,
     type MarkdownSelection,
     type MarkdownToolbarActionId,
     type MarkdownToolbarResult,
@@ -322,11 +324,13 @@ export function ExpandedMarkdownEditor({
         const currentSelection = selectionRef.current;
         const previousValue = valueRef.current;
         const fallbackSelection = lastRangeSelectionRef.current;
+        const assistEnabled = isMarkdownEditorAssistEnabled(useTaskStore.getState().settings);
         const pastedUrl = applyMarkdownUrlPasteWithSelectionFallback(
             previousValue,
             nextValue,
             currentSelection,
             fallbackSelection,
+            { assist: assistEnabled },
         );
         if (pastedUrl) {
             valueRef.current = pastedUrl.result.value;
@@ -345,6 +349,7 @@ export function ExpandedMarkdownEditor({
             nextValue,
             selectionRef.current,
             fallbackSelection,
+            { assist: assistEnabled },
         );
         if (pairedInsertion) {
             valueRef.current = pairedInsertion.result.value;
@@ -362,6 +367,7 @@ export function ExpandedMarkdownEditor({
             valueRef.current,
             nextValue,
             selectionRef.current,
+            { assist: assistEnabled },
         );
         if (continued) {
             lastRangeSelectionRef.current = null;
@@ -381,11 +387,13 @@ export function ExpandedMarkdownEditor({
         onChange(nextValue);
     }, [onChange, onSelectionChange, restoreEditorFocus]);
     const handleKeyPress = React.useCallback((event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+        const assistEnabled = isMarkdownEditorAssistEnabled(useTaskStore.getState().settings);
         const pairedInsertion = applyMarkdownPairKeyPressWithSelectionFallback(
             valueRef.current,
             event.nativeEvent.key,
             selectionRef.current,
             lastRangeSelectionRef.current,
+            { assist: assistEnabled },
         );
         if (pairedInsertion) {
             event.preventDefault?.();

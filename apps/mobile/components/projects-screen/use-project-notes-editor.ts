@@ -3,7 +3,9 @@ import { TextInput } from 'react-native';
 import {
   applyMarkdownToolbarAction,
   continueMarkdownOnTextChange,
+  isMarkdownEditorAssistEnabled,
   resolveAutoTextDirection,
+  useTaskStore,
   type MarkdownSelection,
   type MarkdownToolbarActionId,
   type MarkdownToolbarResult,
@@ -131,10 +133,12 @@ export function useProjectNotesEditor({
   }, []);
 
   const handleSelectedProjectNotesChange = useCallback((text: string) => {
+    const assistEnabled = isMarkdownEditorAssistEnabled(useTaskStore.getState().settings);
     const continued = continueMarkdownOnTextChange(
       selectedProjectNotesRef.current,
       text,
       selectedProjectNotesSelectionRef.current,
+      { assist: assistEnabled },
     );
     if (continued) {
       applySelectedProjectNotesValue(continued.value, {
