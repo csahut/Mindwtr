@@ -39,6 +39,7 @@ import {
     applyMarkdownPairInsertionWithSelectionFallback,
     applyMarkdownUrlPasteWithSelectionFallback,
     createIgnoredNativePairChange,
+    shouldIgnoreNativePairKeyPress,
     shouldIgnoreNativePairChange,
     type IgnoredNativePairChange,
     isRangeSelection,
@@ -387,6 +388,17 @@ export function ExpandedMarkdownEditor({
         onChange(nextValue);
     }, [onChange, onSelectionChange, restoreEditorFocus]);
     const handleKeyPress = React.useCallback((event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+        const ignoredNativeChange = ignoredNativePairChangeRef.current;
+        if (
+            ignoredNativeChange
+            && shouldIgnoreNativePairKeyPress(event.nativeEvent.key, valueRef.current, ignoredNativeChange)
+        ) {
+            ignoredNativeChange.duplicateKeyPressHandled = true;
+            event.preventDefault?.();
+            restoreEditorFocus(ignoredNativeChange.selection);
+            return;
+        }
+
         const assistEnabled = isMarkdownEditorAssistEnabled(useTaskStore.getState().settings);
         const pairedInsertion = applyMarkdownPairKeyPressWithSelectionFallback(
             valueRef.current,

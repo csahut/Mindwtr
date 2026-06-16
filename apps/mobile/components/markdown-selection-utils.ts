@@ -16,6 +16,7 @@ export type IgnoredNativePairChange = {
     duplicateNativeValues: string[];
     appliedValue: string;
     selection: MarkdownSelection;
+    duplicateKeyPressHandled?: boolean;
 };
 
 export const isRangeSelection = (selection: MarkdownSelection | null | undefined): selection is MarkdownSelection => (
@@ -61,6 +62,18 @@ export const shouldIgnoreNativePairChange = (
         || ignoredChange.duplicateNativeValues.includes(nextValue)
     )
 );
+
+export const shouldIgnoreNativePairKeyPress = (
+    key: string,
+    currentValue: string,
+    ignoredChange: IgnoredNativePairChange,
+): boolean => {
+    if (ignoredChange.duplicateKeyPressHandled) return false;
+    if (currentValue !== ignoredChange.appliedValue) return false;
+
+    const duplicateKeyPressValue = replaceSelectionWithText(currentValue, ignoredChange.selection, key);
+    return ignoredChange.duplicateNativeValues.includes(duplicateKeyPressValue);
+};
 
 const getSelectionCandidates = (
     primarySelection: MarkdownSelection,

@@ -24,6 +24,7 @@ import {
     applyMarkdownPairInsertionWithSelectionFallback,
     applyMarkdownPairKeyPressWithSelectionFallback,
     createIgnoredNativePairChange,
+    shouldIgnoreNativePairKeyPress,
     shouldIgnoreNativePairChange,
     type IgnoredNativePairChange,
     isRangeSelection,
@@ -266,6 +267,17 @@ export function TaskEditContentField({
         event: NativeSyntheticEvent<TextInputKeyPressEventData>,
     ) => {
         const previousValue = checklistTitleRefs.current[key] ?? '';
+        const ignoredNativeChange = ignoredNativePairChangeRefs.current[key];
+        if (
+            ignoredNativeChange
+            && shouldIgnoreNativePairKeyPress(event.nativeEvent.key, previousValue, ignoredNativeChange)
+        ) {
+            ignoredNativeChange.duplicateKeyPressHandled = true;
+            event.preventDefault?.();
+            restoreChecklistSelection(key, ignoredNativeChange.selection);
+            return;
+        }
+
         const pairedInsertion = applyMarkdownPairKeyPressWithSelectionFallback(
             previousValue,
             event.nativeEvent.key,

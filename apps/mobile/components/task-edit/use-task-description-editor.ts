@@ -17,6 +17,7 @@ import {
     applyMarkdownPairInsertionWithSelectionFallback,
     applyMarkdownUrlPasteWithSelectionFallback,
     createIgnoredNativePairChange,
+    shouldIgnoreNativePairKeyPress,
     shouldIgnoreNativePairChange,
     type IgnoredNativePairChange,
     isRangeSelection,
@@ -260,6 +261,17 @@ export function useTaskDescriptionEditor({
     }, [applyDescriptionValue, descriptionDraftRef, restoreDescriptionSelection]);
 
     const handleDescriptionKeyPress = React.useCallback((event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+        const ignoredNativeChange = ignoredNativePairChangeRef.current;
+        if (
+            ignoredNativeChange
+            && shouldIgnoreNativePairKeyPress(event.nativeEvent.key, descriptionDraftRef.current, ignoredNativeChange)
+        ) {
+            ignoredNativeChange.duplicateKeyPressHandled = true;
+            event.preventDefault?.();
+            restoreDescriptionSelection(ignoredNativeChange.selection);
+            return;
+        }
+
         const assistEnabled = isMarkdownEditorAssistEnabled(useTaskStore.getState().settings);
         const pairedInsertion = applyMarkdownPairKeyPressWithSelectionFallback(
             descriptionDraftRef.current,

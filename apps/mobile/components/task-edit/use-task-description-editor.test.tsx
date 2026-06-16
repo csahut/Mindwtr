@@ -89,6 +89,47 @@ describe('useTaskDescriptionEditor', () => {
     });
   });
 
+  it('ignores duplicate Android key press echoes before stale native changes arrive', () => {
+    const expose = React.createRef<HarnessApi | null>();
+    let tree!: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<DescriptionEditorHarness expose={expose} />);
+    });
+
+    const firstPreventDefault = vi.fn();
+    act(() => {
+      expose.current!.editor.handleDescriptionKeyPress({
+        nativeEvent: { key: '[' },
+        preventDefault: firstPreventDefault,
+      } as any);
+    });
+
+    expect(firstPreventDefault).toHaveBeenCalled();
+    expect(expose.current!.draft).toBe('[]');
+
+    const duplicatePreventDefault = vi.fn();
+    act(() => {
+      expose.current!.editor.handleDescriptionKeyPress({
+        nativeEvent: { key: '[' },
+        preventDefault: duplicatePreventDefault,
+      } as any);
+    });
+
+    expect(duplicatePreventDefault).toHaveBeenCalled();
+    expect(expose.current!.draft).toBe('[]');
+
+    act(() => {
+      expose.current!.editor.handleDescriptionChange('[[]]');
+    });
+
+    expect(expose.current!.draft).toBe('[]');
+
+    act(() => {
+      tree.unmount();
+    });
+  });
+
   it('types plain text without auto-pairing when editor assist is disabled', () => {
     useTaskStore.setState({ settings: { markdownEditorAssist: false } });
     const expose = React.createRef<HarnessApi | null>();
