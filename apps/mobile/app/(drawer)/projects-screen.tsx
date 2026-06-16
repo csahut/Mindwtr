@@ -7,6 +7,14 @@ import { AREA_PRESET_COLORS, Attachment, DEFAULT_PROJECT_COLOR, Project, shallow
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react-native';
 
+import {
+  DEFAULT_PROJECT_LIST_VIEW_STATE,
+  PROJECT_LIST_VIEW_STATE_STORAGE_KEY,
+  type ProjectListViewState,
+  compactCollapsedAreas,
+  readProjectListViewState,
+  serializeProjectListViewState,
+} from '@/lib/view-state/project-list-view-state';
 import { projectsScreenStyles as styles } from '@/components/projects-screen/projects-screen.styles';
 import {
   buildProjectQuickCaptureReturnTo,
@@ -41,61 +49,6 @@ import { openContextsScreen, openProjectScreen } from '@/lib/task-meta-navigatio
 type ProjectTaskSortBy = TaskSortBy;
 const EMPTY_PROJECT_TASKS: Task[] = [];
 const COMPACT_PROJECT_TEXT_MAX_SCALE = 1.2;
-const PROJECT_LIST_VIEW_STATE_STORAGE_KEY = 'mindwtr:view:projects:v1';
-
-type ProjectListViewState = {
-  collapsedAreas: Record<string, boolean>;
-  showArchivedProjects: boolean;
-  showDeferredProjects: boolean;
-};
-
-const DEFAULT_PROJECT_LIST_VIEW_STATE: ProjectListViewState = {
-  collapsedAreas: {},
-  showArchivedProjects: false,
-  showDeferredProjects: false,
-};
-
-function compactCollapsedAreas(collapsedAreas: Record<string, boolean>): Record<string, boolean> {
-  return Object.fromEntries(
-    Object.entries(collapsedAreas).filter(([areaId, collapsed]) => (
-      areaId.trim().length > 0 && collapsed === true
-    ))
-  );
-}
-
-function readProjectListViewState(raw: string | null): ProjectListViewState | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<ProjectListViewState>;
-    const collapsedAreas = parsed.collapsedAreas && typeof parsed.collapsedAreas === 'object' && !Array.isArray(parsed.collapsedAreas)
-      ? Object.fromEntries(
-        Object.entries(parsed.collapsedAreas).filter(([areaId, collapsed]) => (
-          typeof areaId === 'string' && areaId.trim().length > 0 && collapsed === true
-        ))
-      )
-      : {};
-    return {
-      collapsedAreas,
-      showArchivedProjects: typeof parsed.showArchivedProjects === 'boolean'
-        ? parsed.showArchivedProjects
-        : DEFAULT_PROJECT_LIST_VIEW_STATE.showArchivedProjects,
-      showDeferredProjects: typeof parsed.showDeferredProjects === 'boolean'
-        ? parsed.showDeferredProjects
-        : DEFAULT_PROJECT_LIST_VIEW_STATE.showDeferredProjects,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function serializeProjectListViewState(state: ProjectListViewState): string {
-  return JSON.stringify({
-    collapsedAreas: compactCollapsedAreas(state.collapsedAreas),
-    showArchivedProjects: state.showArchivedProjects,
-    showDeferredProjects: state.showDeferredProjects,
-  });
-}
-
 function resolveTaskRouteTab(value?: string | string[]): TaskEditTab {
   const routeValue = Array.isArray(value) ? value[0] : value;
   return routeValue === 'task' ? 'task' : 'view';
@@ -188,6 +141,7 @@ export default function ProjectsScreen() {
   const [selectedTagFilter, setSelectedTagFilter] = useState(ALL_TAGS);
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [collapsedAreas, setCollapsedAreas] = useState<Record<string, boolean>>({});
+  const [projectListViewStateHydrated, setProjectListViewStateHydrated] = useState(false);
   const [showDeferredProjects, setShowDeferredProjects] = useState(false);
   const [showArchivedProjects, setShowArchivedProjects] = useState(false);
   const [showCompletedProjectTasks, setShowCompletedProjectTasks] = useState(false);
@@ -297,12 +251,20 @@ export default function ProjectsScreen() {
     let active = true;
     AsyncStorage.getItem(PROJECT_LIST_VIEW_STATE_STORAGE_KEY)
       .then((raw) => {
-        if (!active || projectListViewStateTouchedRef.current) return;
-        const persisted = readProjectListViewState(raw);
-        if (!persisted) return;
-        applyProjectListViewState(persisted);
+        if (!active) return;
+        if (!projectListViewStateTouchedRef.current) {
+          const persisted = readProjectListViewState(raw);
+          if (persisted) {
+            applyProjectListViewState(persisted);
+          }
+        }
+        setProjectListViewStateHydrated(true);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (active) {
+          setProjectListViewStateHydrated(true);
+        }
+      });
     return () => {
       active = false;
     };
@@ -328,21 +290,25 @@ export default function ProjectsScreen() {
     logProjectError,
   });
 
-  const projectListRows = useMemo(() => buildProjectListRows({
+  const projectListRows = useMemo(() => {
+    if (!projectListViewStateHydrated) return [];
+    return buildProjectListRows({
+      areaById,
+      collapsedAreas,
+      groupedActiveProjects,
+      groupedArchivedProjects,
+      groupedDeferredProjects,
+      showArchivedProjects,
+      showDeferredProjects,
+      t,
+    });
+  }, [
     areaById,
     collapsedAreas,
     groupedActiveProjects,
     groupedArchivedProjects,
     groupedDeferredProjects,
-    showArchivedProjects,
-    showDeferredProjects,
-    t,
-  }), [
-    areaById,
-    collapsedAreas,
-    groupedActiveProjects,
-    groupedArchivedProjects,
-    groupedDeferredProjects,
+    projectListViewStateHydrated,
     showArchivedProjects,
     showDeferredProjects,
     t,

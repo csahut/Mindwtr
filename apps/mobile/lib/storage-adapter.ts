@@ -1,6 +1,7 @@
 import { AppData, SqliteAdapter, searchAll, type SqliteClient, type CalendarSyncEntry, StorageAdapter, type Task } from '@mindwtr/core';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { WIDGET_DATA_KEY } from './widget-data';
 import { updateMobileWidgetFromData } from './widget-service';
@@ -8,6 +9,8 @@ import { logError, logWarn } from './app-log';
 import { markStartupPhase, measureStartupPhase } from './startup-profiler';
 
 const DATA_KEY = WIDGET_DATA_KEY;
+const STARTUP_BACKUP_VERSION_KEY = `${DATA_KEY}:startup-backup-version`;
+const STARTUP_BACKUP_VERSION = '2';
 const LEGACY_DATA_KEYS = ['focus-gtd-data', 'gtd-todo-data', 'gtd-data'];
 const EMPTY_APP_DATA: AppData = { tasks: [], projects: [], sections: [], areas: [], people: [], settings: {} };
 const SQLITE_STARTUP_TIMEOUT_MS = 3_500;
@@ -253,8 +256,21 @@ const parseStoredAppDataJson = (jsonValue: string): AppData => (
     normalizeStoredAppData(JSON.parse(jsonValue) as AppData)
 );
 
+const saveStartupJsonBackup = async (AsyncStorage: any, data: AppData, phasePrefix: string): Promise<void> => {
+    const jsonValue = await measureStartupPhase(`${phasePrefix}.json_backup_stringify`, async () => JSON.stringify(data));
+    await measureStartupPhase(`${phasePrefix}.json_backup_set`, async () =>
+        AsyncStorage.setItem(DATA_KEY, jsonValue)
+    );
+    await measureStartupPhase(`${phasePrefix}.json_backup_version_set`, async () =>
+        AsyncStorage.setItem(STARTUP_BACKUP_VERSION_KEY, STARTUP_BACKUP_VERSION)
+    );
+};
+
 export const getMobileStartupSnapshotFromBackup = async (): Promise<AppData | null> => {
-    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    const backupVersion = await AsyncStorage.getItem(STARTUP_BACKUP_VERSION_KEY);
+    if (backupVersion !== STARTUP_BACKUP_VERSION) {
+        return null;
+    }
     const jsonValue = await getLegacyJson(AsyncStorage);
     if (jsonValue == null) {
         return null;
@@ -269,7 +285,6 @@ export const getMobileStartupSnapshotFromBackup = async (): Promise<AppData | nu
 
 const initSqliteState = async (): Promise<SqliteState> => {
     markStartupPhase('mobile.storage.sqlite_init.start');
-    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     let client = await measureStartupPhase('mobile.storage.sqlite_init.create_client', async () => createSqliteClient());
     let adapter = new SqliteAdapter(client);
     try {
@@ -302,9 +317,7 @@ const initSqliteState = async (): Promise<SqliteState> => {
                 const data = JSON.parse(jsonValue) as AppData;
                 data.areas = Array.isArray(data.areas) ? data.areas : [];
                 // Ensure JSON backup is updated before SQLite migration so fallback stays consistent.
-                await measureStartupPhase('mobile.storage.sqlite_init.migrate_json_backup_set', async () =>
-                    AsyncStorage.setItem(DATA_KEY, JSON.stringify(data))
-                );
+                await saveStartupJsonBackup(AsyncStorage, data, 'mobile.storage.sqlite_init.migrate');
                 await measureStartupPhase('mobile.storage.sqlite_init.migrate_json_to_sqlite', async () => adapter.saveData(data));
             } catch (error) {
                 logStorageWarn('[Storage] Failed to migrate JSON data to SQLite', error);
@@ -384,7 +397,6 @@ const createStorage = (): StorageAdapter => {
     }
 
     // Native platforms - use SQLite with AsyncStorage backup for widgets/rollback.
-    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     const shouldUseSqlite = Constants.appOwnership !== 'expo';
 
     return {
@@ -439,6 +451,9 @@ const createStorage = (): StorageAdapter => {
                     )
                 );
                 data.areas = Array.isArray(data.areas) ? data.areas : [];
+                saveStartupJsonBackup(AsyncStorage, data, 'mobile.storage.get_data').catch((error) => {
+                    logStorageWarn('[Storage] Failed to refresh startup JSON backup from SQLite load', error);
+                });
                 updateMobileWidgetFromData(data).catch((error) => {
                     logStorageWarn('[Widgets] Failed to update mobile widget from storage load', error);
                 });
@@ -477,10 +492,7 @@ const createStorage = (): StorageAdapter => {
                     }
                 }
                 try {
-                    const jsonValue = await measureStartupPhase('mobile.storage.save_data.json_stringify', async () => JSON.stringify(data));
-                    await measureStartupPhase('mobile.storage.save_data.asyncstorage_set', async () =>
-                        AsyncStorage.setItem(DATA_KEY, jsonValue)
-                    );
+                    await saveStartupJsonBackup(AsyncStorage, data, 'mobile.storage.save_data');
                     await measureStartupPhase('mobile.storage.save_data.widget_update', async () => updateMobileWidgetFromData(data));
                     markStartupPhase('mobile.storage.save_data.end');
                 } catch (e) {
@@ -500,6 +512,7 @@ const createStorage = (): StorageAdapter => {
                     await measureStartupPhase('mobile.storage.save_task.sqlite_write', async () => adapter.saveTask(task));
                     clearPreferJsonBackup();
                     if (snapshot) {
+                        await saveStartupJsonBackup(AsyncStorage, snapshot, 'mobile.storage.save_task');
                         await measureStartupPhase('mobile.storage.save_task.widget_update', async () => updateMobileWidgetFromData(snapshot));
                     }
                 } catch (error) {
@@ -510,10 +523,7 @@ const createStorage = (): StorageAdapter => {
                     }
 
                     try {
-                        const jsonValue = await measureStartupPhase('mobile.storage.save_task.json_fallback_stringify', async () => JSON.stringify(snapshot));
-                        await measureStartupPhase('mobile.storage.save_task.json_fallback_set', async () =>
-                            AsyncStorage.setItem(DATA_KEY, jsonValue)
-                        );
+                        await saveStartupJsonBackup(AsyncStorage, snapshot, 'mobile.storage.save_task.json_fallback');
                         await measureStartupPhase('mobile.storage.save_task.json_fallback_widget_update', async () =>
                             updateMobileWidgetFromData(snapshot)
                         );
@@ -602,6 +612,18 @@ const createStorage = (): StorageAdapter => {
 };
 
 export const mobileStorage = createStorage();
+
+export const __mobileStorageTestUtils = {
+    reset: () => {
+        saveQueue = Promise.resolve();
+        sqliteStatePromise = null;
+        clearPreferJsonBackup();
+    },
+    setSqliteStateForTests: (state: { adapter: Pick<SqliteAdapter, 'saveTask'>; client: Partial<SqliteClient> }) => {
+        sqliteStatePromise = Promise.resolve(state as SqliteState);
+        clearPreferJsonBackup();
+    },
+};
 
 // MARK: - Calendar Sync SQLite helpers
 
