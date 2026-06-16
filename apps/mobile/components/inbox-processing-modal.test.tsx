@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -75,6 +75,13 @@ const setPlatform = (os: typeof Platform.OS) => {
     configurable: true,
     value: os,
   });
+};
+
+const flattenStyle = (style: unknown): Record<string, any> => {
+  if (Array.isArray(style)) {
+    return style.reduce<Record<string, any>>((acc, item) => Object.assign(acc, flattenStyle(item)), {});
+  }
+  return style && typeof style === 'object' ? (style as Record<string, any>) : {};
 };
 
 vi.mock('@mindwtr/core', () => {
@@ -344,6 +351,39 @@ describe('InboxProcessingModal', () => {
     expect(processingScroll.props.automaticallyAdjustKeyboardInsets).toBe(true);
     expect(processingScroll.props.keyboardDismissMode).toBe('interactive');
     expect(processingScroll.props.keyboardShouldPersistTaps).toBe('handled');
+  });
+
+  it('lifts the Android processing form by the measured keyboard inset instead of resizing', () => {
+    setPlatform('android');
+    const listeners = new Map<string, (event?: any) => void>();
+    const addListener = vi.spyOn(Keyboard, 'addListener').mockImplementation((event: string, callback: any) => {
+      listeners.set(event, callback);
+      return { remove: vi.fn() } as any;
+    });
+    const onClose = vi.fn();
+    let tree: ReturnType<typeof create>;
+
+    act(() => {
+      tree = create(<InboxProcessingModal visible onClose={onClose} />);
+    });
+
+    expect(addListener).toHaveBeenCalledWith('keyboardDidShow', expect.any(Function));
+    expect(addListener).toHaveBeenCalledWith('keyboardDidChangeFrame', expect.any(Function));
+    expect(addListener).toHaveBeenCalledWith('keyboardDidHide', expect.any(Function));
+
+    act(() => {
+      listeners.get('keyboardDidShow')?.({ endCoordinates: { height: 280 } });
+    });
+
+    const keyboardAvoidingView = tree!.root.findByType(KeyboardAvoidingView);
+    expect(keyboardAvoidingView.props.behavior).toBeUndefined();
+    expect(flattenStyle(keyboardAvoidingView.props.style).paddingBottom).toBe(280);
+
+    act(() => {
+      listeners.get('keyboardDidHide')?.();
+    });
+
+    expect(flattenStyle(tree!.root.findByType(KeyboardAvoidingView).props.style).paddingBottom).toBeUndefined();
   });
 
   it('replaces the header next action with skip and saves edits before advancing', () => {
