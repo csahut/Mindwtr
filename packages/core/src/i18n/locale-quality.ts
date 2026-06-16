@@ -31,7 +31,6 @@ export const allowedEnglishMirrorTerms = [
     'Vim',
     'Emacs',
     'Nord',
-    'Tags',
 ] as const;
 
 export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]> = {
@@ -57,7 +56,10 @@ export const allowedEnglishMirrorKeysByLocale: Record<string, readonly string[]>
         'settings.syncHistoryType',
         'settings.version',
         'tab.menu',
+        'tags.title',
+        'task.aria.tags',
         'taskEdit.descriptionLabel',
+        'taskEdit.tagsLabel',
     ],
 };
 

@@ -169,7 +169,7 @@ export const frOverrides: Record<string, string> = {
         'taskEdit.duplicateDoneTitle': 'Tâche dupliquée',
         'taskEdit.duplicateDoneBody': 'Une nouvelle copie a été créée dans la boîte de réception.',
         'taskEdit.aiClarify': 'Clarifier avec l’IA',
-        'taskEdit.aiBreakdown': ' Décomposer avec l’IA',
+        'taskEdit.aiBreakdown': 'Décomposer avec l’IA',
         'taskEdit.itemNamePlaceholder': 'Nom de l’élément',
         'taskEdit.titleLabel': 'Titre',
         'taskEdit.statusLabel': 'Statut',
